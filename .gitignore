@@ -216,3 +216,16 @@ __marimo__/
 
 # Streamlit
 .streamlit/secrets.toml
+
+# Project specific ignored files and directories
+data/raw/
+data/processed/
+data/output/
+
+*.dcm
+*.nii
+*.nii.gz
+
+__pycache__/
+.venv/
+.env
