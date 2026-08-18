@@ -18,7 +18,9 @@ Automatizar la carga, validación, conversión, procesamiento, anonimización, e
 
 ## Requisitos funcionales y no funcionales.
 
-Estos se encuentran en el siguiente **[enlace.](/docs/requierments/functional_requierments.md)**
+Estos se encuentran en los siguientes enlaces:
+- **[Requisitos Funcionales](/docs/requierments/functional_requierments.md)**
+- **[Requisitos No Funcionales](/docs/requierments/non_functional_requirements.md)**
 
 ## Estado
 
@@ -41,6 +43,12 @@ Automate loading, validation, convertion, processing, anonymization, labeling an
 - NiBabel
 - NumPy
 - SciPy
+
+## Functional and non functional requierements
+
+These are found on the following links:
+- **[Functional Requirements (ESP)](/docs/requierments/functional_requierments.md)**
+- **[Non Functional Requirements (ESP)](/docs/requierments/non_functional_requirements.md)**
 
 ## Status
 
