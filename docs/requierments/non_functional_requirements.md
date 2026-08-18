@@ -1,3 +1,7 @@
+# Requisitos no funcionales
+
+Estos requisitos establecen las características de calidad y las condiciones bajo las cuales debe funcionar el sistema.
+
 | Requisito | Descripción | Categoría |
 | :---: | :---: | :---: |
 | RNF01 | El sistema debe procesar los estudios MRI de acuerdo con los tiempos de ejecución establecidos durante las pruebas del proyecto. | Rendimiento |
@@ -12,3 +16,4 @@
 | RNF10 | El proyecto debe incluir documentación técnica y de usuario que describa la instalación, configuración, ejecución, arquitectura y funcionalidades principales del sistema. | Documentación |
 | RNF11 | El sistema debe registrar las configuraciones y transformaciones aplicadas durante el procesamiento para permitir reproducir el proceso sobre los mismos datos y parámetros. | Reproducibilidad |
 | RNF12 | El sistema debe priorizar el uso de tecnologías y bibliotecas de código abierto compatibles con el carácter académico del proyecto. | Licenciamiento |
+---

@@ -1,6 +1,6 @@
 # Requisitos funcionales
 
-Este es el resúmen de los requsitos funcionales, que son obligatorios para el correcto funcionamiento del sistema.
+Estos requisitos son obligatorios para el correcto funcionamiento del sistema.
 
 | Requisito | Descripción | Categoría |
 | :---: | :---: | :---: |
