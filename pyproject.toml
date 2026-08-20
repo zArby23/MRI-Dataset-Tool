@@ -1,0 +1,18 @@
+[build-system]
+requires = ["setuptools>=61"]
+build-backend = "setuptools.build_meta"
+
+[project]
+name = "mri-dataset-tool"
+version = "0.1.0"
+description = "Tool for preparing MRI datasets for machine learning"
+requires-python = ">=3.14"
+dependencies = [
+    "pydicom>=3.0",
+    "nibabel>=5.0",
+    "numpy>=2.0",
+    "scipy>=1.0"
+]
+
+[tool.setuptools.packages.find]
+where = ["src"]
