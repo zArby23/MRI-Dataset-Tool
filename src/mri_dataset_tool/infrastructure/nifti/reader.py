@@ -2,7 +2,6 @@ from pathlib import Path
 from typing import Any
 
 import nibabel as nib
-import numpy as np
 from nibabel.filebasedimages import ImageFileError
 
 from mri_dataset_tool.domain.models.serie import MRISeries
