@@ -51,10 +51,15 @@ python --version
    .venv\Scripts\activate.bat
    ```
 
-   Linux o macOS:
+   Linux o macOS (usando Bash):
 
    ```bash
    source .venv/bin/activate
+   ```
+
+   Linux (usando Fish):
+   ```bash
+   source .venv/bin/activate.fish
    ```
 
 4. Instala el proyecto y las dependencias de desarrollo:
@@ -135,11 +140,15 @@ python --version
    .venv\Scripts\activate.bat
    ```
 
-   Linux or macOS:
+   Linux or macOS (using Bash):
 
    ```bash
    source .venv/bin/activate
    ```
+
+   Linux (using Fish):
+   ```bash
+   source .venv/bin/activate.fish
 
 4. Install the project and development dependencies:
 
