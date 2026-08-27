@@ -229,3 +229,5 @@ data/output/
 __pycache__/
 .venv/
 .env
+MEMORY.md
+CHAT_CONTEXT.md
