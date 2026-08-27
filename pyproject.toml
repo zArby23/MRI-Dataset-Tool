@@ -14,5 +14,10 @@ dependencies = [
     "scipy>=1.0"
 ]
 
+[project.optional-dependencies]
+dev = [
+    "pytest>=9.1"
+]
+
 [tool.setuptools.packages.find]
 where = ["src"]
