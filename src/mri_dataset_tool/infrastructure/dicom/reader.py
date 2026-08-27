@@ -23,7 +23,7 @@ class DICOMReader:
         
         if not directory.exists():
             raise FileNotFoundError(
-                f"Path is doesn't exist: {directory}"
+                f"Path doesn't exist: {directory}"
             )
         
         if not directory.is_dir():
