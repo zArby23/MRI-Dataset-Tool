@@ -1,164 +1,69 @@
 from pathlib import Path
-from typing import Any
 
-import pydicom
-from pydicom.dataset import Dataset
 from pydicom.errors import InvalidDicomError
 
-from mri_dataset_tool.domain.models.serie import MRISeries
 from mri_dataset_tool.domain.models.study import MRIStudy
+from mri_dataset_tool.infrastructure.dicom._study_assembler import (
+    DICOMInstanceHeader,
+    assemble_study,
+    read_dicom_header,
+)
 from mri_dataset_tool.infrastructure.logging.logger import get_logger
 
 logger = get_logger(__name__)
 
 
 class DICOMReader:
+    """Load one DICOM study from the direct files of a directory."""
+
     def load_study(self, directory: Path) -> MRIStudy:
-        """
-        Load a DICOM study from a directory.
-        
-        All valid DICOM files are read, grouped by StudyInstanceUID
-        and SeriesInstanceUID, and converted into an MRIStudy object.
-        """
-        
         if not directory.exists():
-            raise FileNotFoundError(
-                f"Path doesn't exist: {directory}"
-            )
-        
+            raise FileNotFoundError(f"Path doesn't exist: {directory}")
         if not directory.is_dir():
-            raise NotADirectoryError(
-                f"Path is not a directory: {directory}"
-            )
-        
-        logger.info("Loading DICOM study from %s", directory)
-        
-        datasets: list[tuple[Path, Dataset]] = []
-        
-        for file_path in directory.iterdir():
-            
-            if not file_path.is_file():
+            raise NotADirectoryError(f"Path is not a directory: {directory}")
+
+        headers: list[DICOMInstanceHeader] = []
+        invalid_file_count = 0
+        unreadable_file_count = 0
+
+        for path in directory.iterdir():
+            if not path.is_file():
                 continue
-            
             try:
-                dataset = pydicom.dcmread(file_path)
-                
+                headers.append(read_dicom_header(path))
             except InvalidDicomError:
-                logger.warning(
-                    "file is not a valid DICOM file: %s",
-                    file_path
-                )
-                continue
-            
-            datasets.append(
-                (file_path, dataset)
-            )
-        
-        if not datasets:
-            raise ValueError(
-                f"No DICOM files were found in directory: {directory}"
-            )
-            
-        logger.info(
-            "Found %d valid DICOM files", len(datasets)
-        )
-        
-        study_uids = {
-            dataset.get("StudyInstanceUID")
-            for _, dataset in datasets
-        }
-        
-        study_uids.discard(None)
-        
-        if len(study_uids) > 1:
-            raise ValueError(
-                f"Multiple studies found in directory: {directory}"
-            )
-        
+                invalid_file_count += 1
+            except (OSError, EOFError):
+                unreadable_file_count += 1
+
+        if not headers:
+            raise ValueError(f"No DICOM files were found in directory: {directory}")
+
+        headers_with_study_uid = [
+            header for header in headers if header.study_uid is not None
+        ]
+        study_uids = {header.study_uid for header in headers_with_study_uid}
         if not study_uids:
-            raise ValueError(
-                "No DICOM files with StudyInstanceUID were found."
-            )
+            raise ValueError("No DICOM files with StudyInstanceUID were found.")
+        if len(study_uids) > 1:
+            raise ValueError(f"Multiple studies found in directory: {directory}")
 
         study_uid = study_uids.pop()
-        
-        series_groups: dict[str, list[tuple[Path, Dataset]]] = {}
-        
-        for file_path, dataset in datasets:
-            series_uid = dataset.get("SeriesInstanceUID")
-            
-            if series_uid is None:
-                logger.warning(
-                    "Skipping DICOM file without SeriesInstanceUID: %s",
-                    file_path
-                )
-                continue
-            
-            series_groups.setdefault(
-                series_uid,
-                []
-            ).append(
-                (file_path, dataset)
-            )
-        
-        if not series_groups:
-            raise ValueError(
-                "No valid DICOM series found."
-            )
-        
-        series = []
-        
-        for series_uid, instances in series_groups.items():
-            dataset = instances[0][1]
-            
-            modality = dataset.get(
-                "Modality",
-                "Unknown"
-                )
-            
-            files = [
-                file_path
-                for file_path, _ in instances
-            ]
-            
-            metadata = self._extract_series_metadata(
-                dataset
-            )
-            
-            series.append(
-                MRISeries(
-                    series_uid=series_uid,
-                    modality=modality,
-                    files=files,
-                    metadata=metadata
-                )
-            )
-            
-            logger.info(
-                "Loaded series %s with %d instances",
-                series_uid,
-                len(files)
-            )
-        
-        return MRIStudy(
-            study_uid=study_uid,
-            series=series
+        valid_headers = [
+            header
+            for header in headers_with_study_uid
+            if header.series_uid is not None
+        ]
+        if not valid_headers:
+            raise ValueError("No valid DICOM series found.")
+
+        study = assemble_study(study_uid, valid_headers)
+        logger.info(
+            "Loaded one DICOM study with %d series. Invalid files: %d; "
+            "unreadable files: %d; missing study or series UID: %d.",
+            len(study.series),
+            invalid_file_count,
+            unreadable_file_count,
+            len(headers) - len(valid_headers),
         )
-    
-    def _extract_series_metadata(
-        self,
-        dataset: Dataset
-        ) -> dict[str, Any]:
-        """
-        Extract metadata required by the application
-        from a representative DICOM instance.
-        """
-        
-        return {
-            "rows": dataset.get("Rows"),
-            "columns": dataset.get("Columns"),
-            "pixel_spacing": dataset.get("PixelSpacing"),
-            "slice_thickness": dataset.get("SliceThickness"),
-            "spacing_between_slices": dataset.get("SpacingBetweenSlices"),
-            "image_orientation": dataset.get("ImageOrientationPatient")
-        }
+        return study
