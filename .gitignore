@@ -232,5 +232,6 @@ __pycache__/
 .vscode/
 MEMORY.md
 CHAT_CONTEXT.md
+tasks/
 
 graphify-out/
