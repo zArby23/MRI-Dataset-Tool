@@ -26,6 +26,7 @@ def test_task_bold():
         "ses-01_T1w.nii.gz",
         "sub-01_ses-01_acq_T1w.nii",  # entity without value
         "sub-_T1w.nii",
+        "ses-01_sub-01_T1w.nii",  # sub- not first
         "sub-01_ses-01_ses-02_T1w.nii",
         "sub-01_a-b-c_T1w.nii",
         "sub-01_ses-01.nii",  # no suffix
