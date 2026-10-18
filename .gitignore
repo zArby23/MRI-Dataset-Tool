@@ -230,8 +230,12 @@ __pycache__/
 .venv/
 .env
 .vscode/
+
+# AI Related files
 MEMORY.md
 CHAT_CONTEXT.md
 tasks/
+CLAUDE.md
+.claude/
 
 graphify-out/
