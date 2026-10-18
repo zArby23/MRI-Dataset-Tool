@@ -45,6 +45,10 @@ class NIfTIBatchReader:
         for path in sorted(directory.rglob("*")):
             if not path.is_file() or not is_nifti_file(path):
                 continue
+            # Hidden components (.git, .datalad...) are skipped silently; only those
+            # below the given root count, so the root itself may live under a hidden dir.
+            if any(part.startswith(".") for part in path.relative_to(directory).parts):
+                continue
 
             try:
                 study = self._reader.load_study(path)

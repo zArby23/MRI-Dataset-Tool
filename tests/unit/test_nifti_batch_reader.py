@@ -88,3 +88,39 @@ def test_failing_callback_does_not_stop_batch_or_leak_paths(
     assert len(studies) == 2
     assert "RuntimeError" in caplog.text
     assert "bad1" not in caplog.text
+
+
+def _tiny_nifti(path: Path) -> None:
+    path.parent.mkdir(parents=True, exist_ok=True)
+    nib.save(nib.Nifti1Image(np.zeros((2, 2, 2), dtype=np.int16), np.eye(4)), path)
+
+
+def test_hidden_directories_are_ignored_silently(tmp_path: Path) -> None:
+    _tiny_nifti(tmp_path / "ok.nii.gz")
+    for hidden in (".git", ".datalad"):
+        (tmp_path / hidden / "objects").mkdir(parents=True)
+        (tmp_path / hidden / "objects" / "SHA256E-s1--abc.nii.gz").write_bytes(b"annex")
+    calls: list[Path] = []
+
+    studies = NIfTIBatchReader().load_studies(tmp_path, on_error=lambda p, e: calls.append(p))
+
+    assert [s.series[0].files[0].name for s in studies] == ["ok.nii.gz"]
+    assert calls == []
+
+
+def test_only_hidden_content_means_no_studies(tmp_path: Path) -> None:
+    (tmp_path / ".git").mkdir()
+    (tmp_path / ".git" / "x.nii.gz").write_bytes(b"annex")
+    calls: list[Path] = []
+    with pytest.raises(ValueError, match="No valid NIfTI studies were found."):
+        NIfTIBatchReader().load_studies(tmp_path, on_error=lambda p, e: calls.append(p))
+    assert calls == []
+
+
+def test_root_under_hidden_directory_still_loads(tmp_path: Path) -> None:
+    root = tmp_path / ".hidden_root" / "data"
+    _tiny_nifti(root / "sub" / "a.nii.gz")
+
+    studies = NIfTIBatchReader().load_studies(root)
+
+    assert len(studies) == 1
