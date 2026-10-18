@@ -30,10 +30,9 @@ class BIDSReader:
         """
         if not path.exists():
             raise FileNotFoundError(f"Path doesn't exist: {path}")
-        files = [path] if path.is_file() else sorted(path.rglob("*"))
-        # Names are only inspected here; the caller may pass a mixed tree.
+        files = [path] if path.is_file() else find_nifti_files(path)
         return self.load_files(
-            [f for f in files if f.is_file() and is_nifti_file(f)],
+            files,
             on_error,
             root=_find_dataset_root(path),
         )
@@ -149,3 +148,14 @@ def _inherited_sidecar(file: Path, entities: BIDSEntities, root: Path | None) ->
                 raise ValueError("JSON sidecar must be an object.")
             merged.update(data)
     return merged
+
+
+def find_nifti_files(directory: Path) -> list[Path]:
+    """Sorted NIfTI files below *directory*, skipping hidden (dot) components relative to it."""
+    return [
+        f
+        for f in sorted(directory.rglob("*"))
+        if is_nifti_file(f)
+        and f.is_file()
+        and not any(part.startswith(".") for part in f.relative_to(directory).parts)
+    ]

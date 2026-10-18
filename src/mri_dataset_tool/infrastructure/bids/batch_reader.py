@@ -4,9 +4,8 @@ from pathlib import Path
 
 from mri_dataset_tool.domain.models.study import MRIStudy
 from mri_dataset_tool.infrastructure.bids.entities import parse_bids_filename
-from mri_dataset_tool.infrastructure.bids.reader import BIDSReader
+from mri_dataset_tool.infrastructure.bids.reader import BIDSReader, find_nifti_files
 from mri_dataset_tool.infrastructure.logging.logger import get_logger
-from mri_dataset_tool.infrastructure.nifti.reader import is_nifti_file
 
 logger = get_logger(__name__)
 
@@ -55,9 +54,7 @@ class BIDSBatchReader:
             errors_count += 1
             self._report(on_error, file, error)
 
-        for file in sorted(dataset_root.rglob("*")):
-            if not file.is_file() or not is_nifti_file(file):
-                continue
+        for file in find_nifti_files(dataset_root):
             try:
                 entities = parse_bids_filename(file.name)
             except ValueError as error:
