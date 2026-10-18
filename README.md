@@ -8,8 +8,10 @@ This tool automates the loading, validation, conversion, processing, anonymizati
 
 ## Features
 
-- DICOM study loading
+- DICOM study loading (headers; 3D/4D volume building)
 - NIfTI dataset handling
+- DICOM to NIfTI and NIfTI to DICOM (3D only) conversion
+- BIDS reading (flexible mode, sidecar inheritance)
 - Batch processing support
 - Data validation and organization
 - Preparation for ML/DL pipelines
@@ -78,7 +80,7 @@ python -m pytest
 
 ## Status
 
-In development.
+In development. Loading (DICOM, NIfTI, BIDS) and DICOM <-> NIfTI conversion are implemented as library code under `src/mri_dataset_tool`; there is no CLI or GUI yet. The generated DICOM does not conform to the strict MR IOD, and visual checks of converted volumes are pending.
 
 ---
 
@@ -162,4 +164,4 @@ python -m pytest
 
 ## Estado
 
-En desarrollo.
+En desarrollo. La carga (DICOM, NIfTI, BIDS) y la conversión DICOM <-> NIfTI están implementadas como código de biblioteca en `src/mri_dataset_tool`; aún no hay CLI ni GUI. El DICOM generado no es conforme al IOD MR estricto y la verificación visual de los volúmenes convertidos está pendiente.
