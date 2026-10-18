@@ -16,7 +16,8 @@ dependencies = [
 
 [project.optional-dependencies]
 dev = [
-    "pytest>=9.1"
+    "pytest>=9.1",
+    "psutil>=5.9"
 ]
 
 [tool.setuptools.packages.find]
