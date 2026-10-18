@@ -19,6 +19,11 @@ DICOM_HEADER_TAGS = [
     "SliceThickness",
     "SpacingBetweenSlices",
     "ImageOrientationPatient",
+    "ImagePositionPatient",
+    "RescaleSlope",
+    "RescaleIntercept",
+    "TemporalPositionIdentifier",
+    "AcquisitionNumber",
 ]
 
 
