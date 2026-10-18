@@ -127,3 +127,51 @@ def test_batch_reader_validates_paths_and_requires_a_valid_study(
         reader.load_studies(non_directory)
     with pytest.raises(ValueError, match="No valid DICOM studies"):
         reader.load_studies(empty_directory)
+
+def _batch_with_four_failures(tmp_path: Path) -> Path:
+    _write_dicom_instance(tmp_path / "ok.dcm", "1.2.3", "1.2.3.1")
+    _write_dicom_instance(tmp_path / "no-study.dcm", None, "1.2.3.1")
+    _write_dicom_instance(tmp_path / "no-series.dcm", "1.2.3", None)
+    (tmp_path / "invalid.bin").write_text("not a DICOM file")
+    return tmp_path
+
+
+def test_on_error_is_called_once_per_skipped_file(tmp_path: Path) -> None:
+    _batch_with_four_failures(tmp_path)
+    unreadable = tmp_path / "unreadable.dcm"
+    _write_dicom_instance(unreadable, "1.2.3", "1.2.3.1")
+    from mri_dataset_tool.infrastructure.dicom import batch_reader
+
+    real = batch_reader.read_dicom_header
+
+    def flaky(path: Path):
+        if path == unreadable:
+            raise OSError("boom")
+        return real(path)
+
+    reported: list[tuple[Path, Exception]] = []
+    with pytest.MonkeyPatch.context() as patch:
+        patch.setattr(batch_reader, "read_dicom_header", flaky)
+        studies = DICOMBatchReader().load_studies(tmp_path, lambda p, e: reported.append((p, e)))
+
+    assert len(studies) == 1
+    assert sorted(p.name for p, _ in reported) == [
+        "invalid.bin", "no-series.dcm", "no-study.dcm", "unreadable.dcm",
+    ]
+    assert all(isinstance(e, Exception) for _, e in reported)
+
+
+def test_failing_on_error_callback_does_not_stop_the_batch(
+    tmp_path: Path, caplog: pytest.LogCaptureFixture
+) -> None:
+    _batch_with_four_failures(tmp_path)
+
+    def broken(path: Path, error: Exception) -> None:
+        raise RuntimeError(f"secret-{path.name}")
+
+    studies = DICOMBatchReader().load_studies(tmp_path, broken)
+
+    assert len(studies) == 1
+    assert "RuntimeError" in caplog.text
+    assert "secret-" not in caplog.text
+    assert "invalid.bin" not in caplog.text

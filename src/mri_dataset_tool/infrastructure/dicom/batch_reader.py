@@ -1,4 +1,5 @@
 from collections import defaultdict
+from collections.abc import Callable
 from pathlib import Path
 
 from pydicom.errors import InvalidDicomError
@@ -17,7 +18,16 @@ logger = get_logger(__name__)
 class DICOMBatchReader:
     """Load all valid DICOM studies found below a directory tree."""
 
-    def load_studies(self, directory: Path) -> list[MRIStudy]:
+    def load_studies(
+        self,
+        directory: Path,
+        on_error: Callable[[Path, Exception], None] | None = None,
+    ) -> list[MRIStudy]:
+        """Load all valid studies below ``directory``.
+
+        ``on_error(path, error)`` is called once for each skipped file (RF16). If the
+        callback itself raises, that is logged by type and the batch continues.
+        """
         if not directory.exists():
             raise FileNotFoundError(f"Path doesn't exist: {directory}")
         if not directory.is_dir():
@@ -35,18 +45,22 @@ class DICOMBatchReader:
 
             try:
                 header = read_dicom_header(path)
-            except InvalidDicomError:
+            except InvalidDicomError as error:
                 invalid_file_count += 1
+                _report(on_error, path, error)
                 continue
-            except (OSError, EOFError):
+            except (OSError, EOFError) as error:
                 unreadable_file_count += 1
+                _report(on_error, path, error)
                 continue
 
             if header.study_uid is None:
                 missing_study_uid_count += 1
+                _report(on_error, path, ValueError("Missing StudyInstanceUID."))
                 continue
             if header.series_uid is None:
                 missing_series_uid_count += 1
+                _report(on_error, path, ValueError("Missing SeriesInstanceUID."))
                 continue
 
             headers_by_study[header.study_uid].append(header)
@@ -69,3 +83,20 @@ class DICOMBatchReader:
             missing_series_uid_count,
         )
         return studies
+
+
+def _report(
+    on_error: Callable[[Path, Exception], None] | None,
+    path: Path,
+    error: Exception,
+) -> None:
+    if on_error is None:
+        return
+    try:
+        on_error(path, error)
+    except Exception as callback_error:
+        logger.warning(
+            "on_error callback failed (%s) while reporting %s",
+            type(callback_error).__name__,
+            type(error).__name__,
+        )
