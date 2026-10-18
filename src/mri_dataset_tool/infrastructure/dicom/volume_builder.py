@@ -14,6 +14,7 @@ logger = get_logger(__name__)
 # LPS (DICOM) <-> RAS+ (NIfTI) is the same sign flip of the x and y axes in both directions.
 _FLIP_XY = np.diag([-1.0, -1.0, 1.0, 1.0])
 _SPACING_TOLERANCE = 1e-2  # relative to the mean slice spacing
+IN_PLANE_TOLERANCE_MM = 1e-3  # max in-plane drift of slice origins (shared with the writer)
 
 
 def lps_to_ras(affine: np.ndarray) -> np.ndarray:
@@ -47,7 +48,7 @@ def build_series_volume(series: MRISeries) -> MRISeries:
         [np.asarray(d.ImagePositionPatient, dtype=float) - pos * normal
          for d, pos in zip(datasets, positions)]
     )
-    if not np.allclose(offsets, offsets[0], atol=1e-3):
+    if np.abs(offsets - offsets[0]).max() > IN_PLANE_TOLERANCE_MM:
         raise ValueError("Slices are shifted in-plane or tilted (gantry tilt is not supported).")
     frames = _group_by_time(datasets, positions)
     slice_count = len(frames[0])

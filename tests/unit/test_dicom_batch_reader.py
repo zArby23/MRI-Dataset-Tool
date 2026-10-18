@@ -1,6 +1,7 @@
 from pathlib import Path
 
 import pytest
+from pydicom.errors import InvalidDicomError
 from pydicom.dataset import Dataset, FileDataset
 from pydicom.uid import ExplicitVRLittleEndian, generate_uid
 
@@ -128,6 +129,7 @@ def test_batch_reader_validates_paths_and_requires_a_valid_study(
     with pytest.raises(ValueError, match="No valid DICOM studies"):
         reader.load_studies(empty_directory)
 
+
 def _batch_with_four_failures(tmp_path: Path) -> Path:
     _write_dicom_instance(tmp_path / "ok.dcm", "1.2.3", "1.2.3.1")
     _write_dicom_instance(tmp_path / "no-study.dcm", None, "1.2.3.1")
@@ -155,10 +157,13 @@ def test_on_error_is_called_once_per_skipped_file(tmp_path: Path) -> None:
         studies = DICOMBatchReader().load_studies(tmp_path, lambda p, e: reported.append((p, e)))
 
     assert len(studies) == 1
-    assert sorted(p.name for p, _ in reported) == [
-        "invalid.bin", "no-series.dcm", "no-study.dcm", "unreadable.dcm",
-    ]
-    assert all(isinstance(e, Exception) for _, e in reported)
+    assert len(reported) == 4
+    assert {p.name: type(e) for p, e in reported} == {
+        "invalid.bin": InvalidDicomError,
+        "no-series.dcm": ValueError,
+        "no-study.dcm": ValueError,
+        "unreadable.dcm": OSError,
+    }
 
 
 def test_failing_on_error_callback_does_not_stop_the_batch(
