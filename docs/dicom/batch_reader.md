@@ -18,9 +18,15 @@ DICOMBatchReader().load_studies(directory, on_error: Callable[[Path, Exception],
 - Sin callback el comportamiento es el mismo que antes (los conteos siguen en el log).
 - Los logs llevan contadores y nombres de tipo de excepción; nunca rutas ni valores de cabecera. La ruta solo llega al llamador por `on_error`.
 
+## Entradas ocultas
+
+Se ignoran en silencio (sin `on_error` ni conteo de error) los directorios y archivos cuyo nombre empieza por `.`, relativos a la raíz
+recibida (p. ej. `.git`, `.datalad`, `.git/annex`); esos directorios ni se recorren. Si la propia raíz está bajo un directorio oculto,
+se carga con normalidad.
+
 ## No filtra por extensión
 
-`DICOMBatchReader` recorre **todos** los archivos con `rglob("*")` y no filtra por extensión. Un `README`, un `DICOMDIR`, un `.json` o
+`DICOMBatchReader` recorre recursivamente **todos** los archivos no ocultos y no filtra por extensión. Un `README`, un `DICOMDIR`, un `.json` o
 cualquier archivo no DICOM genera una llamada a `on_error` (normalmente `InvalidDicomError`). Esas llamadas no son errores de conversión:
 quien consuma el callback no debe presentarlas al usuario como estudios fallidos sin distinguirlas.
 

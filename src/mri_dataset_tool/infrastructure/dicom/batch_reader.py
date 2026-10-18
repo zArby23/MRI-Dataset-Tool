@@ -1,3 +1,4 @@
+import os
 from collections import defaultdict
 from collections.abc import Callable
 from pathlib import Path
@@ -27,6 +28,8 @@ class DICOMBatchReader:
 
         ``on_error(path, error)`` is called once for each skipped file (RF16). If the
         callback itself raises, that is logged by type and the batch continues.
+        Hidden entries (a name starting with ".", relative to ``directory``) are ignored
+        silently: no ``on_error`` call and no error count.
         """
         if not directory.exists():
             raise FileNotFoundError(f"Path doesn't exist: {directory}")
@@ -39,7 +42,7 @@ class DICOMBatchReader:
         missing_study_uid_count = 0
         missing_series_uid_count = 0
 
-        for path in directory.rglob("*"):
+        for path in _iter_visible_files(directory):
             if not path.is_file():
                 continue
 
@@ -100,3 +103,12 @@ def _report(
             type(callback_error).__name__,
             type(error).__name__,
         )
+
+
+def _iter_visible_files(directory: Path):
+    """Yield candidate files below *directory*, pruning hidden subdirectories (.git, .datalad...)."""
+    for root, dirnames, filenames in os.walk(directory):
+        dirnames[:] = sorted(name for name in dirnames if not name.startswith("."))
+        for name in sorted(filenames):
+            if not name.startswith("."):
+                yield Path(root) / name

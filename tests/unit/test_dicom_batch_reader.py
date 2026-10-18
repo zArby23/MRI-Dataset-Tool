@@ -180,3 +180,37 @@ def test_failing_on_error_callback_does_not_stop_the_batch(
     assert "RuntimeError" in caplog.text
     assert "secret-" not in caplog.text
     assert "invalid.bin" not in caplog.text
+
+
+def test_hidden_directories_and_files_are_ignored_silently(tmp_path: Path) -> None:
+    _write_dicom_instance(tmp_path / "visible.dcm", "1.2.3", "1.2.3.1")
+    _write_dicom_instance(tmp_path / ".git" / "objects" / "a.dcm", "9.9", "9.9.1")
+    _write_dicom_instance(tmp_path / ".datalad" / "b.dcm", "9.9", "9.9.1")
+    (tmp_path / ".git" / "config").write_text("not a DICOM file")
+    (tmp_path / ".hidden.dcm").write_text("not a DICOM file")
+    reported: list[Path] = []
+
+    studies = DICOMBatchReader().load_studies(tmp_path, lambda p, e: reported.append(p))
+
+    assert [s.study_uid for s in studies] == ["1.2.3"]
+    assert reported == []
+
+
+def test_root_under_hidden_directory_still_loads(tmp_path: Path) -> None:
+    root = tmp_path / ".cache" / "data"
+    _write_dicom_instance(root / "a.dcm", "1.2.3", "1.2.3.1")
+
+    assert [s.study_uid for s in DICOMBatchReader().load_studies(root)] == ["1.2.3"]
+
+
+def test_on_error_calls_follow_ascending_path_order(tmp_path: Path) -> None:
+    for name in ("b/2.bin", "a/2.bin", "b/1.bin", "a/1.bin", "0.bin"):
+        target = tmp_path / name
+        target.parent.mkdir(parents=True, exist_ok=True)
+        target.write_text("not a DICOM file")
+    _write_dicom_instance(tmp_path / "ok.dcm", "1.2.3", "1.2.3.1")
+    reported: list[Path] = []
+
+    DICOMBatchReader().load_studies(tmp_path, lambda p, e: reported.append(p.relative_to(tmp_path)))
+
+    assert reported == [Path("0.bin"), Path("a/1.bin"), Path("a/2.bin"), Path("b/1.bin"), Path("b/2.bin")]
