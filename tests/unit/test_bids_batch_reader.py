@@ -55,9 +55,9 @@ def test_streaming_is_lazy(tmp_path: Path, monkeypatch) -> None:
     calls = []
     original = reader._reader.load_files
 
-    def counting(files, on_error=None):
+    def counting(files, on_error=None, **kwargs):
         calls.append(files)
-        return original(files, on_error)
+        return original(files, on_error, **kwargs)
 
     monkeypatch.setattr(reader._reader, "load_files", counting)
     it = reader.iter_studies(tmp_path)

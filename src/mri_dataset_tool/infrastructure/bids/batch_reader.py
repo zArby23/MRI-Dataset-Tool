@@ -68,7 +68,7 @@ class BIDSBatchReader:
         studies_loaded = 0
         for key in sorted(groups):
             try:
-                study = self._reader.load_files(groups[key], report)
+                study = self._reader.load_files(groups[key], report, root=dataset_root)
             except (ValueError, OSError):
                 continue  # every failed file was already reported
             studies_loaded += 1
