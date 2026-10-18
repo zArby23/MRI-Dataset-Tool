@@ -50,3 +50,41 @@ def test_batch_skips_truncated_gzip(tmp_path: Path) -> None:
     studies = NIfTIBatchReader().load_studies(tmp_path)
 
     assert [s.series[0].files[0].name for s in studies] == [valid.name]
+
+
+def _mixed_dir(tmp_path: Path) -> list[Path]:
+    for name in ("a.nii.gz", "b.nii.gz"):
+        nib.save(nib.Nifti1Image(np.zeros((2, 2, 2), dtype=np.int16), np.eye(4)), tmp_path / name)
+    bad = [tmp_path / "bad1.nii.gz", tmp_path / "bad2.nii"]
+    for path in bad:
+        path.write_bytes(b"garbage")
+    return bad
+
+
+def test_on_error_called_once_per_broken_file(tmp_path: Path) -> None:
+    bad = _mixed_dir(tmp_path)
+    calls: list[tuple[Path, Exception]] = []
+
+    studies = NIfTIBatchReader().load_studies(
+        tmp_path, on_error=lambda p, e: calls.append((p, e))
+    )
+
+    assert len(studies) == 2
+    assert sorted(p for p, _ in calls) == sorted(bad)
+    assert all(isinstance(e, ValueError) for _, e in calls)
+
+
+def test_failing_callback_does_not_stop_batch_or_leak_paths(
+    tmp_path: Path, caplog: pytest.LogCaptureFixture
+) -> None:
+    _mixed_dir(tmp_path)
+
+    def boom(path: Path, error: Exception) -> None:
+        raise RuntimeError(str(path))
+
+    with caplog.at_level("WARNING"):
+        studies = NIfTIBatchReader().load_studies(tmp_path, on_error=boom)
+
+    assert len(studies) == 2
+    assert "RuntimeError" in caplog.text
+    assert "bad1" not in caplog.text
