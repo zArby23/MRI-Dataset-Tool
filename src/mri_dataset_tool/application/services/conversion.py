@@ -34,14 +34,17 @@ def convert_dicom_to_nifti(
     geometry in ``metadata`` and the conversion parameters in ``metadata["provenance"]``.
     Studies where every series failed are omitted from the result.
 
-    Known limits: unreadable DICOM files are skipped by ``DICOMBatchReader`` without
-    ``on_error`` until T12; running again over the same *output_dir* raises
+    ``on_error`` also receives the files of the tree that ``DICOMBatchReader`` skips
+    (not DICOM, unreadable, missing UIDs; DICOMDIR, README, .json...): those are not
+    conversion errors. Running again over the same *output_dir* raises
     ``FileExistsError`` per series (by design, there is no overwrite option).
     """
     if output_dir.resolve().is_relative_to(input_dir.resolve()):
         raise ValueError("Output directory must not be inside the input directory.")
 
-    studies = DICOMBatchReader().load_studies(input_dir)
+    studies = DICOMBatchReader().load_studies(
+        input_dir, on_error=lambda path, error: _report(on_error, path, error)
+    )
     output_dir.mkdir(parents=True, exist_ok=True)
 
     writer = NIfTIWriter()

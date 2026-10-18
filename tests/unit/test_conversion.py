@@ -334,3 +334,15 @@ def test_nifti_to_dicom_round_trip_with_rotated_affine(tmp_path: Path, rotation:
     rebuilt = build_series_volume(MRISeries(files=series.files))
     np.testing.assert_allclose(rebuilt.volume, data, atol=1e-4)
     np.testing.assert_allclose(rebuilt.metadata["affine"], affine, atol=1e-4)
+
+
+def test_dicom_to_nifti_reports_skipped_non_dicom_file_and_continues(tmp_path: Path) -> None:
+    src = _make_input(tmp_path / "in")
+    junk = src / "README.txt"
+    junk.write_text("not dicom")
+    calls: list[Path] = []
+
+    studies = convert_dicom_to_nifti(src, tmp_path / "out", on_error=lambda p, e: calls.append(p))
+
+    assert calls == [junk]
+    assert sum(len(s.series) for s in studies) == 2
