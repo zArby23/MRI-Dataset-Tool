@@ -306,3 +306,31 @@ def test_nifti_to_dicom_failing_callback_logs_no_paths_or_uids(
     assert "RuntimeError" in caplog.text
     assert str(src) not in caplog.text
     assert all(uid not in caplog.text for uid in uids)
+
+
+def _rotation(axis: int, degrees: float) -> np.ndarray:
+    c, s = np.cos(np.radians(degrees)), np.sin(np.radians(degrees))
+    i, j = [k for k in range(3) if k != axis]
+    rot = np.eye(3)
+    rot[i, i], rot[i, j], rot[j, i], rot[j, j] = c, -s, s, c
+    return rot
+
+
+@pytest.mark.parametrize(
+    "rotation",
+    [_rotation(2, 10), _rotation(2, 10) @ _rotation(0, 15)],
+    ids=["single_axis_10deg", "mixed_axes"],
+)
+def test_nifti_to_dicom_round_trip_with_rotated_affine(tmp_path: Path, rotation: np.ndarray) -> None:
+    affine = np.eye(4)
+    affine[:3, :3] = rotation @ np.diag([2.0, 3.0, 4.0])
+    affine[:3, 3] = [-10, 5, 7]
+    src = tmp_path / "in"
+    src.mkdir()
+    data = _save_nifti(src / "r.nii.gz", affine=affine)
+
+    series = convert_nifti_to_dicom(src, tmp_path / "out")[0].series[0]
+
+    rebuilt = build_series_volume(MRISeries(files=series.files))
+    np.testing.assert_allclose(rebuilt.volume, data, atol=1e-4)
+    np.testing.assert_allclose(rebuilt.metadata["affine"], affine, atol=1e-4)
