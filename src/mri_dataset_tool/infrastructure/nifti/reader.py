@@ -11,6 +11,11 @@ from mri_dataset_tool.infrastructure.logging.logger import get_logger
 logger = get_logger(__name__)
 
 
+def is_nifti_file(path: Path) -> bool:
+    """Return whether *path* uses a supported single-file NIfTI suffix."""
+    return path.name.endswith((".nii", ".nii.gz"))
+
+
 class NIfTIReader:
     def load_study(self, path: Path) -> MRIStudy:
         """Load one NIfTI image as a study containing one MRI series.
@@ -26,7 +31,7 @@ class NIfTIReader:
             raise ValueError(
                 f"NIfTI path must identify a file. {path}"
             )
-        if not self._is_nifti_file(path):
+        if not is_nifti_file(path):
             raise ValueError(
                 f"Unsupported NIfTI file extension. Expected .nii or .nii.gz. {path}"
             )
@@ -35,7 +40,7 @@ class NIfTIReader:
         try:
             image = nib.load(path)
             volume = image.get_fdata()
-        except (ImageFileError, OSError) as error:
+        except (ImageFileError, OSError, EOFError) as error:
             logger.error("Unable to load NIfTI image")
             raise ValueError("Unable to load NIfTI image.") from error
 
@@ -46,10 +51,6 @@ class NIfTIReader:
         )
         logger.info("Loaded NIfTI volume with shape %s", image.shape)
         return MRIStudy(study_uid=None, series=[series])
-
-    def _is_nifti_file(self, path: Path) -> bool:
-        """Return whether *path* uses a supported single-file NIfTI suffix."""
-        return path.suffix == ".nii" or path.name.endswith(".nii.gz")
 
     def _extract_series_metadata(
         self,

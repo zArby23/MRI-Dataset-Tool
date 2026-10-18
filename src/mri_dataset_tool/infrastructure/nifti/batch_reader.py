@@ -5,7 +5,7 @@ from nibabel.filebasedimages import ImageFileError
 
 from mri_dataset_tool.domain.models.study import MRIStudy
 from mri_dataset_tool.infrastructure.logging.logger import get_logger
-from mri_dataset_tool.infrastructure.nifti.reader import NIfTIReader
+from mri_dataset_tool.infrastructure.nifti.reader import NIfTIReader, is_nifti_file
 
 logger = get_logger(__name__)
 
@@ -21,23 +21,26 @@ class NIfTIBatchReader:
 
         This is the streaming path recommended by RNF02 for large batches.
         """
+        # Validate eagerly: a generator function would defer this to the first next().
         if not directory.exists():
             raise FileNotFoundError(f"Path doesn't exist: {directory}")
         if not directory.is_dir():
             raise NotADirectoryError(f"Path is not a directory: {directory}")
+        return self._iter_studies(directory)
 
+    def _iter_studies(self, directory: Path) -> Iterator[MRIStudy]:
         errors_count = 0
         studies_loaded = 0
 
         for path in sorted(directory.rglob("*")):
-            if not path.is_file() or not self._is_nifti_file(path):
+            if not path.is_file() or not is_nifti_file(path):
                 continue
 
             try:
                 study = self._reader.load_study(path)
             except (ImageFileError, OSError, EOFError, ValueError):
                 errors_count += 1
-                logger.warning("Skipping invalid or unreadable NIfTI file: %s", path)
+                logger.warning("Skipping invalid or unreadable NIfTI file")
                 continue
 
             studies_loaded += 1
@@ -58,9 +61,3 @@ class NIfTIBatchReader:
         Use iter_studies() when processing large datasets to keep memory bounded.
         """
         return list(self.iter_studies(directory))
-
-    @staticmethod
-    def _is_nifti_file(path: Path) -> bool:
-        return path.name.endswith(".nii") or path.name.endswith(".nii.gz")
-
-    
