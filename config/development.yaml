@@ -1,0 +1,3 @@
+# Development overrides on top of default.yaml (load_config(environment="development")).
+logging:
+  level: DEBUG
