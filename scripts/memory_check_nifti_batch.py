@@ -2,6 +2,7 @@ from __future__ import annotations
 
 import gc
 import os
+import sys
 from pathlib import Path
 
 import psutil
@@ -14,6 +15,7 @@ def rss_mb() -> float:
 
 
 def main() -> int:
+    lazy = "--lazy" in sys.argv[1:]  # keep volumes as nibabel proxies (M0)
     root = Path(__file__).resolve().parents[1]
     batch_dir = root / "data" / "raw" / "nifti_test_studies"
 
@@ -26,10 +28,11 @@ def main() -> int:
     processed = 0
 
     print(f"Batch directory: {batch_dir}")
+    print(f"Lazy loading: {lazy}")
     print(f"Baseline RSS: {baseline:.1f} MB")
 
     try:
-        for study in reader.iter_studies(batch_dir):
+        for study in reader.iter_studies(batch_dir, lazy=lazy):
             processed += 1
             current = rss_mb()
             peak = max(peak, current)

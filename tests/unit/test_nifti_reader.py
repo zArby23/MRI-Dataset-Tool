@@ -89,3 +89,83 @@ def test_load_study_rejects_corrupt_nifti_file(tmp_path: Path) -> None:
 
     with pytest.raises(ValueError, match="Unable to load NIfTI image"):
         NIfTIReader().load_study(path)
+
+
+def _scaled_nifti(path: Path, shape: tuple[int, ...] = (3, 4, 5)) -> np.ndarray:
+    data = np.arange(np.prod(shape), dtype=np.int16).reshape(shape)
+    image = nib.Nifti1Image(data, np.diag([2.0, 3.0, 4.0, 1.0]))
+    image.header.set_slope_inter(0.5, 1.0)
+    nib.save(image, path)
+    return data
+
+
+@pytest.mark.parametrize("name", ["scan.nii", "scan.nii.gz"])
+def test_load_study_lazy_keeps_proxy_and_same_metadata(tmp_path: Path, name: str) -> None:
+    from mri_dataset_tool.infrastructure.processing.arrays import load_array
+
+    path = tmp_path / name
+    _scaled_nifti(path, (3, 4, 5, 2))
+    eager = NIfTIReader().load_study(path).series[0]
+    lazy = NIfTIReader().load_study(path, lazy=True).series[0]
+
+    assert not isinstance(lazy.volume, np.ndarray)
+    assert lazy.volume.shape == eager.volume.shape
+    assert lazy.metadata.keys() == eager.metadata.keys()
+    for key, value in eager.metadata.items():
+        np.testing.assert_array_equal(lazy.metadata[key], value)
+    np.testing.assert_array_equal(load_array(lazy.volume, np.float64), eager.volume)
+
+
+def test_load_study_lazy_reads_no_voxel_and_keeps_no_file_open(tmp_path: Path) -> None:
+    from mri_dataset_tool.infrastructure.processing.arrays import load_array
+
+    path = tmp_path / "scan.nii"
+    _scaled_nifti(path)
+    series = NIfTIReader().load_study(path, lazy=True).series[0]
+    path.unlink()  # on Windows this fails if the reader left the file open or mapped
+
+    # Data was never read at load time, so materializing now fails.
+    with pytest.raises(ValueError, match=r"^Unable to read volume data\.$"):
+        load_array(series.volume)
+
+
+def test_load_study_lazy_truncated_gz_fails_only_when_materialized(tmp_path: Path) -> None:
+    from mri_dataset_tool.infrastructure.processing.arrays import load_array
+
+    good = tmp_path / "good.nii.gz"
+    nib.save(nib.Nifti1Image(np.arange(4096, dtype=np.int16).reshape(16, 16, 16), np.eye(4)), good)
+    path = tmp_path / "truncated.nii.gz"
+    raw = good.read_bytes()
+    path.write_bytes(raw[: len(raw) // 2])
+
+    with pytest.raises(ValueError):
+        NIfTIReader().load_study(path)
+    series = NIfTIReader().load_study(path, lazy=True).series[0]
+    with pytest.raises(ValueError, match=r"^Unable to read volume data\.$"):
+        load_array(series.volume)
+
+
+def test_nifti_writer_accepts_lazy_proxy_exactly_when_unscaled(tmp_path: Path) -> None:
+    from mri_dataset_tool.infrastructure.nifti.writer import NIfTIWriter
+
+    source = tmp_path / "source.nii.gz"
+    data = np.arange(60, dtype=np.int16).reshape(3, 4, 5)
+    nib.save(nib.Nifti1Image(data, np.eye(4)), source)
+    series = NIfTIReader().load_study(source, lazy=True).series[0]
+    written = nib.load(NIfTIWriter().write(series, tmp_path / "out.nii.gz"))
+
+    assert written.get_data_dtype() == np.int16
+    np.testing.assert_array_equal(written.get_fdata(), data)
+
+
+def test_nifti_writer_requantizes_scaled_lazy_proxy(tmp_path: Path) -> None:
+    from mri_dataset_tool.infrastructure.nifti.writer import NIfTIWriter
+
+    source = tmp_path / "source.nii.gz"
+    data = _scaled_nifti(source)
+    series = NIfTIReader().load_study(source, lazy=True).series[0]
+    written = nib.load(NIfTIWriter().write(series, tmp_path / "out.nii.gz")).get_fdata()
+
+    # nibabel recomputes slope/inter for the on-disk int16: close, not exact.
+    # Materialize with load_array(volume, dtype) first when exact values matter.
+    np.testing.assert_allclose(written, data * 0.5 + 1.0, atol=1e-2)

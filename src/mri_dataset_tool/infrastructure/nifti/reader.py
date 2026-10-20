@@ -17,11 +17,13 @@ def is_nifti_file(path: Path) -> bool:
 
 
 class NIfTIReader:
-    def load_study(self, path: Path) -> MRIStudy:
+    def load_study(self, path: Path, lazy: bool = False) -> MRIStudy:
         """Load one NIfTI image as a study containing one MRI series.
 
         NIfTI has no DICOM study or series UIDs, so those fields are ``None``.
         Processing such as normalization and reorientation remains elsewhere.
+        With ``lazy=True`` the volume is nibabel's proxy (``image.dataobj``): no voxel
+        is read until it is materialized, so a truncated ``.nii.gz`` fails only then.
         """
         if not path.exists():
             raise FileNotFoundError(
@@ -38,8 +40,13 @@ class NIfTIReader:
 
         logger.info("Loading NIfTI study")
         try:
-            image = nib.load(path)
-            volume = image.get_fdata()
+            if lazy:
+                # No mmap: a memory map would keep the file open (locked on Windows).
+                image = nib.load(path, mmap=False)
+                volume = image.dataobj
+            else:
+                image = nib.load(path)
+                volume = image.get_fdata()
         except (ImageFileError, OSError, EOFError) as error:
             logger.error("Unable to load NIfTI image")
             raise ValueError("Unable to load NIfTI image.") from error

@@ -104,3 +104,15 @@ def test_root_under_hidden_directory_still_loads(tmp_path: Path) -> None:
     root.mkdir(parents=True)
     _dataset(root)
     assert len(BIDSBatchReader().load_studies(root)) == 3
+
+
+def test_iter_studies_lazy_passes_through(tmp_path: Path) -> None:
+    _dataset(tmp_path)
+    eager = BIDSBatchReader().load_studies(tmp_path)
+    lazy = BIDSBatchReader().load_studies(tmp_path, lazy=True)
+
+    assert [(s.subject_id, s.session_id, len(s.series)) for s in lazy] == [
+        (s.subject_id, s.session_id, len(s.series)) for s in eager
+    ]
+    assert all(isinstance(series.volume, np.ndarray) for study in eager for series in study.series)
+    assert not any(isinstance(series.volume, np.ndarray) for study in lazy for series in study.series)

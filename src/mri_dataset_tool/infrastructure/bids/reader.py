@@ -21,6 +21,7 @@ class BIDSReader:
         self,
         path: Path,
         on_error: Callable[[Path, Exception], None] | None = None,
+        lazy: bool = False,
     ) -> MRIStudy:
         """Load a subject/session directory, or one loose BIDS-named NIfTI file.
 
@@ -35,6 +36,7 @@ class BIDSReader:
             files,
             on_error,
             root=_find_dataset_root(path),
+            lazy=lazy,
         )
 
     def load_files(
@@ -42,6 +44,7 @@ class BIDSReader:
         files: list[Path],
         on_error: Callable[[Path, Exception], None] | None = None,
         root: Path | None = None,
+        lazy: bool = False,
     ) -> MRIStudy:
         """Load the given NIfTI files as one study; identity comes from the first valid file.
 
@@ -55,7 +58,7 @@ class BIDSReader:
                 entities = parse_bids_filename(file.name)
                 if identity not in (None, (entities.sub, entities.ses)):
                     raise ValueError("File belongs to a different subject/session.")
-                one = self._load_series(file, entities, root)
+                one = self._load_series(file, entities, root, lazy)
             except (ValueError, OSError) as error:
                 logger.warning("Skipping BIDS file (%s)", type(error).__name__)
                 self._report(on_error, file, error)
@@ -73,8 +76,8 @@ class BIDSReader:
             session_id=identity[1],
         )
 
-    def _load_series(self, file: Path, entities: BIDSEntities, root: Path | None):
-        series = self._reader.load_study(file).series[0]
+    def _load_series(self, file: Path, entities: BIDSEntities, root: Path | None, lazy: bool = False):
+        series = self._reader.load_study(file, lazy=lazy).series[0]
         series.modality = entities.suffix
         series.metadata["bids"] = asdict(entities)
         sidecar = _inherited_sidecar(file, entities, root)

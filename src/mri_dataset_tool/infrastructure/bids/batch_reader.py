@@ -20,6 +20,7 @@ class BIDSBatchReader:
         self,
         dataset_root: Path,
         on_error: Callable[[Path, Exception], None] | None = None,
+        lazy: bool = False,
     ) -> Iterator[MRIStudy]:
         """Yield one study per subject/session, keeping only one loaded at a time (RNF02).
 
@@ -39,12 +40,13 @@ class BIDSBatchReader:
                 valid = False
             if not valid:
                 raise ValueError("Invalid dataset_description.json.")
-        return self._iter_studies(dataset_root, on_error)
+        return self._iter_studies(dataset_root, on_error, lazy)
 
     def _iter_studies(
         self,
         dataset_root: Path,
         on_error: Callable[[Path, Exception], None] | None,
+        lazy: bool,
     ) -> Iterator[MRIStudy]:
         groups: dict[tuple[str, str], list[Path]] = {}
         errors_count = 0  # skipped files, including those that fail inside a group
@@ -65,7 +67,7 @@ class BIDSBatchReader:
         studies_loaded = 0
         for key in sorted(groups):
             try:
-                study = self._reader.load_files(groups[key], report, root=dataset_root)
+                study = self._reader.load_files(groups[key], report, root=dataset_root, lazy=lazy)
             except (ValueError, OSError):
                 continue  # every failed file was already reported
             studies_loaded += 1
@@ -90,6 +92,7 @@ class BIDSBatchReader:
         self,
         dataset_root: Path,
         on_error: Callable[[Path, Exception], None] | None = None,
+        lazy: bool = False,
     ) -> list[MRIStudy]:
         """Return all studies in memory; prefer iter_studies() for large datasets."""
-        return list(self.iter_studies(dataset_root, on_error))
+        return list(self.iter_studies(dataset_root, on_error, lazy))

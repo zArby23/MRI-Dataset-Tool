@@ -124,3 +124,48 @@ def test_root_under_hidden_directory_still_loads(tmp_path: Path) -> None:
     studies = NIfTIBatchReader().load_studies(root)
 
     assert len(studies) == 1
+
+
+def test_iter_studies_lazy_yields_proxies_matching_eager(tmp_path: Path) -> None:
+    from mri_dataset_tool.infrastructure.processing.arrays import load_array
+
+    for index in range(2):
+        nib.save(nib.Nifti1Image(np.full((2, 3, 4), index, dtype=np.int16), np.eye(4)), tmp_path / f"s{index}.nii.gz")
+
+    eager = NIfTIBatchReader().load_studies(tmp_path)
+    lazy = NIfTIBatchReader().load_studies(tmp_path, lazy=True)
+
+    assert len(lazy) == len(eager) == 2
+    for lazy_study, eager_study in zip(lazy, eager, strict=True):
+        assert not isinstance(lazy_study.series[0].volume, np.ndarray)
+        np.testing.assert_array_equal(load_array(lazy_study.series[0].volume, np.float64), eager_study.series[0].volume)
+
+
+def test_iter_studies_lazy_truncated_gz_is_yielded_and_fails_when_materialized(tmp_path: Path) -> None:
+    from mri_dataset_tool.infrastructure.processing.arrays import load_array
+
+    _truncated_gz(tmp_path)
+    errors: list[Path] = []
+    studies = list(NIfTIBatchReader().iter_studies(tmp_path, lambda path, error: errors.append(path), lazy=True))
+
+    assert errors == []  # header is intact: the batch reader can't see the truncation
+    with pytest.raises(ValueError, match=r"^Unable to read volume data\.$"):
+        load_array(studies[0].series[0].volume)
+
+
+def test_iter_studies_lazy_does_not_retain_studies_or_open_files(tmp_path: Path) -> None:
+    import gc
+    import weakref
+
+    for index in range(3):
+        nib.save(nib.Nifti1Image(np.zeros((2, 2, 2), dtype=np.int16), np.eye(4)), tmp_path / f"s{index}.nii")
+
+    refs = []
+    for study in NIfTIBatchReader().iter_studies(tmp_path, lazy=True):
+        gc.collect()
+        assert all(ref() is None for ref in refs)  # earlier studies were released
+        refs.append(weakref.ref(study))
+        del study
+
+    for path in tmp_path.iterdir():
+        path.unlink()  # fails on Windows if a proxy kept its file open
