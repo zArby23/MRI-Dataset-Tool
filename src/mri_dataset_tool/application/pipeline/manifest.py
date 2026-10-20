@@ -8,6 +8,7 @@ from importlib.metadata import PackageNotFoundError, version
 from pathlib import Path
 from typing import Any
 
+from mri_dataset_tool.application.pipeline import steps as _builtin_steps  # noqa: F401  registers built-in steps by name
 from mri_dataset_tool.application.pipeline.runner import Pipeline
 from mri_dataset_tool.application.pipeline.step import build_step
 from mri_dataset_tool.domain.models.transformation import StudyReport
