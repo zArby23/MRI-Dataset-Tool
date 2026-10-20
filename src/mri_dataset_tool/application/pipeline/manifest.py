@@ -1,15 +1,12 @@
 import copy
 import json
+import os
 import platform
 from dataclasses import asdict, dataclass, field
 from datetime import UTC, datetime
-from importlib.metadata import version
+from importlib.metadata import PackageNotFoundError, version
 from pathlib import Path
 from typing import Any
-
-import nibabel
-import numpy
-import pydicom
 
 from mri_dataset_tool.application.pipeline.runner import Pipeline
 from mri_dataset_tool.application.pipeline.step import build_step
@@ -54,7 +51,7 @@ class RunManifest:
             return cls(
                 config=data["config"],
                 versions=data["versions"],
-                steps=[{"name": s["name"], "version": s["version"], "params": s["params"]} for s in data["steps"]],
+                steps=[_parse_step(step) for step in data["steps"]],
                 reports=[StudyReport.from_dict(report) for report in data["reports"]],
                 timestamps=data["timestamps"],
             )
@@ -62,26 +59,47 @@ class RunManifest:
             raise ValueError("Invalid run manifest.") from None  # the cause quotes keys or content
 
     def write(self, path: Path, overwrite: bool = False) -> Path:
-        """Write the manifest as JSON to *path* (usually ``config["report"]["path"]``)."""
-        # shortcut: not atomic (a crash mid-write leaves a partial file); use staging + os.replace if it matters
+        """Write the manifest as JSON to *path* (usually ``config["report"]["path"]``).
+
+        Atomic: written to a temporary file in the same directory and moved with
+        ``os.replace``, so a failure never leaves a truncated manifest or temporaries.
+        The parent directory must exist.
+        """
+        if path.exists() and not overwrite:
+            raise FileExistsError("Run manifest file already exists.")
+        text = self.to_json()
+        tmp = path.with_name(f".{path.name}.tmp")
         try:
-            with path.open("w" if overwrite else "x", encoding="utf-8") as file:
-                file.write(self.to_json())
-        except FileExistsError:
-            raise FileExistsError("Run manifest file already exists.") from None
+            tmp.write_text(text, encoding="utf-8")
+            os.replace(tmp, path)
         except OSError:
+            tmp.unlink(missing_ok=True)
             raise OSError("Run manifest file could not be written.") from None  # the cause quotes the path
         return path
 
 
 def collect_versions() -> dict[str, str]:
     return {
-        "mri_dataset_tool": version("mri-dataset-tool"),
+        "mri_dataset_tool": _distribution_version("mri-dataset-tool"),
         "python": platform.python_version(),
-        "numpy": numpy.__version__,
-        "nibabel": nibabel.__version__,
-        "pydicom": pydicom.__version__,
+        "numpy": _distribution_version("numpy"),
+        "nibabel": _distribution_version("nibabel"),
+        "pydicom": _distribution_version("pydicom"),
     }
+
+
+def _distribution_version(name: str) -> str:
+    try:
+        return version(name)
+    except PackageNotFoundError:
+        return "unknown"
+
+
+def _parse_step(data: dict[str, Any]) -> dict[str, Any]:
+    step = {"name": data["name"], "version": data["version"], "params": data["params"]}
+    if not (isinstance(step["name"], str) and isinstance(step["version"], str) and isinstance(step["params"], dict)):
+        raise ValueError("Invalid run manifest step.")  # replaced by the fixed from_json message
+    return step
 
 
 def pipeline_from_config(config: dict[str, Any]) -> Pipeline:

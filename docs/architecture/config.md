@@ -37,6 +37,9 @@ Solo existen estas claves; cualquier otra lanza `ValueError`.
   (`application/pipeline/step.py`); los pasos corren en el orden de la lista.
 - `report.path` se devuelve tal cual, sin resolver. Lo interpreta el manifiesto de corrida (P4).
 
+Cómo usa estos valores el pipeline: [pipeline.md](pipeline.md). `config/example_run.yaml` es el
+archivo de corrida de `scripts/run_example_pipeline.py`.
+
 Ejemplo de archivo de corrida:
 
 ```yaml

@@ -1,0 +1,9 @@
+# Run file for scripts/run_example_pipeline.py (manual check, stage 2).
+# load_config(Path("config/example_run.yaml")) layers it over default.yaml.
+pipeline:
+  steps:
+    - name: example.scale
+      params: {factor: 2.0}
+
+report:
+  path: data/output/example_run_manifest.json

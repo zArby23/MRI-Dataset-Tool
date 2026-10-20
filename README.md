@@ -13,6 +13,8 @@ This tool automates the loading, validation, conversion, processing, anonymizati
 - DICOM to NIfTI and NIfTI to DICOM (3D only) conversion
 - BIDS reading (flexible mode, sidecar inheritance)
 - Batch processing support
+- Processing pipeline core: step contract, streaming batch runner that reports errors and continues, JSON run manifest to reproduce a run
+- YAML configuration (default < environment < run file)
 - Data validation and organization
 - Preparation for ML/DL pipelines
 
@@ -77,10 +79,12 @@ python -m pytest
 
 - [Functional requirements](/docs/requierments/functional_requierments.md)
 - [Non-functional requirements](/docs/requierments/non_functional_requirements.md)
+- [Pipeline architecture](/docs/architecture/pipeline.md)
+- [Configuration](/docs/architecture/config.md)
 
 ## Status
 
-In development. Loading (DICOM, NIfTI, BIDS) and DICOM <-> NIfTI conversion are implemented as library code under `src/mri_dataset_tool`; there is no CLI or GUI yet. The generated DICOM does not conform to the strict MR IOD, and visual checks of converted volumes are pending.
+In development. Loading (DICOM, NIfTI, BIDS), DICOM <-> NIfTI conversion and the processing pipeline core (step contract, batch runner, run manifest, YAML configuration) are implemented as library code under `src/mri_dataset_tool`. No real processing steps exist yet (normalization, reorientation, resampling and anonymization come in stage 3), and there is no CLI or GUI. The generated DICOM does not conform to the strict MR IOD, and visual checks of converted volumes are pending.
 
 ---
 
@@ -97,6 +101,8 @@ La herramienta automatiza la carga, validación, conversión, procesamiento, ano
 - Carga de estudios DICOM
 - Manejo de datasets NIfTI
 - Soporte para procesamiento por lotes
+- Núcleo del pipeline de procesamiento: contrato de paso, runner por lotes en streaming que informa errores y continúa, manifiesto JSON para reproducir una corrida
+- Configuración YAML (default < entorno < archivo de corrida)
 - Validación y organización de datos
 - Preparación para pipelines de ML/DL
 
@@ -161,7 +167,9 @@ python -m pytest
 
 - [Requisitos funcionales](/docs/requierments/functional_requierments.md)
 - [Requisitos no funcionales](/docs/requierments/non_functional_requirements.md)
+- [Arquitectura del pipeline](/docs/architecture/pipeline.md)
+- [Configuración](/docs/architecture/config.md)
 
 ## Estado
 
-En desarrollo. La carga (DICOM, NIfTI, BIDS) y la conversión DICOM <-> NIfTI están implementadas como código de biblioteca en `src/mri_dataset_tool`; aún no hay CLI ni GUI. El DICOM generado no es conforme al IOD MR estricto y la verificación visual de los volúmenes convertidos está pendiente.
+En desarrollo. La carga (DICOM, NIfTI, BIDS), la conversión DICOM <-> NIfTI y el núcleo del pipeline de procesamiento (contrato de paso, runner por lotes, manifiesto de corrida, configuración YAML) están implementados como código de biblioteca en `src/mri_dataset_tool`. Aún no hay pasos de procesamiento reales (normalización, reorientación, remuestreo y anonimización llegan en la etapa 3), ni CLI ni GUI. El DICOM generado no es conforme al IOD MR estricto y la verificación visual de los volúmenes convertidos está pendiente.

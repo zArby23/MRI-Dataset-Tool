@@ -1,4 +1,6 @@
+import ast
 import json
+from importlib.metadata import PackageNotFoundError
 from dataclasses import dataclass, replace
 from pathlib import Path
 from typing import Any, ClassVar
@@ -6,6 +8,7 @@ from typing import Any, ClassVar
 import numpy as np
 import pytest
 
+from mri_dataset_tool.application.pipeline import manifest as manifest_module
 from mri_dataset_tool.application.pipeline.manifest import (
     RunManifest,
     collect_versions,
@@ -167,6 +170,12 @@ def test_changed_step_version_raises_value_error() -> None:
         '{"config": {}, "versions": {}, "steps": [], "timestamps": {}, "reports":'
         ' [{"index": 1, "source_path": null, "steps": [{"name": "a", "version": "1", "params": {},'
         ' "status": "SECRET", "error_type": null}]}]}',
+        '{"config": {}, "versions": {}, "steps": [{"name": ["x"], "version": "1", "params": {}}],'
+        ' "reports": [], "timestamps": {}}',
+        '{"config": {}, "versions": {}, "steps": [{"name": "x", "version": 1, "params": {}}],'
+        ' "reports": [], "timestamps": {}}',
+        '{"config": {}, "versions": {}, "steps": [{"name": "x", "version": "1", "params": [1]}],'
+        ' "reports": [], "timestamps": {}}',
     ],
 )
 def test_malformed_json_raises_fixed_value_error(text: str) -> None:
@@ -194,3 +203,50 @@ def test_write_to_missing_directory_raises_fixed_message(tmp_path: Path) -> None
     with pytest.raises(OSError, match="could not be written") as info:
         _manifest_with_step("manifest.add").write(tmp_path / "secret_dir" / "run.json")
     assert "secret_dir" not in str(info.value)
+
+
+def test_overwrite_replaces_atomically(tmp_path: Path) -> None:
+    path = tmp_path / "run.json"
+    path.write_text("old", encoding="utf-8")
+    manifest = _manifest_with_step("manifest.add")
+
+    manifest.write(path, overwrite=True)
+
+    assert RunManifest.from_json(path.read_text(encoding="utf-8")) == manifest
+    assert [p.name for p in tmp_path.iterdir()] == ["run.json"]
+
+
+def test_failed_write_keeps_previous_file_and_leaves_no_temporaries(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    path = tmp_path / "secret_run.json"
+    path.write_text("old", encoding="utf-8")
+
+    def failing_replace(src: Path, dst: Path) -> None:
+        raise PermissionError(f"cannot replace {dst}")
+
+    monkeypatch.setattr(manifest_module.os, "replace", failing_replace)
+    with pytest.raises(OSError, match="could not be written") as info:
+        _manifest_with_step("manifest.add").write(path, overwrite=True)
+
+    assert "secret_run" not in str(info.value)
+    assert path.read_text(encoding="utf-8") == "old"
+    assert [p.name for p in tmp_path.iterdir()] == ["secret_run.json"]
+
+
+def test_missing_distribution_version_is_unknown(monkeypatch: pytest.MonkeyPatch) -> None:
+    def missing(name: str) -> str:
+        raise PackageNotFoundError(name)
+
+    monkeypatch.setattr(manifest_module, "version", missing)
+    versions = collect_versions()
+    assert versions["mri_dataset_tool"] == versions["numpy"] == "unknown"
+    assert versions["python"]
+
+
+def test_manifest_module_imports_no_format_or_array_libraries() -> None:
+    tree = ast.parse(Path(manifest_module.__file__).read_text(encoding="utf-8"))
+    imported = {
+        alias.name.split(".")[0] for node in ast.walk(tree) if isinstance(node, ast.Import) for alias in node.names
+    } | {node.module.split(".")[0] for node in ast.walk(tree) if isinstance(node, ast.ImportFrom) and node.module}
+    assert imported.isdisjoint({"numpy", "pydicom", "nibabel"})
