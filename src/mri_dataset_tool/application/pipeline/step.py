@@ -12,6 +12,12 @@ class ProcessingStep(Protocol):
     and must be deterministic given ``params``. ``params`` holds only JSON-serializable
     values and, passed back to the factory, rebuilds an equivalent step. ``name`` is the
     name the step is registered under.
+
+    A step that computes values to record (RF15) also defines
+    ``apply_with_outputs(study) -> tuple[MRIStudy, dict]``; the runner then uses it and
+    stores the dict in ``StepRecord.outputs``, and ``apply`` returns its first item.
+    Convention: ``{"series": [{"index": i, ...}]}`` with ``i`` the position in
+    ``study.series``, only for the series the step transformed.
     """
 
     @property

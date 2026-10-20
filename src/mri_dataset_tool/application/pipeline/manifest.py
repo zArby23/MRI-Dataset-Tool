@@ -43,7 +43,9 @@ class RunManifest:
         )
 
     def to_json(self) -> str:
-        return json.dumps(asdict(self), indent=2, sort_keys=True)
+        data = asdict(self)
+        data["reports"] = [report.to_dict() for report in self.reports]  # omits empty outputs
+        return json.dumps(data, indent=2, sort_keys=True)
 
     @classmethod
     def from_json(cls, text: str) -> "RunManifest":

@@ -25,6 +25,17 @@ class ProcessingStep(Protocol):
 - Es determinista dado `params`; sin estado oculto.
 - `params` debe ser **JSON puro**: `dict`, `list`, `str`, `int`, `float`, `bool`, `None`. Una tupla
   vuelve del JSON como lista y rompe `from_json(to_json(m)) == m` y la reproducción.
+- **Salidas calculadas (opcional, RF15):** un paso que calcula valores a registrar (media, forma
+  resultante, orientación de origen...) define además
+  `apply_with_outputs(study) -> tuple[MRIStudy, dict]`, y `apply` devuelve su primer elemento. El
+  runner usa `apply_with_outputs` si existe y guarda el dict en `StepRecord.outputs`; si no, llama a
+  `apply` y `outputs` queda `{}`. Convención obligatoria para los pasos de la etapa 3:
+  `{"series": [{"index": i, ...}]}`, con `i` la posición en `study.series`, solo para las series
+  transformadas. Solo tipos básicos JSON (convierte `np.float32`/`np.ndarray` con `float`/`tolist`);
+  nunca PHI, rutas, UIDs ni mensajes.
+- **Pasos incorporados:** viven en `application/pipeline/steps/`; su `__init__.py` importa cada módulo
+  y `manifest.py` importa el paquete, así que `pipeline_from_config`/`pipeline_from_manifest` los
+  encuentran por nombre sin importarlos a mano.
 - `@register_step("nombre")` registra la factory (normalmente la clase). Un nombre repetido lanza
   `ValueError`. `name` debe coincidir con el nombre registrado.
 - `build_step(name, params=None)`: un nombre desconocido lanza `ValueError("Unknown processing step.")`.
@@ -34,9 +45,15 @@ class ProcessingStep(Protocol):
 
 ## Registro de transformaciones
 
-- `StepRecord(name, version, params, status, error_type=None)`. `status` es `"ok"` o `"failed"`.
-  `error_type` es `type(error).__name__` y está presente solo si falló. **Nunca** guarda el mensaje
-  de la excepción.
+- `StepRecord(name, version, params, status, error_type=None, outputs={})`. `status` es `"ok"` o
+  `"failed"`. `error_type` es `type(error).__name__` y está presente solo si falló. **Nunca** guarda el
+  mensaje de la excepción.
+- `outputs` guarda los valores calculados por el paso en su forma JSON (copia profunda; las tuplas
+  pasan a listas, así que `from_json(to_json(m)) == m`). Un paso `failed` no tiene `outputs`. Un valor
+  no serializable o no finito lanza `ValueError("Step outputs must be JSON-serializable.")` sin causa
+  ni valor; dentro del runner eso hace fallar el paso para ese estudio y el lote continúa.
+  `to_dict()` omite la clave cuando está vacío (un manifiesto sin salidas es idéntico al de la etapa 2)
+  y `from_dict()` acepta registros antiguos sin ella. `outputs` entra en la igualdad del manifiesto.
 - `StudyReport(index, source_path, steps)`. `index` empieza en 1 y sigue el orden de entrada.
   `source_path` es `str(series[0].files[0])`, o `None` si el estudio no tiene archivos. `steps`
   sigue el orden de ejecución; el último es el que falló, si alguno falló.
@@ -78,7 +95,7 @@ Pipeline(steps).run(
 - `versions`: `mri_dataset_tool`, `python`, `numpy`, `nibabel` y `pydicom`, leídas con
   `importlib.metadata`. Si un paquete no está instalado, su valor es `"unknown"`.
 - `steps`: `{"name", "version", "params"}` de cada paso tal como se ejecutó.
-- `reports`: la lista que devuelve `run`.
+- `reports`: la lista que devuelve `run`, con los `outputs` de cada paso por estudio (no van en `steps`).
 - `timestamps`: `{"created_at": ISO 8601 UTC}`. Se guarda en el JSON pero **no entra en la
   igualdad** (`compare=False`), así que dos corridas reproducidas son iguales.
 

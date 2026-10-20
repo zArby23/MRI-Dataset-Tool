@@ -47,7 +47,13 @@ class Pipeline:
             current: MRIStudy | None = study
             for step in self.steps:
                 try:
-                    current = step.apply(current)
+                    apply_with_outputs = getattr(step, "apply_with_outputs", None)
+                    if apply_with_outputs is None:
+                        current, outputs = step.apply(current), {}
+                    else:
+                        current, outputs = apply_with_outputs(current)
+                    # built inside the boundary: non-JSON outputs fail this study, not the batch
+                    record = StepRecord(step.name, step.version, copy.deepcopy(step.params), "ok", outputs=outputs)
                 except Exception as error:  # per-study boundary: any failure must not stop the batch
                     records.append(
                         StepRecord(step.name, step.version, copy.deepcopy(step.params), "failed", type(error).__name__)
@@ -58,7 +64,7 @@ class Pipeline:
                     # shortcut: a study without files reports Path(); upgrade if such sources appear
                     _call_safely("on_error", on_error, source or Path(), error)
                     break
-                records.append(StepRecord(step.name, step.version, copy.deepcopy(step.params), "ok"))
+                records.append(record)
 
             report = StudyReport(index, str(source) if source is not None else None, records)
             reports.append(report)
