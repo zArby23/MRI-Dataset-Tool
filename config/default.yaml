@@ -1,0 +1,10 @@
+# Base configuration. Schema, defaults and precedence: docs/architecture/config.md
+logging:
+  level: INFO
+
+pipeline:
+  # Each entry: {name: <registered step name>, params: {...}}; run in order.
+  steps: []
+
+report:
+  path: data/output/run_manifest.json
