@@ -1,3 +1,4 @@
+import copy
 from collections.abc import Callable, Sequence
 from dataclasses import replace
 from typing import Any
@@ -14,11 +15,13 @@ def replace_volume(series: MRISeries, volume: Any, affine: np.ndarray) -> MRISer
 
     The only place processing writes ``shape``, ``voxel_size``, ``affine`` and
     ``orientation``: voxel size comes from the affine columns and orientation from
-    ``nib.aff2axcodes``. The rest of ``metadata`` and ``files`` is kept.
+    ``nib.aff2axcodes``. The rest of ``metadata`` (deep-copied, so nested dicts such as
+    ``bids``, ``sidecar`` or ``provenance`` are not shared with the input) and ``files``
+    is kept.
     """
     affine = _as_affine(affine)
     metadata = {
-        **series.metadata,
+        **copy.deepcopy({k: v for k, v in series.metadata.items() if k not in _GEOMETRY_KEYS}),
         "shape": tuple(int(n) for n in volume.shape),
         "voxel_size": tuple(float(v) for v in np.linalg.norm(affine[:3, :3], axis=0)),
         "affine": affine,
@@ -34,7 +37,11 @@ def validate_geometry(series: MRISeries) -> None:
     if "affine" not in series.metadata:
         raise ValueError("Series has no affine.")
     _as_affine(series.metadata["affine"])
-    if tuple(series.metadata.get("shape", ())) != tuple(series.volume.shape):
+    try:
+        shape = tuple(series.metadata.get("shape", ()))
+    except TypeError:
+        shape = None
+    if shape != tuple(series.volume.shape):
         raise ValueError("Series shape does not match its volume.")
 
 
@@ -50,20 +57,29 @@ def check_modalities(modalities: Sequence[str] | None) -> None:
 
 def apply_to_series(
     study: MRIStudy,
-    transform: Callable[[MRISeries], MRISeries],
+    transform: Callable[[MRISeries], tuple[MRISeries, dict[str, Any]]],
     modalities: Sequence[str] | None = None,
-) -> MRIStudy:
-    """Return a new study with *transform* applied to the selected series (Q12).
+) -> tuple[MRIStudy, dict[str, Any]]:
+    """Apply *transform* to the selected series (Q12); return the new study and its outputs.
 
     Selected: series with a volume and, when *modalities* is given, a ``modality`` in it
-    (``modality=None`` is then left out). The other series are kept as they are.
+    (``modality=None`` is then left out; ``[]`` selects nothing). The other series are kept
+    as they are. *transform* returns the new series and its computed values; the outputs
+    follow the ``StepRecord.outputs`` convention ``{"series": [{"index": i, ...}]}``, with
+    ``i`` the position in ``study.series``, for the transformed series only.
     """
     check_modalities(modalities)
+    series_list: list[MRISeries] = []
+    outputs: list[dict[str, Any]] = []
+    for index, series in enumerate(study.series):
+        if series.volume is not None and (modalities is None or series.modality in modalities):
+            series, values = transform(series)
+            outputs.append({"index": index, **values})
+        series_list.append(series)
+    return replace(study, series=series_list), {"series": outputs}
 
-    def selected(series: MRISeries) -> bool:
-        return series.volume is not None and (modalities is None or series.modality in modalities)
 
-    return replace(study, series=[transform(s) if selected(s) else s for s in study.series])
+_GEOMETRY_KEYS = ("shape", "voxel_size", "affine", "orientation")
 
 
 def _as_affine(raw: Any) -> np.ndarray:
@@ -75,6 +91,8 @@ def _as_affine(raw: Any) -> np.ndarray:
         raise ValueError("Affine must be a 4x4 matrix.")
     if not np.all(np.isfinite(affine)):
         raise ValueError("Affine must be finite.")
+    if not np.array_equal(affine[3], [0.0, 0.0, 0.0, 1.0]):
+        raise ValueError("Affine must have [0, 0, 0, 1] as its last row.")
     if np.linalg.matrix_rank(affine) < 4:
         raise ValueError("Affine must be invertible.")
     return affine

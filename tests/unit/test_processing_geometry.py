@@ -84,6 +84,17 @@ def test_replace_volume_keeps_other_metadata_and_files_without_mutating_input() 
     assert result.metadata["affine"][0, 0] == -1.0
 
 
+def test_replace_volume_does_not_share_nested_metadata_with_input() -> None:
+    series = _series(metadata={"affine": np.eye(4), "sidecar": {"EchoTime": 0.03}, "provenance": {"tool": "x"}})
+
+    result = replace_volume(series, np.ones((2, 2, 2)), np.eye(4))
+    result.metadata["sidecar"]["EchoTime"] = 1.0
+    result.metadata["provenance"]["tool"] = "y"
+
+    assert series.metadata["sidecar"] == {"EchoTime": 0.03}
+    assert series.metadata["provenance"] == {"tool": "x"}
+
+
 def test_replace_volume_4d_takes_spatial_geometry_from_affine() -> None:
     result = replace_volume(_series(), np.zeros((2, 3, 4, 5)), AFFINES["anisotropic"][0])
 
@@ -98,14 +109,15 @@ BAD_AFFINES = {
     "nan": np.diag([1.0, np.nan, 1.0, 1.0]),
     "inf": np.diag([1.0, 1.0, np.inf, 1.0]),
     "singular": np.diag([1.0, 0.0, 1.0, 1.0]),
+    "projective_last_row": np.array([[1.0, 0, 0, 0], [0, 1, 0, 0], [0, 0, 1, 0], [0, 0, 0.5, 1]]),
 }
 
 
 @pytest.mark.parametrize("name", BAD_AFFINES)
 def test_invalid_affine_is_rejected_with_fixed_message(name: str) -> None:
-    with pytest.raises(ValueError, match=r"^Affine must be") as replace_error:
+    with pytest.raises(ValueError, match=r"^Affine must") as replace_error:
         replace_volume(_series(), np.zeros((2, 3, 4)), BAD_AFFINES[name])
-    with pytest.raises(ValueError, match=r"^Affine must be") as validate_error:
+    with pytest.raises(ValueError, match=r"^Affine must") as validate_error:
         validate_geometry(_series(metadata={"shape": (2, 3, 4), "affine": BAD_AFFINES[name]}))
 
     assert replace_error.value.__cause__ is None
@@ -117,6 +129,8 @@ def test_validate_geometry_rejects_shape_mismatch_missing_volume_and_affine() ->
         validate_geometry(_series(metadata={"shape": (2, 3, 5), "affine": np.eye(4)}))
     with pytest.raises(ValueError, match="^Series shape does not match its volume.$"):
         validate_geometry(_series(metadata={"affine": np.eye(4)}))
+    with pytest.raises(ValueError, match="^Series shape does not match its volume.$"):
+        validate_geometry(_series(metadata={"shape": 3, "affine": np.eye(4)}))
     with pytest.raises(ValueError, match="^Series has no volume.$"):
         validate_geometry(_series(volume=None))
     with pytest.raises(ValueError, match="^Series has no affine.$"):
@@ -127,8 +141,8 @@ def test_validate_geometry_accepts_list_affine_from_manifest_like_metadata() -> 
     validate_geometry(_series(metadata={"shape": [2, 3, 4], "affine": np.eye(4).tolist()}))
 
 
-def _mark(series: MRISeries) -> MRISeries:
-    return replace_volume(series, series.volume + 1, series.metadata["affine"])
+def _mark(series: MRISeries) -> tuple[MRISeries, dict]:
+    return replace_volume(series, series.volume + 1, series.metadata["affine"]), {"marked": True}
 
 
 def _study() -> MRIStudy:
@@ -146,8 +160,9 @@ def _study() -> MRIStudy:
 def test_apply_to_series_without_filter_transforms_every_series_with_volume() -> None:
     study = _study()
 
-    result = apply_to_series(study, _mark)
+    result, outputs = apply_to_series(study, _mark)
 
+    assert outputs == {"series": [{"index": 0, "marked": True}, {"index": 1, "marked": True}, {"index": 2, "marked": True}]}
     assert result is not study
     assert [s.volume.max() if s.volume is not None else None for s in result.series] == [1, 1, 1, None]
     assert result.series[3] is study.series[3]
@@ -157,8 +172,9 @@ def test_apply_to_series_without_filter_transforms_every_series_with_volume() ->
 def test_apply_to_series_with_filter_only_transforms_listed_modalities() -> None:
     study = _study()
 
-    result = apply_to_series(study, _mark, ["T1w"])
+    result, outputs = apply_to_series(study, _mark, ["T1w"])
 
+    assert outputs == {"series": [{"index": 0, "marked": True}]}
     assert result.series[0].volume.max() == 1
     assert result.series[1:] == study.series[1:]
     assert all(a is b for a, b in zip(result.series[1:], study.series[1:]))  # modality=None excluded
@@ -167,7 +183,10 @@ def test_apply_to_series_with_filter_only_transforms_listed_modalities() -> None
 def test_apply_to_series_with_empty_filter_selects_nothing() -> None:
     study = _study()
 
-    assert apply_to_series(study, _mark, []).series == study.series
+    result, outputs = apply_to_series(study, _mark, [])
+
+    assert result.series == study.series
+    assert outputs == {"series": []}
 
 
 @pytest.mark.parametrize("modalities", ["T1w", 3, [1], {"T1w": 1}])
