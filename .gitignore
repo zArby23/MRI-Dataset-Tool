@@ -221,6 +221,7 @@ __marimo__/
 data/raw/
 data/processed/
 data/output/
+notebooks/
 
 *.dcm
 *.nii
