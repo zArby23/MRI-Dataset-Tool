@@ -5,3 +5,5 @@ Each step module is imported here; ``manifest.py`` imports this package so that
 """
 
 from mri_dataset_tool.application.pipeline.steps import validate  # noqa: F401
+
+from mri_dataset_tool.application.pipeline.steps import anonymize  # noqa: F401
