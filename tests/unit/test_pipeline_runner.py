@@ -140,10 +140,50 @@ def test_streaming_is_lazy_and_releases_each_study(tmp_path: Path) -> None:
         assert consumed == report.index  # the next study was not read yet
         output_refs.append(weakref.ref(study))
 
-    reports = Pipeline([tracker]).run(source(), on_result)
+    errors: list[str] = []
+    reports = Pipeline([tracker, FailOnSubjectStep("02")]).run(
+        source(), on_result, lambda p, e: errors.append(type(e).__name__)
+    )
 
-    assert len(reports) == 3
+    assert [r.steps[-1].status for r in reports] == ["ok", "failed", "ok"]
+    assert errors == ["ValueError"]
+    assert len(output_refs) == 2
     assert all(ref() is None for ref in tracker.seen + output_refs)
+
+
+def test_exception_from_the_iterable_propagates(tmp_path: Path) -> None:
+    results: list[int] = []
+
+    def source() -> Iterator[MRIStudy]:
+        yield _study("01", tmp_path)
+        raise ValueError("No valid NIfTI studies were found.")
+
+    with pytest.raises(ValueError, match="No valid NIfTI"):
+        Pipeline([AddStep()]).run(source(), lambda s, r: results.append(r.index))
+    assert results == [1]
+
+
+def test_reports_do_not_share_params_objects(tmp_path: Path) -> None:
+    @dataclass(frozen=True)
+    class SharedParamsStep:
+        shared: ClassVar[dict[str, Any]] = {"axes": [0, 1]}
+        name: ClassVar[str] = "test.shared"
+        version: ClassVar[str] = "1"
+
+        @property
+        def params(self) -> dict[str, Any]:
+            return self.shared
+
+        def apply(self, study: MRIStudy) -> MRIStudy:
+            return study
+
+    studies = [_study(s, tmp_path) for s in ("01", "02")]
+    reports = Pipeline([SharedParamsStep()]).run(studies, lambda s, r: None)
+
+    first, second = (r.steps[0].params for r in reports)
+    assert first == second == SharedParamsStep.shared
+    assert first is not second and first["axes"] is not second["axes"]
+    assert first is not SharedParamsStep.shared
 
 
 def test_logs_have_no_paths_or_uids(tmp_path: Path, caplog: pytest.LogCaptureFixture) -> None:

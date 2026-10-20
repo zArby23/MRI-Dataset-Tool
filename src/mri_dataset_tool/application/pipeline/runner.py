@@ -1,3 +1,4 @@
+import copy
 from collections.abc import Callable, Iterable, Sequence
 from pathlib import Path
 from typing import Any
@@ -30,6 +31,9 @@ class Pipeline:
         is called with the study's first file and the batch continues. Returns one
         ``StudyReport`` per study (successful and failed), in input order; reports hold
         paths, step names and exception type names, never exception messages.
+
+        If ``on_error`` keeps the exception, its ``__traceback__`` keeps the failing
+        study (and its volume) alive; keep only what is needed, e.g. ``type(error)``.
         """
         reports: list[StudyReport] = []
         failed_count = 0
@@ -45,14 +49,16 @@ class Pipeline:
                 try:
                     current = step.apply(current)
                 except Exception as error:  # per-study boundary: any failure must not stop the batch
-                    records.append(StepRecord(step.name, step.version, step.params, "failed", type(error).__name__))
+                    records.append(
+                        StepRecord(step.name, step.version, copy.deepcopy(step.params), "failed", type(error).__name__)
+                    )
                     current = None
                     failed_count += 1
                     logger.warning("Skipping study that failed in a processing step (%s)", type(error).__name__)
                     # shortcut: a study without files reports Path(); upgrade if such sources appear
                     _call_safely("on_error", on_error, source or Path(), error)
                     break
-                records.append(StepRecord(step.name, step.version, step.params, "ok"))
+                records.append(StepRecord(step.name, step.version, copy.deepcopy(step.params), "ok"))
 
             report = StudyReport(index, str(source) if source is not None else None, records)
             reports.append(report)
