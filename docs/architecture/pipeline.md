@@ -33,6 +33,7 @@ class ProcessingStep(Protocol):
   `{"series": [{"index": i, ...}]}`, con `i` la posición en `study.series`, solo para las series
   transformadas. Solo tipos básicos JSON (convierte `np.float32`/`np.ndarray` con `float`/`tolist`);
   nunca PHI, rutas, UIDs ni mensajes.
+  Las claves deben ser `str` (`json.dumps` convierte `{0: x}` en `{"0": x}` en silencio) y `apply` debe delegar en `apply_with_outputs(study)[0]`.
 - **Pasos incorporados:** viven en `application/pipeline/steps/`; su `__init__.py` importa cada módulo
   y `manifest.py` importa el paquete, así que `pipeline_from_config`/`pipeline_from_manifest` los
   encuentran por nombre sin importarlos a mano.
