@@ -70,3 +70,29 @@ for study in NIfTIBatchReader().iter_studies(root, lazy=True):
 | `lazy=True` | 1,3 MB |
 
 Pendiente (verificación manual del humano): medir sobre la sesión con difusión de BIDS ds005299.
+
+## Paso `validate` (RF03, I1)
+
+Comprobaciones puras en `infrastructure/processing/validation.py` (`validate_series`); el paso
+`validate` (`application/pipeline/steps/validate.py`, versión `1`) las aplica a las series con volumen
+seleccionadas por `params.modalities` (por defecto todas). No cambia el volumen ni la geometría.
+
+- **Graves (Q6): rechazan el estudio** con `ValueError` de mensaje fijo; el runner lo marca `failed` y
+  el lote sigue:
+  - geometría ausente o incoherente (`validate_geometry`: affine no 4×4, no finita, última fila distinta
+    de `[0, 0, 0, 1]` o no invertible; `shape` distinta de la del volumen);
+  - volumen vacío (`"Volume is empty."`);
+  - `voxel_size` ausente, nulo, negativo o no finito (`"Voxel size must be three positive finite numbers."`);
+  - dimensionalidad distinta de 3D/4D (`"Unsupported volume dimensionality."`);
+  - valores NaN/Inf (`"Volume contains non-finite values."`);
+  - volumen perezoso ilegible o truncado (`"Unable to read volume data."`).
+- **No graves: se anotan** con códigos constantes y el estudio pasa: `CONSTANT_VOLUME` (mínimo igual
+  al máximo en toda la serie) y `SINGLE_VOLUME_4D` (4D con un solo volumen).
+- Cada serie comprobada recibe `metadata["validation"] = {"status": "ok", "findings": [códigos]}`.
+  `StepRecord.outputs` = `{"series": [{"index": i, "findings": [códigos], "volumes_checked": n}]}`:
+  solo códigos y conteos, nunca valores del volumen, rutas ni PHI.
+- El volumen se lee de a un volumen 3D en `float64` (`iter_volumes_3d`), también si es perezoso, y no
+  se materializa en la serie de salida. Si el dtype en disco es entero, se omite la comprobación de
+  NaN/Inf (no pueden existir). Un `.nii.gz` truncado cargado con `lazy=True` falla aquí.
+- No duplica la etapa 1: los archivos ilegibles al cargar los reporta el `on_error` de los lectores y la
+  geometría DICOM la valida `build_series_volume`.

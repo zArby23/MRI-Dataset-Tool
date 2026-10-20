@@ -3,3 +3,5 @@
 Each step module is imported here; ``manifest.py`` imports this package so that
 ``pipeline_from_config`` and ``pipeline_from_manifest`` find them by name.
 """
+
+from mri_dataset_tool.application.pipeline.steps import validate  # noqa: F401
