@@ -180,3 +180,59 @@ El script corre `example.scale` sobre `data/raw/nifti_test_studies` con la confi
 ignora. Después reconstruye el pipeline desde ese manifiesto y lo vuelve a correr, e imprime
 `reproduced from manifest: True` si ambas corridas coinciden. Revisa que el JSON solo contenga rutas,
 pasos, parámetros, versiones y tipos de excepción, nunca mensajes ni valores de cabecera.
+
+## Ejemplo de la etapa 3 (E1)
+
+`config/stage3_example.yaml` define el pipeline completo solo con claves admitidas por el loader
+(`pipeline.steps`, `report.path`):
+
+```yaml
+pipeline:
+  steps:
+    - name: validate
+    - name: anonymize
+    - name: reorient
+      params: {target: RAS}
+    - name: resample
+      params: {spacing: [1.0, 1.0, 1.0], interpolation: linear}
+    - name: normalize
+      params: {method: zscore, mask: nonzero, per_volume: true}
+report:
+  path: data/output/stage3_run_manifest.json
+```
+
+`scripts/run_stage3_pipeline.py`:
+
+1. Si `MRI_ANON_KEY` falta o tiene menos de 32 caracteres, termina con un mensaje fijo (código 2)
+   sin traceback y sin crear nada; lo mismo si falta `data/raw/nifti_test_studies` (el mensaje
+   lleva solo esa ruta relativa fija). Si existen salidas de una corrida anterior
+   (`data/processed/study-*.nii.gz` o el manifiesto), se detiene sin sobrescribir (código 1).
+2. Lee `data/raw/nifti_test_studies` con `NIfTIBatchReader.iter_studies(lazy=True)`: un estudio a la
+   vez y sin leer vóxeles hasta que un paso los pide.
+3. `on_result` materializa con `load_array(volume, np.float32)` y escribe con `NIfTIWriter`
+   (`overwrite=False`) en `data/processed/study-NNN.nii.gz`, con `NNN` = posición en el orden de
+   entrada (`StudyReport.index`), nunca el nombre de origen. Un fallo de escritura se reporta como
+   cualquier otro error.
+4. `on_error` imprime solo el tipo de excepción y un contador; al final, conteos de estudios ok y
+   fallidos y errores por tipo.
+5. Escribe el manifiesto, comprueba que no contiene la ruta de entrada ni `sub-` (C1: `anonymize`
+   declara `redacts_sources`), lo reconstruye con `pipeline_from_manifest`, vuelve a correr sin
+   escribir y compara.
+
+La versión ejecutable con un lote sintético (NaN, otra orientación y otro espaciado) está en
+`tests/unit/test_pipeline_stage3_example.py`.
+
+Verificación manual (humano), desde la raíz del repositorio:
+
+```powershell
+$env:MRI_ANON_KEY = "<secreto de al menos 32 caracteres>"
+python scripts/run_stage3_pipeline.py
+```
+
+Abrir en un visor un volumen de `data/raw/nifti_test_studies` y su `data/processed/study-NNN.nii.gz`
+(orientación, espaciado de 1 mm, contraste normalizado). Revisar que
+`data/output/stage3_run_manifest.json` no contenga rutas, nombres `sub-`, la clave ni mensajes.
+
+Pico de memoria medido con `scripts/memory_check_nifti_batch.py` sobre `data/raw/nifti_test_studies`
+(6 archivos, 2026-10-20, Windows): carga eager +97.7 MB sobre la línea base; `--lazy` +1.3 MB. Mide
+solo la lectura del lote, no el pipeline completo.
