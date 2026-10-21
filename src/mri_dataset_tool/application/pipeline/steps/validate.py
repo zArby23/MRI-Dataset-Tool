@@ -1,3 +1,4 @@
+import copy
 from dataclasses import replace
 from typing import Any
 
@@ -36,5 +37,6 @@ class ValidateStep:
 
 def _validate(series: MRISeries) -> tuple[MRISeries, dict[str, Any]]:
     result = validate_series(series)
-    metadata = {**series.metadata, "validation": {"status": "ok", "findings": list(result["findings"])}}
+    # Deep copy, as replace_volume does: editing the output must not change the input.
+    metadata = {**copy.deepcopy(series.metadata), "validation": {"status": "ok", "findings": list(result["findings"])}}
     return replace(series, metadata=metadata, files=list(series.files)), result

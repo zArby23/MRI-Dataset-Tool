@@ -44,7 +44,7 @@ class NIfTIWriter:
 
         # Atomic write: temp file in the same directory keeps the NIfTI suffix
         # (nibabel picks compression from it), so a failure never leaves a partial output.
-        suffix = ".nii.gz" if path.name.endswith(".nii.gz") else ".nii"
+        suffix = ".nii.gz" if path.name.lower().endswith(".nii.gz") else ".nii"
         tmp = path.with_name(f".{path.name}.tmp{suffix}")
         try:
             nib.save(image, tmp)

@@ -29,6 +29,9 @@ def load_array(volume: Any, dtype: Any = None) -> np.ndarray:
     float when the header scales intensities).
     """
     resolved = _check_dtype(dtype)
+    if np.dtype(volume.dtype).kind == "c":
+        # A float cast would drop the imaginary part with only a warning.
+        raise ValueError("Unsupported NIfTI data type.")
     try:
         return np.asarray(volume, dtype=resolved)
     except _READ_ERRORS as error:

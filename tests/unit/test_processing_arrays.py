@@ -147,3 +147,8 @@ def test_proxy_keeps_no_file_open(tmp_path: Path) -> None:
     load_array(proxy)
     path.unlink()  # fails on Windows if the file stayed open or memory-mapped
     assert not path.exists()
+
+
+def test_load_array_rejects_complex_source() -> None:
+    with pytest.raises(ValueError, match=r"^Unsupported NIfTI data type\.$"):
+        load_array(np.ones((2, 3, 4), dtype=np.complex64), np.float32)

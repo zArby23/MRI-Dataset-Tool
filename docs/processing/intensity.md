@@ -40,7 +40,8 @@ for study in NIfTIBatchReader().iter_studies(root, lazy=True):
     un proxy solo se lee ese volumen). Es un generador: los errores salen en el primer `next()`.
   - Errores con mensaje fijo, sin rutas: `"Invalid volume dtype."` (solo enteros y flotantes reales),
     `"Unsupported volume dimensionality."` (no 3D/4D), `"Unable to read volume data."` (archivo
-    truncado, corrupto o borrado al materializar).
+    truncado, corrupto o borrado al materializar) y `"Unsupported NIfTI data type."` (origen complejo:
+    convertirlo a real perdería la parte imaginaria; `NIfTIReader` ya rechaza estos archivos al cargar, QA1-01).
 - Con `lazy=True` el lector abre la imagen con `mmap=False` y nibabel no mantiene el archivo abierto
   (`keep_file_open=False`): el archivo se puede borrar o mover (también en Windows) mientras el proxy
   existe; materializarlo después falla con `"Unable to read volume data."`.

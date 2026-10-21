@@ -134,3 +134,9 @@ def test_unsupported_dtype_raises_generic_value_error(tmp_path: Path, dtype: typ
     with pytest.raises(ValueError):
         NIfTIWriter().write(series, tmp_path / "x.nii")
     assert list(tmp_path.iterdir()) == []
+
+
+def test_write_upper_case_gz_extension_is_compressed(tmp_path: Path) -> None:
+    path = NIfTIWriter().write(_series(), tmp_path / "x.NII.GZ")
+    assert path.read_bytes()[:2] == b"\x1f\x8b"
+    assert np.array_equal(nib.load(path).get_fdata(), _series().volume)

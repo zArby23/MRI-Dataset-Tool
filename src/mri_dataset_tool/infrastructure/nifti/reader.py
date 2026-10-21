@@ -13,7 +13,7 @@ logger = get_logger(__name__)
 
 def is_nifti_file(path: Path) -> bool:
     """Return whether *path* uses a supported single-file NIfTI suffix."""
-    return path.name.endswith((".nii", ".nii.gz"))
+    return path.name.lower().endswith((".nii", ".nii.gz"))
 
 
 class NIfTIReader:
@@ -40,13 +40,14 @@ class NIfTIReader:
 
         logger.info("Loading NIfTI study")
         try:
-            if lazy:
-                # No mmap: a memory map would keep the file open (locked on Windows).
-                image = nib.load(path, mmap=False)
-                volume = image.dataobj
-            else:
-                image = nib.load(path)
-                volume = image.get_fdata()
+            # No mmap when lazy: a memory map would keep the file open (locked on Windows).
+            image = nib.load(path, mmap=False) if lazy else nib.load(path)
+            if image.header.get_data_dtype().kind == "c":
+                # get_fdata() and float casts drop the imaginary part with only a warning.
+                raise ValueError("Unsupported NIfTI data type.")
+            if any(size < 0 for size in image.shape):
+                raise OSError("Negative NIfTI dimension.")  # numpy would fail with its own message
+            volume = image.dataobj if lazy else image.get_fdata()
         except (ImageFileError, OSError, EOFError) as error:
             logger.error("Unable to load NIfTI image")
             raise ValueError("Unable to load NIfTI image.") from error

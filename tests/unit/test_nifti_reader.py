@@ -169,3 +169,30 @@ def test_nifti_writer_requantizes_scaled_lazy_proxy(tmp_path: Path) -> None:
     # nibabel recomputes slope/inter for the on-disk int16: close, not exact.
     # Materialize with load_array(volume, dtype) first when exact values matter.
     np.testing.assert_allclose(written, data * 0.5 + 1.0, atol=1e-2)
+
+
+@pytest.mark.parametrize("lazy", [False, True])
+def test_load_study_rejects_complex_data(tmp_path: Path, lazy: bool) -> None:
+    path = tmp_path / "complex.nii"
+    nib.save(nib.Nifti1Image((np.ones((2, 3, 4)) + 1j).astype(np.complex64), np.eye(4)), path)
+    with pytest.raises(ValueError, match=r"^Unsupported NIfTI data type\.$"):
+        NIfTIReader().load_study(path, lazy=lazy)
+
+
+@pytest.mark.parametrize("lazy", [False, True])
+def test_load_study_negative_dim_raises_fixed_message(tmp_path: Path, lazy: bool) -> None:
+    path = tmp_path / "x.nii"
+    nib.save(nib.Nifti1Image(np.zeros((2, 3, 4), dtype=np.int16), np.eye(4)), path)
+    raw = bytearray(path.read_bytes())
+    raw[42:44] = np.int16(-3).tobytes()  # dim[1], little-endian
+    path.write_bytes(bytes(raw))
+    with pytest.raises(ValueError, match=r"^Unable to load NIfTI image\.$"):
+        NIfTIReader().load_study(path, lazy=lazy)
+
+
+@pytest.mark.parametrize("name", ["UP.NII", "mixed.nii.GZ", "UP.NII.GZ"])
+def test_upper_case_extensions_are_loaded(tmp_path: Path, name: str) -> None:
+    nib.save(nib.Nifti1Image(np.zeros((2, 3, 4), dtype=np.int16), np.eye(4)), tmp_path / name)
+    assert NIfTIReader().load_study(tmp_path / name).series[0].volume.shape == (2, 3, 4)
+    studies = NIfTIBatchReader().load_studies(tmp_path)
+    assert [s.series[0].files[0].name for s in studies] == [name]

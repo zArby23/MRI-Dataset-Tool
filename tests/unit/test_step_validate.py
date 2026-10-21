@@ -157,3 +157,12 @@ def test_step_does_not_retain_studies() -> None:
     Pipeline([build_step("validate")]).run(source(), lambda s, r: refs.append(weakref.ref(s)))
     gc.collect()
     assert len(refs) == 3 and all(ref() is None for ref in refs)
+
+
+def test_output_does_not_share_nested_metadata_with_input() -> None:
+    study = MRIStudy(study_uid=None, series=[_series(_ramp())])
+    out = build_step("validate").apply(study)
+    out.series[0].metadata["affine"][0, 3] += 1
+    out.series[0].metadata["sidecar"]["EchoTime"] = 1.0
+    assert study.series[0].metadata["affine"][0, 3] == 0
+    assert "EchoTime" not in study.series[0].metadata["sidecar"]
