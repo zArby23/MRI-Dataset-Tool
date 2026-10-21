@@ -14,6 +14,7 @@ Algoritmos en `infrastructure/processing/` (solo `numpy`, `nibabel`, `scipy`; no
 | `resample` | `spacing` | `[1.0, 1.0, 1.0]` (mm) | 3 números finitos positivos (no `bool`) | `Spacing must be three finite positive numbers.` |
 | `resample` | `interpolation` | `"linear"` | `"nearest"`, `"linear"`, `"cubic"` | `Unknown interpolation.` |
 | `resample` | `modalities` | `None` (todas) | lista de `str` | `Modalities must be a list of strings.` |
+| `resample` | `max_output_voxels` | `4294967296` (`2**32`) | entero positivo (no `bool` ni `float`) | `Max output voxels must be a positive integer.` |
 
 Errores al aplicar (el runner marca el estudio `failed` y el lote sigue): los de `validate_geometry`,
 `Unsupported volume dimensionality.` (ni 3D ni 4D) y, en `resample`,
@@ -93,9 +94,13 @@ Algoritmo (`resample.py`), decisiones Q5:
 - **Antialiasing:** al reducir resolución en un eje (factor `spacing / voxel > 1`), se suaviza antes
   con un gaussiano de `sigma = (factor - 1) / 2` voxels de entrada (`mode="nearest"`). No se aplica
   con `nearest`, para conservar el conjunto de valores.
-- **Límite de tamaño:** si la salida supera `MAX_OUTPUT_VOXELS = 2**28` voxels (1 GiB en `float32`,
-  contando el eje temporal), lanza `ValueError("Resampled volume would be too large.")` antes de
-  reservar memoria.
+- **Límite de tamaño:** si la salida supera `max_output_voxels` voxels (contando el eje temporal;
+  por defecto `MAX_OUTPUT_VOXELS = 2**32`, 16 GiB en `float32`), lanza
+  `ValueError("Resampled volume would be too large.")` antes de reservar memoria. Es una red de
+  seguridad contra un `spacing` diminuto, no un control de la RAM disponible: se sube o baja desde el
+  YAML (`params: {max_output_voxels: ...}`). Antes valía `2**28` y rechazaba una difusión real
+  (144×144×78×140 a 1,8 mm → 260×260×141×140 ≈ 1.330 millones de voxels a 1 mm). Los manifiestos
+  anteriores, sin este parámetro, se reconstruyen con el defecto nuevo (la versión del paso sigue en `"1"`).
 
 | Propiedad | Qué pasa |
 |---|---|
@@ -112,9 +117,13 @@ Algoritmo (`resample.py`), decisiones Q5:
   esa caja se pierden, y las zonas de la caja sin datos de entrada valen `0`.
 - **`cubic`:** puede producir sobreoscilación (valores fuera del rango de entrada) cerca de bordes
   marcados.
-- **Memoria:** 4D volumen a volumen con `iter_volumes_3d` en `float32`. El pico es la salida
-  completa más un volumen 3D de entrada y sus copias de trabajo (suavizado y relleno), que se
-  liberan antes de leer el siguiente.
+- **Memoria:** 4D volumen a volumen con `iter_volumes_3d` en `float32`, pero la salida 4D se reserva
+  entera en `float32` desde el principio. El pico es la salida completa más un volumen 3D de entrada
+  y sus copias de trabajo (suavizado y relleno), que se liberan antes de leer el siguiente. Medido
+  (QA1-07, entrada perezosa `int16` 144×144×78×T a 1,8 mm → 1 mm, `tracemalloc` y working set
+  coinciden): pico = salida + ≈ 46 MiB constantes (T=5: 228 MiB; T=10: 410 MiB; T=20: 773 MiB),
+  ≈ 1,6 s por volumen. Extrapolado a T=140: ≈ 5,0 GiB y ≈ 4 min. Pasos posteriores que crean otro
+  volumen (p. ej. `normalize`) suman su propia salida mientras la anterior sigue viva.
 - **`outputs`:** `{"series": [{"index": i, "shape": [...], "spacing": [...]}]}` (`int`/`float`
   nativos; `spacing` sale del affine resultante).
 
@@ -129,7 +138,10 @@ Algoritmo (`resample.py`), decisiones Q5:
   sin datos valen `0`.
 - **`resample` con `cubic`:** sobreoscilación (*ringing*) cerca de bordes marcados; puede dar valores
   fuera del rango de entrada.
-- **`MAX_OUTPUT_VOXELS = 2**28`** (1 GiB en `float32`, eje temporal incluido): un `spacing` que pida
-  más se rechaza antes de reservar memoria.
-- **Memoria de `resample`:** el pico es la salida completa más un volumen 3D de entrada y sus copias
-  de trabajo; no hay recorte ni relleno a matriz fija (etapa 4).
+- **`max_output_voxels`** (defecto `2**32` = 16 GiB en `float32`, eje temporal incluido): un `spacing`
+  que pida más se rechaza antes de reservar memoria. El límite no mira la RAM libre: una salida
+  permitida que no cabe da `MemoryError` al reservarla (el runner marca el estudio `failed` y sigue);
+  en Linux con *overcommit* el proceso puede morir por OOM en vez de fallar.
+- **Memoria de `resample`:** el pico es la salida 4D completa en `float32` más un volumen 3D de
+  entrada y sus copias de trabajo (≈ 5 GiB para una difusión 144×144×78×140 a 1 mm); no hay salida en
+  disco ni por trozos, ni recorte o relleno a matriz fija (etapa 4).

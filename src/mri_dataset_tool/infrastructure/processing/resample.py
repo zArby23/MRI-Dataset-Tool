@@ -11,8 +11,9 @@ from mri_dataset_tool.infrastructure.processing.arrays import iter_volumes_3d
 
 INTERPOLATION_ORDERS = {"nearest": 0, "linear": 1, "cubic": 3}
 
-# 2**28 float32 voxels = 1 GiB: guards against a tiny spacing asking for a huge output
-MAX_OUTPUT_VOXELS = 2**28
+# Default safety net (2**32 float32 voxels = 16 GiB, the time axis included): a tiny spacing must
+# not ask for an impossible output; real 4D diffusion at 1 mm (~1.3e9 voxels) fits under it
+MAX_OUTPUT_VOXELS = 2**32
 
 # shape * voxel / spacing is ceiled; this absorbs float error (3 * 0.1 / 0.1 = 3.0000000000000004)
 _CEIL_TOLERANCE = 1e-6
@@ -25,6 +26,11 @@ def check_spacing(spacing: Any) -> None:
     for value in spacing:
         if isinstance(value, bool) or not isinstance(value, (int, float)) or not math.isfinite(value) or value <= 0:
             raise ValueError("Spacing must be three finite positive numbers.")
+
+
+def check_max_output_voxels(max_output_voxels: Any) -> None:
+    if isinstance(max_output_voxels, bool) or not isinstance(max_output_voxels, int) or max_output_voxels <= 0:
+        raise ValueError("Max output voxels must be a positive integer.")
 
 
 def check_interpolation(interpolation: Any) -> None:
@@ -53,7 +59,11 @@ def target_grid(shape: tuple[int, ...], affine: np.ndarray, spacing: Any) -> tup
 
 
 def resample(
-    volume: Any, affine: np.ndarray, spacing: Any = (1.0, 1.0, 1.0), interpolation: str = "linear"
+    volume: Any,
+    affine: np.ndarray,
+    spacing: Any = (1.0, 1.0, 1.0),
+    interpolation: str = "linear",
+    max_output_voxels: int = MAX_OUTPUT_VOXELS,
 ) -> tuple[np.ndarray, np.ndarray]:
     """Resample *volume* (3D or 4D, ``ndarray`` or lazy) to *spacing* on an RAS-aligned grid.
 
@@ -62,17 +72,19 @@ def resample(
     is smoothed with a Gaussian (``sigma = (factor - 1) / 2`` voxels; not with ``nearest``).
     The input is edge-padded by one voxel so the field of view's outer half voxel takes the
     edge value; output points beyond it are 0. 4D is processed one 3D volume at a time and the
-    time axis is left as is.
+    time axis is left as is. An output of more than *max_output_voxels* voxels (time axis
+    included) is rejected before allocating.
     """
     check_spacing(spacing)
     check_interpolation(interpolation)
+    check_max_output_voxels(max_output_voxels)
     if len(volume.shape) not in (3, 4):
         raise ValueError("Unsupported volume dimensionality.")
     affine = np.asarray(affine, dtype=float)
     shape = tuple(int(n) for n in volume.shape)
     new_shape, new_affine = target_grid(shape, affine, spacing)
     out_shape = new_shape + shape[3:]
-    if math.prod(out_shape) > MAX_OUTPUT_VOXELS:
+    if math.prod(out_shape) > max_output_voxels:
         raise ValueError("Resampled volume would be too large.")
 
     mapping = np.linalg.inv(affine) @ new_affine  # output index -> input index
@@ -84,8 +96,8 @@ def resample(
             factor = float(spacing[int(world_axis)]) / voxel[axis]
             sigma[axis] = max(0.0, (factor - 1) / 2)
 
-    out = np.empty(out_shape, dtype=np.float32)
     frames = iter_volumes_3d(volume, np.float32)
+    out = np.empty(out_shape, dtype=np.float32)
     t = 0  # no enumerate(): its cached tuple would keep the previous frame alive
     for frame in frames:
         if any(sigma):

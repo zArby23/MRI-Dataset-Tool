@@ -10,7 +10,13 @@ from mri_dataset_tool.infrastructure.processing.geometry import (
     replace_volume,
     validate_geometry,
 )
-from mri_dataset_tool.infrastructure.processing.resample import check_interpolation, check_spacing, resample
+from mri_dataset_tool.infrastructure.processing.resample import (
+    MAX_OUTPUT_VOXELS,
+    check_interpolation,
+    check_max_output_voxels,
+    check_spacing,
+    resample,
+)
 
 
 @register_step("resample")
@@ -24,6 +30,7 @@ class ResampleStep:
     spacing: list[float] = field(default_factory=lambda: [1.0, 1.0, 1.0])
     interpolation: str = "linear"
     modalities: list[str] | None = None
+    max_output_voxels: int = MAX_OUTPUT_VOXELS
     name: ClassVar[str] = "resample"
     version: ClassVar[str] = "1"
 
@@ -31,6 +38,7 @@ class ResampleStep:
         check_spacing(self.spacing)
         check_interpolation(self.interpolation)
         check_modalities(self.modalities)
+        check_max_output_voxels(self.max_output_voxels)
         object.__setattr__(self, "spacing", [float(s) for s in self.spacing])  # JSON floats, not shared with the caller
         if self.modalities is not None:
             object.__setattr__(self, "modalities", list(self.modalities))
@@ -41,6 +49,7 @@ class ResampleStep:
             "spacing": list(self.spacing),
             "interpolation": self.interpolation,
             "modalities": None if self.modalities is None else list(self.modalities),
+            "max_output_voxels": self.max_output_voxels,
         }
 
     def apply_with_outputs(self, study: MRIStudy) -> tuple[MRIStudy, dict[str, Any]]:
@@ -51,6 +60,8 @@ class ResampleStep:
 
     def _resample_series(self, series: MRISeries) -> tuple[MRISeries, dict[str, Any]]:
         validate_geometry(series)
-        volume, affine = resample(series.volume, series.metadata["affine"], self.spacing, self.interpolation)
+        volume, affine = resample(
+            series.volume, series.metadata["affine"], self.spacing, self.interpolation, self.max_output_voxels
+        )
         result = replace_volume(series, volume, affine)
         return result, {"shape": list(result.metadata["shape"]), "spacing": list(result.metadata["voxel_size"])}

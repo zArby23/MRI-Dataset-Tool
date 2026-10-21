@@ -46,10 +46,22 @@ def test_step_is_registered_with_json_params_and_defaults() -> None:
     step = build_step("resample")
 
     assert isinstance(step, ResampleStep)
-    assert step.params == {"spacing": [1.0, 1.0, 1.0], "interpolation": "linear", "modalities": None}
+    assert step.params == {
+        "spacing": [1.0, 1.0, 1.0],
+        "interpolation": "linear",
+        "modalities": None,
+        "max_output_voxels": 2**32,
+    }
     assert json.loads(json.dumps(step.params)) == step.params
-    custom = build_step("resample", {"spacing": [2, 2, 1], "interpolation": "nearest", "modalities": ["T1w"]})
-    assert custom.params == {"spacing": [2.0, 2.0, 1.0], "interpolation": "nearest", "modalities": ["T1w"]}
+    custom = build_step(
+        "resample", {"spacing": [2, 2, 1], "interpolation": "nearest", "modalities": ["T1w"], "max_output_voxels": 10}
+    )
+    assert custom.params == {
+        "spacing": [2.0, 2.0, 1.0],
+        "interpolation": "nearest",
+        "modalities": ["T1w"],
+        "max_output_voxels": 10,
+    }
 
 
 def test_builtin_step_is_found_by_name_from_config_in_a_clean_interpreter() -> None:
@@ -68,6 +80,8 @@ def test_builtin_step_is_found_by_name_from_config_in_a_clean_interpreter() -> N
         ({"spacing": 1.0}, "Spacing must be three finite positive numbers."),
         ({"interpolation": "spline"}, "Unknown interpolation."),
         ({"modalities": "T1w"}, "Modalities must be a list of strings."),
+        ({"max_output_voxels": 0}, "Max output voxels must be a positive integer."),
+        ({"max_output_voxels": 1e9}, "Max output voxels must be a positive integer."),
     ],
 )
 def test_invalid_params_are_rejected_when_building(params, message: str) -> None:
@@ -143,6 +157,24 @@ def test_invalid_geometry_fails_the_study_and_the_batch_continues() -> None:
     assert [r.steps[0].status for r in reports] == ["ok", "failed", "ok"]
     assert errors == ["ValueError"] and len(results) == 2
     assert reports[1].steps[0].outputs == {}
+
+
+def test_max_output_voxels_from_config_fails_only_that_study() -> None:
+    config = {"pipeline": {"steps": [{"name": "resample", "params": {"max_output_voxels": 10}}]}}
+    errors: list[str] = []
+
+    reports = pipeline_from_config(config).run([_study(), _study()], lambda s, r: None, lambda p, e: errors.append(str(e)))
+
+    assert [r.steps[0].status for r in reports] == ["failed", "failed"]
+    assert errors == ["Resampled volume would be too large."] * 2
+
+
+def test_manifest_without_max_output_voxels_rebuilds_with_the_default() -> None:
+    old_params = {"spacing": [1.0, 1.0, 1.0], "interpolation": "linear", "modalities": None}
+
+    step = build_step("resample", old_params)
+
+    assert step.version == "1" and step.max_output_voxels == 2**32
 
 
 def test_outputs_reach_the_manifest_and_are_reproduced() -> None:
