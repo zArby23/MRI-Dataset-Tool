@@ -1,15 +1,13 @@
 # Política de anonimización (RF09, RNF07)
 
 > **Versión de la política: `1`** (`POLICY_VERSION` en `infrastructure/anonymization/policy.py`).
-> Estado: **propuesta pendiente de aprobación del humano (Checkpoint 1)**. Las listas de las
-> secciones 3 y 4 son propuesta; las reglas de fechas, edad, seudónimos y clave ya las decidió el humano.
+> Estado: **aprobada por el humano en el Checkpoint 1** (versión `1`).
 
 La política es **datos**: listas blancas y una tabla etiqueta → acción. Lo que no aparece en una
 lista se **descarta**.
 
-**Versionado:** la versión `1` es la que apruebe el humano en el Checkpoint 1; hasta entonces el
-borrador se ajusta sin cambiar la versión (no se ha producido ninguna salida real con él). Desde esa
-aprobación, cualquier cambio que altere un resultado anonimizado sube `POLICY_VERSION`.
+**Versionado:** la versión `1` es la que aprobó el humano en el Checkpoint 1. Desde esa aprobación,
+cualquier cambio que altere un resultado anonimizado sube `POLICY_VERSION`.
 
 | Módulo | Contenido |
 |---|---|
@@ -17,8 +15,9 @@ aprobación, cualquier cambio que altere un resultado anonimizado sube `POLICY_V
 | `infrastructure/anonymization/pseudonym.py` | Clave (`MRI_ANON_KEY`) y seudónimos HMAC |
 | `application/pipeline/steps/anonymize.py` | Paso `anonymize` sobre `MRIStudy` (A1) |
 
-El servicio sobre archivos DICOM (`anonymize_dicom_tree`, A2) aplicará la tabla de la sección 4; aún
-no está implementado.
+| `infrastructure/anonymization/dicom.py` | `anonymize_dataset` (aplica la tabla de la sección 4) y `generalize_date`/`generalize_datetime`/`generalize_age` |
+| `infrastructure/anonymization/report.py` | `AnonymizationReport` |
+| `application/services/anonymize.py` | `anonymize_dicom_tree` sobre archivos DICOM (A2, sección 5) |
 
 ## 1. Seudónimos y clave
 
@@ -55,7 +54,7 @@ no está implementado.
 - `volume` no se toca ni se lee: un volumen perezoso sigue perezoso.
 - No muta la entrada y es determinista dada la clave.
 
-## 3. Listas blancas del modelo (propuesta)
+## 3. Listas blancas del modelo
 
 `METADATA_WHITELIST` también la importa `summarize_study` (I2): hay una sola definición.
 
@@ -97,9 +96,9 @@ y `extension`. De `other` solo quedan las entidades de adquisición de la especi
 no estándar se descarta. Las **claves** de estas entidades describen la adquisición (contraste,
 dirección de fase, repetición), pero sus **valores** (`acq-<etiqueta>`, `task-<etiqueta>`, …) son
 **texto libre** que elige quien organiza el dataset y no se filtran. Un `acq-<nombre>` mal elegido
-llevaría texto identificable a la salida (riesgo residual, sección 5).
+llevaría texto identificable a la salida (riesgo residual, sección 6).
 
-## 4. Tabla DICOM (para A2; propuesta)
+## 4. Tabla DICOM
 
 Lista blanca: **todo elemento no listado se elimina** (`removed`), incluidos los elementos privados y
 las secuencias no listadas (con todo su contenido anidado). `DICOM_ACTIONS` usa keywords de pydicom.
@@ -124,7 +123,51 @@ el año). La edad solo se conserva a través del rango de `PatientAge`.
 años, p. ej. `047Y` → `040Y`. 90 años o más → `090Y`. D/W/M se pasan a años antes; menos de 1 año → `000Y`.
 El VR AS no admite `90+` ni rangos, por eso se escribe el límite inferior.
 
-## 5. Riesgo residual
+Un valor que no se puede generalizar (formato inválido o multivaluado) se vacía y el informe lo
+cuenta como `emptied`. `PatientID` usa el mismo dominio de seudónimo que `subject_id` (`"subject"`):
+el mismo ID con la misma clave da el mismo seudónimo en DICOM y en el modelo.
+
+## 5. Servicio `anonymize_dicom_tree` (A2)
+
+`anonymize_dicom_tree(input_dir, output_dir, on_error=None) -> AnonymizationReport`, con el mismo
+patrón que `application/services/conversion.py`:
+
+1. Antes de leer o crear nada: entrada inexistente → `FileNotFoundError`; no es directorio →
+   `NotADirectoryError`; `output_dir` dentro de `input_dir` (o igual) → `ValueError`; sin clave →
+   `ValueError`; `output_dir/anonymization_report.json` ya existe → `FileExistsError`.
+2. Recorre `input_dir` como `DICOMBatchReader`: orden determinista, y se ignoran sin reportarlos los
+   archivos y directorios ocultos (`.git`, …).
+3. Cada archivo se lee completo con `pydicom.dcmread` y se le aplica la tabla de la sección 4 (file meta
+   incluida). Al guardar, pydicom regenera con sus propios valores los elementos obligatorios de la file
+   meta (`FileMetaInformationVersion`, `ImplementationClassUID`, `ImplementationVersionName`). Los
+   datos de píxel y la sintaxis de transferencia no cambian. El **preámbulo** de 128 bytes (bytes
+   libres fuera de todo elemento, donde algunos exportadores y los archivos «dual personality»
+   escriben cabeceras con datos) se reescribe a ceros. Es una corrección de un defecto, no un cambio
+   de política (sigue la versión `1`). Un elemento estándar con VR `UN` que deba generalizarse hace
+   fallar el archivo entero: se reporta por `on_error` y no se escribe (seguro, pero ruidoso). pydicom
+   ya convierte `UN` al VR conocido por defecto.
+4. Salida: `output_dir/study-<id>/series-<id>/<id>.dcm`, donde cada `<id>` son 16 hex derivados por
+   HMAC del UID **nuevo** (sin identificadores; estables entre corridas con la misma clave). Escritura
+   atómica (temporal oculto + `os.replace`); una salida existente da `FileExistsError` y no se
+   reemplaza. Hay una ventana mínima entre la comprobación y el reemplazo, como en `NIfTIWriter`.
+   Colisión de nombres: los `<id>` usan la parte de 40 bits del seudónimo. Con ~10⁴ cortes en un mismo
+   directorio, la probabilidad de que dos compartan nombre es ≈ 5·10⁻⁵. Si ocurre, el segundo da
+   `FileExistsError` reportado: nunca hay pérdida silenciosa.
+5. Un archivo ilegible, no DICOM, sin `Study/Series/SOPInstanceUID` o que falla al escribirse se
+   reporta con `on_error(path, error)` y el lote sigue. Un callback que lanza se captura y solo se
+   registra su tipo.
+6. El informe (`AnonymizationReport`: `policy_version`, `files_written`, `files_failed` y, por
+   etiqueta, acción → conteo) se guarda en `output_dir/anonymization_report.json` y se devuelve.
+   Etiquetas: keyword DICOM o `GGGG,EEEE` para las privadas. Nunca guarda valores, rutas, UIDs ni la
+   clave. Los elementos dentro de una secuencia eliminada no se cuentan por separado. Las acciones
+   se acumulan por archivo y solo se suman al informe si el archivo se escribe: los conteos
+   corresponden a `files_written`.
+7. Logs: solo contadores y nombres de tipo de excepción.
+
+Para volver a ejecutar sobre la misma salida hay que retirar antes el informe; los archivos ya
+escritos se reportan entonces como `FileExistsError`.
+
+## 6. Riesgo residual
 
 - **La imagen** puede reidentificar: reconstrucción de la cara en volúmenes 3D (*defacing* fuera de
   alcance) y texto quemado en los píxeles (fuera de alcance, Q11).
@@ -137,5 +180,5 @@ El VR AS no admite `90+` ni rangos, por eso se escribe el límite inferior.
 - **Valores de entidades BIDS** permitidas (`acq-`, `task-`, …): texto libre del autor del dataset, sin filtrar.
 - **Manifiesto**: `StudyReport.source_path` guarda la ruta del archivo de **entrada** (en BIDS contiene
   `sub-<ID>`). El paso declara `redacts_sources = True` y, con el contrato C1, el runner deja
-  `source_path = None` en las corridas con `anonymize`. Hasta que C1 esté integrado, la ruta sigue
-  apareciendo.
+  `source_path = None` en las corridas con `anonymize` (C1, integrado). `on_error` sigue recibiendo
+  la ruta: quien lo implemente no debe volcarla en salidas compartidas.
