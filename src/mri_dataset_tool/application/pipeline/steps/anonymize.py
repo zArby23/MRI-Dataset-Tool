@@ -5,6 +5,7 @@ carry identifiers. The HMAC key is read from the environment when the step is bu
 never part of ``params``, ``repr`` or any output.
 """
 
+import copy
 from dataclasses import replace
 from typing import Any, ClassVar
 
@@ -64,7 +65,8 @@ class AnonymizeStep:
         return None if value is None else pseudonymize_label(value, kind, self._key)
 
     def _series(self, series: MRISeries) -> MRISeries:
-        metadata = {key: value for key, value in series.metadata.items() if key in METADATA_WHITELIST}
+        # Deep copy (like replace_volume): editing the output in place must not change the input.
+        metadata = copy.deepcopy({key: value for key, value in series.metadata.items() if key in METADATA_WHITELIST})
         if "sidecar" in metadata:
             metadata["sidecar"] = _filter_sidecar(metadata["sidecar"])
         if "bids" in metadata:

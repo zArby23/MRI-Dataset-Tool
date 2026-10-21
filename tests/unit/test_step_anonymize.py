@@ -183,6 +183,17 @@ def test_input_is_not_mutated():
     assert _plain(study) == before
 
 
+def test_editing_the_output_in_place_does_not_change_the_input():
+    study = _study()
+    before = copy.deepcopy(_plain(study))
+    metadata = AnonymizeStep().apply(study).series[0].metadata
+    metadata["affine"][0, 3] += 1.0
+    metadata["sidecar"]["SliceTiming"].append(9.0)
+    metadata["bids"]["other"]["acq"] = "changed"
+    metadata["provenance"]["tool"] = "changed"
+    assert _plain(study) == before
+
+
 def test_deterministic_with_same_key_and_different_with_other_key(monkeypatch):
     first = AnonymizeStep().apply(_study())
     second = AnonymizeStep().apply(_study())
