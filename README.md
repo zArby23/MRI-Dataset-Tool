@@ -16,7 +16,9 @@ This tool automates the loading, validation, conversion, processing, anonymizati
 - Processing pipeline core: step contract, streaming batch runner that reports errors and continues, JSON run manifest that records each step's parameters and computed outputs and reproduces a run
 - Processing steps: integrity validation, reorientation to RAS+ (no interpolation), resampling to a fixed spacing (default 1 mm, linear), intensity normalization, and a technical metadata summary
 - Anonymization (in development, tested only with synthetic data): model anonymization step and DICOM file anonymization with a version 1 policy and an audit report
-- Lazy NIfTI loading (`lazy=True`) for batches
+- Lazy NIfTI loading (`lazy=True`) for batches, with linear-time reads of 4D `.nii.gz`
+- Memory guard before large allocations in `resample` and `normalize` (explicit `allow_insufficient_memory` consent, recorded in the run manifest)
+- Example runs: `scripts/run_stage3_pipeline.py` (loose NIfTI) and `scripts/run_stage3_bids_pipeline.py` with `config/stage3_bids.yaml` (BIDS; anatomical series at 1 mm, diffusion at 2 mm to bound RAM)
 - YAML configuration (default < environment < run file)
 - Data validation and organization
 - Preparation for ML/DL pipelines
@@ -86,10 +88,43 @@ python -m pytest
 - [Configuration](/docs/architecture/config.md)
 - [Processing steps: geometry](/docs/processing/geometry.md) and [intensity](/docs/processing/intensity.md)
 - [Anonymization policy](/docs/anonymization/policy.md)
+- [Stage 3 QA report](/docs/testing/qa_etapa3.md)
 
 ## Status
 
-In development. Loading (DICOM, NIfTI, BIDS), DICOM <-> NIfTI conversion and the processing pipeline core (step contract, batch runner, run manifest, YAML configuration) are implemented as library code under `src/mri_dataset_tool`. Processing steps (validation, anonymization, reorientation, resampling, normalization) are implemented and run through `scripts/run_stage3_pipeline.py` (it needs the `MRI_ANON_KEY` environment variable, at least 32 characters); visual checks of their output are pending. Anonymization has been tested only with synthetic data, does not remove faces or text burned into pixels, and keeps quasi-identifiers (year, age range, sex, scanner model): review the report and the output before sharing real data. There is no CLI or GUI. The generated DICOM does not conform to the strict MR IOD, and visual checks of converted volumes are pending.
+In development. Stages 1 to 3 are complete; stage 4 (dataset) is being planned.
+
+**Implemented** (library code under `src/mri_dataset_tool`)
+- Loading of DICOM, NIfTI and BIDS studies, and DICOM <-> NIfTI conversion.
+- Processing pipeline core: step contract, batch runner, run manifest and YAML configuration.
+- Processing steps: validation, anonymization, reorientation, resampling and normalization.
+
+**How to run the processing steps**
+- `scripts/run_stage3_pipeline.py` for loose NIfTI files.
+- `scripts/run_stage3_bids_pipeline.py` for BIDS datasets.
+- Both need the `MRI_ANON_KEY` environment variable (at least 32 characters).
+- Send large outputs to a drive with enough free space, outside the repository.
+
+**Memory**
+- Resampling a 4D diffusion series to 1 mm can need several GB of RAM.
+- The tool checks the available memory first and refuses to continue.
+- You can force it with `allow_insufficient_memory: true`; the choice is recorded in the run manifest.
+
+**Verification so far**
+- Stage 3 was audited with synthetic data and with the local test datasets.
+- The NIfTI output was checked in a viewer.
+- Still pending: runs on Linux and with compressed DICOM.
+
+**Limits**
+- Anonymization does not remove faces or text burned into the pixels.
+- It keeps quasi-identifiers (year, age range, sex, scanner model).
+- Review the report and the output before sharing real data.
+- The generated DICOM does not conform to the strict MR IOD.
+- Visual checks of converted DICOM volumes are pending.
+
+**Not implemented yet**
+- Dataset organization, labels, export and reports (stage 4).
+- CLI and GUI.
 
 ---
 
@@ -103,13 +138,17 @@ La herramienta automatiza la carga, validación, conversión, procesamiento, ano
 
 ## Características
 
-- Carga de estudios DICOM
+- Carga de estudios DICOM (cabeceras; construcción de volúmenes 3D/4D)
 - Manejo de datasets NIfTI
+- Conversión DICOM a NIfTI y NIfTI a DICOM (solo 3D)
+- Lectura BIDS (modo flexible, herencia de sidecars)
 - Soporte para procesamiento por lotes
 - Núcleo del pipeline de procesamiento: contrato de paso, runner por lotes en streaming que informa errores y continúa, manifiesto JSON que registra parámetros y valores calculados de cada paso y reproduce una corrida
 - Pasos de procesamiento: validación de integridad, reorientación a RAS+ (sin interpolar), remuestreo a un espaciado fijo (1 mm por defecto, lineal), normalización de intensidad y resumen técnico de metadatos
 - Anonimización (en desarrollo, probada solo con datos sintéticos): paso sobre el modelo y anonimización de archivos DICOM con la política v1 e informe de auditoría
-- Carga perezosa de NIfTI (`lazy=True`) para lotes
+- Carga perezosa de NIfTI (`lazy=True`) para lotes, con lectura lineal de 4D `.nii.gz`
+- Comprobación de memoria antes de reservas grandes en `resample` y `normalize` (consentimiento explícito `allow_insufficient_memory`, registrado en el manifiesto)
+- Corridas de ejemplo: `scripts/run_stage3_pipeline.py` (NIfTI sueltos) y `scripts/run_stage3_bids_pipeline.py` con `config/stage3_bids.yaml` (BIDS; anatómicas a 1 mm y difusión a 2 mm para acotar la RAM)
 - Configuración YAML (default < entorno < archivo de corrida)
 - Validación y organización de datos
 - Preparación para pipelines de ML/DL
@@ -179,7 +218,40 @@ python -m pytest
 - [Configuración](/docs/architecture/config.md)
 - [Pasos de procesamiento: geometría](/docs/processing/geometry.md) e [intensidad](/docs/processing/intensity.md)
 - [Política de anonimización](/docs/anonymization/policy.md)
+- [Informe de QA de la etapa 3](/docs/testing/qa_etapa3.md)
 
 ## Estado
 
-En desarrollo. La carga (DICOM, NIfTI, BIDS), la conversión DICOM <-> NIfTI y el núcleo del pipeline de procesamiento (contrato de paso, runner por lotes, manifiesto de corrida, configuración YAML) están implementados como código de biblioteca en `src/mri_dataset_tool`. Los pasos de procesamiento (validación, anonimización, reorientación, remuestreo, normalización) están implementados y se ejecutan con `scripts/run_stage3_pipeline.py` (requiere la variable de entorno `MRI_ANON_KEY`, de al menos 32 caracteres); la verificación visual de su salida está pendiente. La anonimización se ha probado solo con datos sintéticos, no borra caras ni texto quemado en los píxeles y conserva cuasi-identificadores (año, rango de edad, sexo, modelo de escáner): revisa el informe y la salida antes de compartir datos reales. No hay CLI ni GUI. El DICOM generado no es conforme al IOD MR estricto y la verificación visual de los volúmenes convertidos está pendiente.
+En desarrollo. Las etapas 1 a 3 están completas; la etapa 4 (dataset) está en planificación.
+
+**Implementado** (código de biblioteca en `src/mri_dataset_tool`)
+- Carga de estudios DICOM, NIfTI y BIDS, y conversión DICOM <-> NIfTI.
+- Núcleo del pipeline de procesamiento: contrato de paso, runner por lotes, manifiesto de corrida y configuración YAML.
+- Pasos de procesamiento: validación, anonimización, reorientación, remuestreo y normalización.
+
+**Cómo ejecutar los pasos de procesamiento**
+- `scripts/run_stage3_pipeline.py` para archivos NIfTI sueltos.
+- `scripts/run_stage3_bids_pipeline.py` para datasets BIDS.
+- Ambos requieren la variable de entorno `MRI_ANON_KEY` (de al menos 32 caracteres).
+- Dirige las salidas grandes a un disco con espacio libre, fuera del repositorio.
+
+**Memoria**
+- Remuestrear una difusión 4D a 1 mm puede necesitar varios GB de RAM.
+- La herramienta comprueba primero la memoria disponible y se niega a continuar.
+- Puedes forzarlo con `allow_insufficient_memory: true`; la decisión queda registrada en el manifiesto de la corrida.
+
+**Verificación hasta ahora**
+- La etapa 3 se auditó con datos sintéticos y con los datasets locales de prueba.
+- La salida NIfTI se revisó en un visor.
+- Siguen pendientes las corridas en Linux y con DICOM comprimido.
+
+**Límites**
+- La anonimización no borra caras ni texto quemado en los píxeles.
+- Conserva cuasi-identificadores (año, rango de edad, sexo, modelo de escáner).
+- Revisa el informe y la salida antes de compartir datos reales.
+- El DICOM generado no es conforme al IOD MR estricto.
+- La verificación visual de los volúmenes DICOM convertidos está pendiente.
+
+**Todavía no implementado**
+- Organización del dataset, etiquetas, exportación y reportes (etapa 4).
+- CLI y GUI.
