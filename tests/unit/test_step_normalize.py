@@ -5,9 +5,11 @@ import logging
 import weakref
 from collections.abc import Iterator
 from pathlib import Path
+from types import SimpleNamespace
 
 import nibabel as nib
 import numpy as np
+import psutil
 import pytest
 
 from mri_dataset_tool.application.pipeline.manifest import RunManifest, pipeline_from_config, pipeline_from_manifest
@@ -51,7 +53,7 @@ def _study(*series: MRISeries) -> MRIStudy:
 def test_defaults_and_params_round_trip() -> None:
     step = build_step("normalize")
     assert (step.name, step.version) == ("normalize", "1")
-    assert step.params == {"method": "zscore", "mask": "nonzero", "per_volume": True, "percentiles": None, "modalities": None}
+    assert step.params == {"method": "zscore", "mask": "nonzero", "per_volume": True, "percentiles": None, "modalities": None, "allow_insufficient_memory": False}
     custom = build_step("normalize", {"method": "percentile", "percentiles": [1, 99], "modalities": ["T1w"]})
     assert custom.params["percentiles"] == [1.0, 99.0]
     assert build_step("normalize", custom.params).params == custom.params
@@ -59,7 +61,10 @@ def test_defaults_and_params_round_trip() -> None:
     assert pipeline_from_config({"pipeline": {"steps": [{"name": "normalize"}]}}).steps[0].name == "normalize"
 
 
-@pytest.mark.parametrize("params", [{"method": "x"}, {"percentiles": [1, 99]}, {"modalities": "T1w"}])
+@pytest.mark.parametrize(
+    "params",
+    [{"method": "x"}, {"percentiles": [1, 99]}, {"modalities": "T1w"}, {"allow_insufficient_memory": 1}],
+)
 def test_invalid_params_raise(params) -> None:
     with pytest.raises(ValueError):
         build_step("normalize", params)
@@ -170,3 +175,25 @@ def test_step_does_not_retain_studies() -> None:
     Pipeline([build_step("normalize")]).run(source(), lambda s, r: refs.append(weakref.ref(s)))
     gc.collect()
     assert len(refs) == 6 and all(ref() is None for ref in refs)
+
+
+def test_manifest_without_allow_insufficient_memory_rebuilds_with_the_default() -> None:
+    old_params = {"method": "zscore", "mask": "nonzero", "per_volume": True, "percentiles": None, "modalities": None}
+    step = build_step("normalize", old_params)
+    assert step.version == "1" and step.params["allow_insufficient_memory"] is False
+
+
+def test_insufficient_memory_fails_only_that_study_unless_allowed(monkeypatch) -> None:
+    # The estimate grows with the volume: 4 KiB is enough for a tiny study, not for a larger one.
+    monkeypatch.setattr(psutil, "virtual_memory", lambda: SimpleNamespace(available=4096))
+    studies = [_study(_series(_volume(shape))) for shape in ((20, 20, 20), (4, 4, 4), (20, 20, 20))]
+    errors: list[str] = []
+
+    refused = Pipeline([build_step("normalize")]).run(studies, lambda s, r: None, lambda p, e: errors.append(str(e)))
+    allowed = pipeline_from_config(
+        {"pipeline": {"steps": [{"name": "normalize", "params": {"allow_insufficient_memory": True}}]}}
+    ).run([_study(_series(_volume((20, 20, 20))))], lambda s, r: None)
+
+    assert [r.steps[0].status for r in refused] == ["failed", "ok", "failed"]
+    assert errors == ["Insufficient available memory for the normalized volume."] * 2
+    assert allowed[0].steps[0].status == "ok"

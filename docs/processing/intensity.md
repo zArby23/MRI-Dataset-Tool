@@ -134,6 +134,7 @@ Algoritmos en `infrastructure/processing/normalize.py` (`normalize_volume`, `che
 | `per_volume` | `true` | 4D: estadísticos por volumen 3D (`true`) o globales (`false`); sin efecto en 3D |
 | `percentiles` | `null` | obligatorio con `method: percentile` (`0 ≤ p_low < p_high ≤ 100`); con otro método, error |
 | `modalities` | `null` | filtro de series (Q12) |
+| `allow_insufficient_memory` | `false` | `true`/`false` (solo `bool`; si no, `"Allow insufficient memory must be a boolean."`) |
 
 - **Fuera de la máscara** los vóxeles quedan en `0` (el fondo sigue siendo fondo; decisión del humano,
   igual para los tres métodos). Por eso, con `mask: nonzero`, `normalize` **no es una transformación
@@ -143,12 +144,34 @@ Algoritmos en `infrastructure/processing/normalize.py` (`normalize_volume`, `che
   La desviación es poblacional (`ddof=0`).
 - **Errores (mensaje fijo):** `"Normalization mask is empty."`, `"Volume is constant within the
   normalization mask."` (desviación o rango nulo), `"Volume contains non-finite values."` (NaN/Inf en
-  la máscara; nunca se propagan en silencio), parámetros inválidos.
+  la máscara; nunca se propagan en silencio), `"Insufficient available memory for the normalized
+  volume."` (ver abajo), parámetros inválidos.
 - **4D y memoria:** se lee un volumen 3D a la vez en `float64` (`iter_volumes_3d`) y la salida se
   escribe en un único `float32`. En modo global hay dos pasadas: la primera combina media y varianza por
   volumen (Chan et al.) o mín/máx, sin materializar el 4D en `float64`. Límite: `percentile` global
   guarda todos los valores de la máscara en `float32` (≈ el 4D en `float32`) para calcular los
   percentiles exactos.
+- **Comprobación de RAM (QA1-09).** Antes de leer el volumen o reservar nada, `normalize_volume` compara
+  su estimación del pico con `psutil.virtual_memory().available` mediante el helper
+  `check_available_memory` de `processing/memory.py`, el mismo que usa `resample`. La estimación es
+  `required_bytes(shape, method, per_volume)` = `4 × N` (salida `float32`) `+ 32 × V` (copias de trabajo
+  `float64` de un frame 3D: entrada, máscara y transformación), donde `N` son todos los vóxeles y `V` los
+  de un frame. Con `percentile` global en 4D se suman `16 × N` (valores de la máscara en `float32`, su
+  concatenación y la copia de `np.percentile`). Medido con `tracemalloc` en entradas `int16` sintéticas:
+  ≈ 25 B por vóxel del frame más la salida, y ≈ 10 B por vóxel más en percentile global. Una prueba fija
+  `pico ≤ estimación < 3 × pico`.
+  - Si no cabe, lanza `ValueError("Insufficient available memory for the normalized volume.")` sin
+    cifras: el runner marca solo ese estudio como `failed` y el lote sigue.
+  - Con `allow_insufficient_memory: true` (consentimiento explícito) sigue adelante y registra un
+    WARNING sin cifras.
+  - Si `psutil` falla, la comprobación no bloquea y la red de seguridad queda en `MemoryError`.
+  - El parámetro entra en `params` y en el manifiesto. Los manifiestos anteriores, sin él, se
+    reconstruyen con `false` (la versión sigue en `"1"`).
+  - **Qué no comprueba:** es una foto de un instante, así que no garantiza que la memoria siga libre
+    al reservarla. No cuenta lo que ya está en memoria: la entrada si ya está materializada (p. ej. la
+    salida `float32` de `resample`, que sigue viva mientras se normaliza) ni el pico de otros pasos.
+    `available` es una estimación del sistema operativo (incluye caché reclamable y no cuenta el swap).
+    En Linux con *overcommit*, con `true` el proceso puede morir por OOM en vez de fallar.
 - **Invariancia:** escala positiva previa → misma salida; desplazamiento previo → misma salida con
   `mask: none` (con `nonzero` un desplazamiento cambia la máscara).
 - `StepRecord.outputs`: `{"series": [{"index": i, "method": m, ...}]}` con `mean`/`std` (zscore),

@@ -4,6 +4,7 @@ from mri_dataset_tool.application.pipeline.step import register_step
 from mri_dataset_tool.domain.models.serie import MRISeries
 from mri_dataset_tool.domain.models.study import MRIStudy
 from mri_dataset_tool.infrastructure.processing.geometry import apply_to_series, check_modalities, replace_volume
+from mri_dataset_tool.infrastructure.processing.memory import check_allow_insufficient_memory
 from mri_dataset_tool.infrastructure.processing.normalize import check_params, normalize_volume
 
 
@@ -21,9 +22,12 @@ class NormalizeStep:
         per_volume: bool = True,
         percentiles: list[float] | None = None,
         modalities: list[str] | None = None,
+        allow_insufficient_memory: bool = False,
     ) -> None:
         check_params(method, mask, per_volume, percentiles)
         check_modalities(modalities)
+        check_allow_insufficient_memory(allow_insufficient_memory)
+        self._allow_insufficient_memory = allow_insufficient_memory
         self._method = method
         self._mask = mask
         self._per_volume = per_volume
@@ -38,6 +42,7 @@ class NormalizeStep:
             "per_volume": self._per_volume,
             "percentiles": None if self._percentiles is None else list(self._percentiles),
             "modalities": None if self._modalities is None else list(self._modalities),
+            "allow_insufficient_memory": self._allow_insufficient_memory,
         }
 
     def apply(self, study: MRIStudy) -> MRIStudy:
@@ -48,6 +53,11 @@ class NormalizeStep:
 
     def _normalize(self, series: MRISeries) -> tuple[MRISeries, dict[str, Any]]:
         volume, stats = normalize_volume(
-            series.volume, self._method, self._mask, self._per_volume, self._percentiles
+            series.volume,
+            self._method,
+            self._mask,
+            self._per_volume,
+            self._percentiles,
+            self._allow_insufficient_memory,
         )
         return replace_volume(series, volume, series.metadata["affine"]), {"method": self._method, **stats}

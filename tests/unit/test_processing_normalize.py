@@ -1,10 +1,13 @@
+import tracemalloc
 from pathlib import Path
+from types import SimpleNamespace
 
 import nibabel as nib
 import numpy as np
+import psutil
 import pytest
 
-from mri_dataset_tool.infrastructure.processing.normalize import check_params, normalize_volume
+from mri_dataset_tool.infrastructure.processing.normalize import check_params, normalize_volume, required_bytes
 
 
 def _brain(shape=(6, 7, 8), seed=0) -> np.ndarray:
@@ -174,3 +177,43 @@ def test_invalid_params_raise_fixed_value_error(kwargs) -> None:
 def test_unsupported_dimensionality_raises() -> None:
     with pytest.raises(ValueError, match=r"^Unsupported volume dimensionality\.$"):
         normalize_volume(np.ones((3, 3)))
+
+
+@pytest.mark.parametrize(
+    "kwargs",
+    [{}, {"per_volume": False}, {"method": "minmax"}, {"method": "percentile", "percentiles": [1, 99], "per_volume": False}],
+)
+@pytest.mark.parametrize("shape", [(32, 32, 20), (32, 32, 20, 6)])
+def test_required_bytes_covers_the_measured_peak(shape, kwargs) -> None:
+    volume = np.random.default_rng(0).integers(1, 500, shape).astype(np.int16)
+    tracemalloc.start()
+    try:
+        normalize_volume(volume, **kwargs)
+        peak = tracemalloc.get_traced_memory()[1]
+    finally:
+        tracemalloc.stop()
+    estimate = required_bytes(shape, kwargs.get("method", "zscore"), kwargs.get("per_volume", True))
+    assert peak <= estimate < 3 * peak
+
+
+def test_insufficient_memory_raises_fixed_message_before_allocating(monkeypatch) -> None:
+    monkeypatch.setattr(psutil, "virtual_memory", lambda: SimpleNamespace(available=0))
+    with pytest.raises(ValueError, match=r"^Insufficient available memory for the normalized volume\.$") as info:
+        normalize_volume(_brain())
+    assert info.value.__cause__ is None and info.value.__suppress_context__
+    _, stats = normalize_volume(_brain(), allow_insufficient_memory=True)
+    assert stats["std"] > 0
+
+
+def test_unreadable_available_memory_skips_the_check(monkeypatch) -> None:
+    def fail():
+        raise OSError("restricted")
+
+    monkeypatch.setattr(psutil, "virtual_memory", fail)
+    assert normalize_volume(_brain())[0].dtype == np.float32
+
+
+@pytest.mark.parametrize("value", ["yes", 1, None])
+def test_allow_insufficient_memory_must_be_a_boolean(value) -> None:
+    with pytest.raises(ValueError, match=r"^Allow insufficient memory must be a boolean\.$"):
+        normalize_volume(_brain(), allow_insufficient_memory=value)

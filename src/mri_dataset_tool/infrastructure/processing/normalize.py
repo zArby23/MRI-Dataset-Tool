@@ -1,10 +1,12 @@
 """Intensity normalization (RF06): zscore, minmax and percentile, over an optional foreground mask."""
 
+import math
 from typing import Any
 
 import numpy as np
 
 from mri_dataset_tool.infrastructure.processing.arrays import iter_volumes_3d
+from mri_dataset_tool.infrastructure.processing.memory import check_allow_insufficient_memory, check_available_memory
 
 METHODS = ("zscore", "minmax", "percentile")
 MASKS = ("nonzero", "none")
@@ -37,15 +39,22 @@ def normalize_volume(
     mask: str = "nonzero",
     per_volume: bool = True,
     percentiles: Any = None,
+    allow_insufficient_memory: bool = False,
 ) -> tuple[np.ndarray, dict[str, Any]]:
     """Return the normalized ``float32`` volume and the statistics used.
 
     Statistics come from the voxels in the mask (``nonzero``: input != 0); voxels outside
     the mask stay 0. A 4D volume is processed one 3D volume at a time: with *per_volume*
     each gets its own statistics (``{"volumes": [...]}``), otherwise one global set.
-    Empty mask, constant data or NaN/Inf raise ``ValueError`` with a fixed message.
+    Empty mask, constant data or NaN/Inf raise ``ValueError`` with a fixed message, and so
+    does too little available RAM, unless *allow_insufficient_memory* (explicit user consent).
     """
     check_params(method, mask, per_volume, percentiles)
+    check_allow_insufficient_memory(allow_insufficient_memory)
+    try:
+        check_available_memory(required_bytes(volume.shape, method, per_volume), allow_insufficient_memory)
+    except ValueError:  # the helper's only error is its own (resample) insufficient-memory message
+        raise ValueError("Insufficient available memory for the normalized volume.") from None
     four_d = len(volume.shape) == 4
     if not four_d:
         (frame,) = iter_volumes_3d(volume, np.float64)
@@ -67,6 +76,19 @@ def normalize_volume(
     for t, frame in enumerate(iter_volumes_3d(volume, np.float64)):
         output[..., t] = _transform(frame, _mask(frame, mask), stats, method)
     return output, stats
+
+
+def required_bytes(shape: tuple[int, ...], method: str, per_volume: bool) -> int:
+    """Estimated peak: float32 output + float64 working copies of one 3D frame (+ masked values, global 4D percentiles).
+
+    Measured with tracemalloc (int16 input): ~25 B per frame voxel plus the output; global 4D
+    percentiles add ~10 B per voxel (masked values kept as float32, concatenated and partitioned).
+    """
+    total, frame = math.prod(shape), math.prod(shape[:3])
+    required = 4 * total + 32 * frame
+    if len(shape) == 4 and method == "percentile" and not per_volume:
+        required += 16 * total
+    return required
 
 
 def _mask(frame: np.ndarray, mask: str) -> np.ndarray:
