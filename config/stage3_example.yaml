@@ -1,0 +1,16 @@
+# Run file for scripts/run_stage3_pipeline.py (stage 3 closing pipeline, E1).
+# load_config(Path("config/stage3_example.yaml")) layers it over default.yaml.
+# The anonymize step reads its HMAC key from the MRI_ANON_KEY environment variable (never here).
+pipeline:
+  steps:
+    - name: validate
+    - name: anonymize
+    - name: reorient
+      params: {target: RAS}
+    - name: resample
+      params: {spacing: [1.0, 1.0, 1.0], interpolation: linear}
+    - name: normalize
+      params: {method: zscore, mask: nonzero, per_volume: true}
+
+report:
+  path: data/output/stage3_run_manifest.json

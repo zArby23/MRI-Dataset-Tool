@@ -20,6 +20,7 @@ class NIfTIBatchReader:
         self,
         directory: Path,
         on_error: Callable[[Path, Exception], None] | None = None,
+        lazy: bool = False,
     ) -> Iterator[MRIStudy]:
         """Yield studies one at a time to keep memory usage bounded.
 
@@ -32,12 +33,13 @@ class NIfTIBatchReader:
             raise FileNotFoundError(f"Path doesn't exist: {directory}")
         if not directory.is_dir():
             raise NotADirectoryError(f"Path is not a directory: {directory}")
-        return self._iter_studies(directory, on_error)
+        return self._iter_studies(directory, on_error, lazy)
 
     def _iter_studies(
         self,
         directory: Path,
         on_error: Callable[[Path, Exception], None] | None,
+        lazy: bool,
     ) -> Iterator[MRIStudy]:
         errors_count = 0
         studies_loaded = 0
@@ -51,7 +53,7 @@ class NIfTIBatchReader:
                 continue
 
             try:
-                study = self._reader.load_study(path)
+                study = self._reader.load_study(path, lazy=lazy)
             except (ImageFileError, OSError, EOFError, ValueError) as error:
                 errors_count += 1
                 logger.warning(
@@ -85,9 +87,10 @@ class NIfTIBatchReader:
         self,
         directory: Path,
         on_error: Callable[[Path, Exception], None] | None = None,
+        lazy: bool = False,
     ) -> list[MRIStudy]:
         """Backward-compatible API that returns all studies in memory.
 
         Use iter_studies() when processing large datasets to keep memory bounded.
         """
-        return list(self.iter_studies(directory, on_error))
+        return list(self.iter_studies(directory, on_error, lazy))

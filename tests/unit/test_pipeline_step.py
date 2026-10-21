@@ -167,3 +167,48 @@ def test_transformation_module_imports_no_format_or_array_libraries() -> None:
         alias.name.split(".")[0] for node in ast.walk(tree) if isinstance(node, ast.Import) for alias in node.names
     } | {node.module.split(".")[0] for node in ast.walk(tree) if isinstance(node, ast.ImportFrom) and node.module}
     assert imported.isdisjoint({"numpy", "pydicom", "nibabel"})
+
+
+def test_step_record_outputs_are_stored_in_json_form_and_round_trip() -> None:
+    record = StepRecord("test.scale", "1", {}, "ok", outputs={"series": [{"index": 0, "shape": (2, 3, 4)}]})
+
+    data = json.loads(json.dumps(record.to_dict()))
+
+    assert record.outputs == {"series": [{"index": 0, "shape": [2, 3, 4]}]}
+    assert data["outputs"] == record.outputs
+    assert StepRecord.from_dict(data) == record
+
+
+def test_step_record_outputs_are_copied() -> None:
+    outputs = {"series": [{"index": 0, "mean": 1.5}]}
+    record = StepRecord("test.scale", "1", {}, "ok", outputs=outputs)
+
+    outputs["series"][0]["mean"] = 9.0
+
+    assert record.outputs["series"][0]["mean"] == 1.5
+
+
+def test_step_record_without_outputs_omits_the_key_and_reads_old_records() -> None:
+    record = StepRecord("test.scale", "1", {}, "ok")
+
+    assert record.outputs == {}
+    assert "outputs" not in record.to_dict()
+    assert StepRecord.from_dict({"name": "test.scale", "version": "1", "params": {}, "status": "ok", "error_type": None}) == record
+
+
+@pytest.mark.parametrize("outputs", [{"value": np.float32(1.0)}, {"value": object()}, {"value": float("nan")}, {"value": float("inf")}])
+def test_step_record_rejects_non_json_outputs_with_fixed_message(outputs: dict[str, Any]) -> None:
+    with pytest.raises(ValueError, match="^Step outputs must be JSON-serializable.$") as error:
+        StepRecord("test.scale", "1", {}, "ok", outputs=outputs)
+    assert error.value.__cause__ is None
+
+
+@pytest.mark.parametrize("outputs", [[1], "text", None])
+def test_step_record_rejects_outputs_that_are_not_a_dict(outputs: Any) -> None:
+    with pytest.raises(ValueError, match="^Step outputs must be a dict.$"):
+        StepRecord("test.scale", "1", {}, "ok", outputs=outputs)
+
+
+def test_failed_step_record_has_no_outputs() -> None:
+    with pytest.raises(ValueError, match="^Failed steps have no outputs.$"):
+        StepRecord("test.scale", "1", {}, "failed", "ValueError", outputs={"series": []})

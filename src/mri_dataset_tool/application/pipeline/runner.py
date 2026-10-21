@@ -30,12 +30,16 @@ class Pipeline:
         raises, the following steps are skipped for that study, ``on_error(path, error)``
         is called with the study's first file and the batch continues. Returns one
         ``StudyReport`` per study (successful and failed), in input order; reports hold
-        paths, step names and exception type names, never exception messages.
+        paths, step names and exception type names, never exception messages. If any
+        step declares ``redacts_sources``, reports hold no paths (``on_error`` still gets
+        the real path, in memory only).
 
         If ``on_error`` keeps the exception, its ``__traceback__`` keeps the failing
         study (and its volume) alive; keep only what is needed, e.g. ``type(error)``.
         """
         reports: list[StudyReport] = []
+        # a step that redacts sources (e.g. anonymize) keeps input paths out of every report (RNF07)
+        redact = any(bool(getattr(step, "redacts_sources", False)) for step in self.steps)
         failed_count = 0
 
         # no enumerate(): its cached result tuple keeps the previous study alive while the next is read
@@ -47,7 +51,13 @@ class Pipeline:
             current: MRIStudy | None = study
             for step in self.steps:
                 try:
-                    current = step.apply(current)
+                    apply_with_outputs = getattr(step, "apply_with_outputs", None)
+                    if apply_with_outputs is None:
+                        current, outputs = step.apply(current), {}
+                    else:
+                        current, outputs = apply_with_outputs(current)
+                    # built inside the boundary: non-JSON outputs fail this study, not the batch
+                    record = StepRecord(step.name, step.version, copy.deepcopy(step.params), "ok", outputs=outputs)
                 except Exception as error:  # per-study boundary: any failure must not stop the batch
                     records.append(
                         StepRecord(step.name, step.version, copy.deepcopy(step.params), "failed", type(error).__name__)
@@ -58,9 +68,9 @@ class Pipeline:
                     # shortcut: a study without files reports Path(); upgrade if such sources appear
                     _call_safely("on_error", on_error, source or Path(), error)
                     break
-                records.append(StepRecord(step.name, step.version, copy.deepcopy(step.params), "ok"))
+                records.append(record)
 
-            report = StudyReport(index, str(source) if source is not None else None, records)
+            report = StudyReport(index, str(source) if source is not None and not redact else None, records)
             reports.append(report)
             if current is not None:
                 _call_safely("on_result", on_result, current, report)

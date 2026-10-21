@@ -8,6 +8,7 @@ from importlib.metadata import PackageNotFoundError, version
 from pathlib import Path
 from typing import Any
 
+from mri_dataset_tool.application.pipeline import steps as _builtin_steps  # noqa: F401  registers built-in steps by name
 from mri_dataset_tool.application.pipeline.runner import Pipeline
 from mri_dataset_tool.application.pipeline.step import build_step
 from mri_dataset_tool.domain.models.transformation import StudyReport
@@ -42,7 +43,9 @@ class RunManifest:
         )
 
     def to_json(self) -> str:
-        return json.dumps(asdict(self), indent=2, sort_keys=True)
+        data = asdict(self)
+        data["reports"] = [report.to_dict() for report in self.reports]  # omits empty outputs
+        return json.dumps(data, indent=2, sort_keys=True)
 
     @classmethod
     def from_json(cls, text: str) -> "RunManifest":

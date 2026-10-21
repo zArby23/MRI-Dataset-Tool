@@ -210,3 +210,89 @@ def test_empty_pipeline_passes_studies_through(tmp_path: Path) -> None:
     results: list[StudyReport] = []
     reports = Pipeline([]).run([_study("01", tmp_path)], lambda s, r: results.append(r))
     assert reports == results == [StudyReport(1, str(tmp_path / "sub-SECRET01_T1w.nii.gz"), [])]
+
+
+@dataclass(frozen=True)
+class MeanStep:
+    """Records the mean of each volume; ``leak`` returns a non-JSON value instead."""
+
+    leak: bool = False
+    name: ClassVar[str] = "test.mean"
+    version: ClassVar[str] = "1"
+
+    @property
+    def params(self) -> dict[str, Any]:
+        return {"leak": self.leak}
+
+    def apply_with_outputs(self, study: MRIStudy) -> tuple[MRIStudy, dict[str, Any]]:
+        # np.float64 subclasses float and serializes; np.float32 does not
+        means = [np.float32(s.volume.mean()) if self.leak else float(s.volume.mean()) for s in study.series]
+        return replace(study), {"series": [{"index": i, "mean": m} for i, m in enumerate(means)]}
+
+    def apply(self, study: MRIStudy) -> MRIStudy:
+        return self.apply_with_outputs(study)[0]
+
+
+def test_step_outputs_are_recorded_per_study(tmp_path: Path) -> None:
+    reports = Pipeline([AddStep(1.0), MeanStep(), FailOnSubjectStep("02")]).run(
+        [_study(s, tmp_path) for s in ("01", "02")], lambda s, r: None
+    )
+
+    assert [r.steps[0].outputs for r in reports] == [{}, {}]
+    assert [r.steps[1].outputs for r in reports] == [{"series": [{"index": 0, "mean": 1.0}]}] * 2
+    assert reports[1].steps[2].status == "failed" and reports[1].steps[2].outputs == {}
+
+
+def test_non_json_outputs_fail_the_study_and_the_batch_continues(tmp_path: Path) -> None:
+    results: list[MRIStudy] = []
+    errors: list[str] = []
+
+    reports = Pipeline([MeanStep(leak=True)]).run(
+        [_study("01", tmp_path)], lambda s, r: results.append(s), lambda p, e: errors.append(type(e).__name__)
+    )
+
+    assert results == [] and errors == ["ValueError"]
+    assert reports[0].steps == [StepRecord("test.mean", "1", {"leak": True}, "failed", "ValueError")]
+
+
+@dataclass(frozen=True)
+class RedactingStep:
+    name: ClassVar[str] = "test.redact"
+    version: ClassVar[str] = "1"
+    params: ClassVar[dict[str, Any]] = {}
+    redacts_sources: ClassVar[Any] = True
+
+    def apply(self, study: MRIStudy) -> MRIStudy:
+        return replace(study, series=[replace(s, files=[]) for s in study.series])
+
+
+def test_redacting_step_keeps_paths_out_of_every_report(tmp_path: Path) -> None:
+    errors: list[Path] = []
+    results: list[StudyReport] = []
+
+    # study 02 fails before the redacting step runs: its path must not be stored either
+    reports = Pipeline([FailOnSubjectStep("02"), RedactingStep(), AddStep()]).run(
+        [_study(s, tmp_path) for s in ("01", "02", "03")], lambda s, r: results.append(r), lambda p, e: errors.append(p)
+    )
+
+    assert [r.source_path for r in reports] == [None, None, None]
+    assert [r.source_path for r in results] == [None, None]
+    assert errors == [tmp_path / "sub-SECRET02_T1w.nii.gz"]  # on_error still gets the real path
+    assert "SECRET" not in json.dumps([r.to_dict() for r in reports])
+    assert [r.index for r in reports] == [1, 2, 3]
+
+
+@pytest.mark.parametrize(("value", "redacted"), [(1, True), ("yes", True), (False, False), (0, False), (None, False)])
+def test_redacts_sources_is_read_as_a_truth_value(tmp_path: Path, value: Any, redacted: bool) -> None:
+    step = AddStep()
+    object.__setattr__(step, "redacts_sources", value)
+
+    reports = Pipeline([step]).run([_study("01", tmp_path)], lambda s, r: None)
+
+    assert (reports[0].source_path is None) is redacted
+
+
+def test_steps_without_redacts_sources_keep_the_source_path(tmp_path: Path) -> None:
+    reports = Pipeline([AddStep()]).run([_study("01", tmp_path)], lambda s, r: None)
+
+    assert reports[0].source_path == str(tmp_path / "sub-SECRET01_T1w.nii.gz")

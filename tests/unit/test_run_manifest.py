@@ -250,3 +250,82 @@ def test_manifest_module_imports_no_format_or_array_libraries() -> None:
         alias.name.split(".")[0] for node in ast.walk(tree) if isinstance(node, ast.Import) for alias in node.names
     } | {node.module.split(".")[0] for node in ast.walk(tree) if isinstance(node, ast.ImportFrom) and node.module}
     assert imported.isdisjoint({"numpy", "pydicom", "nibabel"})
+
+
+@register_step("manifest.mean")
+@dataclass(frozen=True)
+class MeanStep:
+    name: ClassVar[str] = "manifest.mean"
+    version: ClassVar[str] = "1"
+    params: ClassVar[dict[str, Any]] = {}
+
+    def apply_with_outputs(self, study: MRIStudy) -> tuple[MRIStudy, dict[str, Any]]:
+        outputs = {"series": [{"index": i, "mean": float(s.volume.mean()), "shape": s.volume.shape} for i, s in enumerate(study.series)]}
+        return replace(study), outputs
+
+    def apply(self, study: MRIStudy) -> MRIStudy:
+        return self.apply_with_outputs(study)[0]
+
+
+OUTPUTS_CONFIG = {**CONFIG, "pipeline": {"steps": [*CONFIG["pipeline"]["steps"], {"name": "manifest.mean"}]}}
+
+
+def test_outputs_are_saved_compared_and_reproduced_from_the_manifest(tmp_path: Path) -> None:
+    pipeline = pipeline_from_config(OUTPUTS_CONFIG)
+    _, reports = _run(pipeline, tmp_path)
+    manifest = RunManifest.from_run(OUTPUTS_CONFIG, pipeline, reports)
+    saved = RunManifest.from_json(manifest.to_json())
+
+    data = json.loads(manifest.to_json())
+    assert data["reports"][0]["steps"][2]["outputs"] == {"series": [{"index": 0, "mean": 3.0, "shape": [2, 2, 2]}]}
+    assert "outputs" not in data["reports"][0]["steps"][0]  # steps without outputs keep the stage 2 form
+    assert saved == manifest
+
+    replay = pipeline_from_manifest(saved)
+    _, replay_reports = _run(replay, tmp_path)
+    assert RunManifest.from_run(saved.config, replay, replay_reports) == saved
+
+    tampered = json.loads(manifest.to_json())
+    tampered["reports"][0]["steps"][2]["outputs"]["series"][0]["mean"] = 4.0
+    assert RunManifest.from_json(json.dumps(tampered)) != manifest
+
+
+def test_manifest_with_invalid_outputs_raises_fixed_value_error(tmp_path: Path) -> None:
+    pipeline = pipeline_from_config(OUTPUTS_CONFIG)
+    _, reports = _run(pipeline, tmp_path)
+    data = json.loads(RunManifest.from_run(OUTPUTS_CONFIG, pipeline, reports).to_json())
+    data["reports"][0]["steps"][2]["outputs"] = ["not", "a", "dict"]
+
+    with pytest.raises(ValueError, match="^Invalid run manifest.$"):
+        RunManifest.from_json(json.dumps(data))
+
+
+@register_step("manifest.redact")
+@dataclass(frozen=True)
+class RedactingStep:
+    name: ClassVar[str] = "manifest.redact"
+    version: ClassVar[str] = "1"
+    params: ClassVar[dict[str, Any]] = {}
+    redacts_sources: ClassVar[bool] = True
+
+    def apply(self, study: MRIStudy) -> MRIStudy:
+        return replace(study, series=[replace(s, files=[]) for s in study.series])
+
+
+REDACT_CONFIG = {**CONFIG, "pipeline": {"steps": [*CONFIG["pipeline"]["steps"], {"name": "manifest.redact"}]}}
+
+
+def test_redacting_pipeline_manifest_has_no_source_paths_and_is_reproduced(tmp_path: Path) -> None:
+    pipeline = pipeline_from_config(REDACT_CONFIG)
+    _, reports = _run(pipeline, tmp_path)
+    manifest = RunManifest.from_run(REDACT_CONFIG, pipeline, reports)
+    text = manifest.to_json()
+
+    assert str(tmp_path) not in text and "sub-0" not in text
+    assert [r["source_path"] for r in json.loads(text)["reports"]] == [None, None, None]
+    assert "redacts_sources" not in text  # a class attribute, not a param
+
+    saved = RunManifest.from_json(text)
+    replay = pipeline_from_manifest(saved)
+    _, replay_reports = _run(replay, tmp_path)
+    assert RunManifest.from_run(saved.config, replay, replay_reports) == saved == manifest

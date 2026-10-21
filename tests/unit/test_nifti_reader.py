@@ -1,11 +1,14 @@
 from pathlib import Path
+from unittest import mock
 
 import nibabel as nib
 import numpy as np
 import pytest
+from nibabel.openers import ImageOpener
 
 from mri_dataset_tool.infrastructure.nifti.batch_reader import NIfTIBatchReader
 from mri_dataset_tool.infrastructure.nifti.reader import NIfTIReader
+from mri_dataset_tool.infrastructure.processing.arrays import iter_volumes_3d, load_array
 
 
 def test_batch_reader_loads_nested_valid_studies_and_skips_invalid_files(
@@ -89,3 +92,177 @@ def test_load_study_rejects_corrupt_nifti_file(tmp_path: Path) -> None:
 
     with pytest.raises(ValueError, match="Unable to load NIfTI image"):
         NIfTIReader().load_study(path)
+
+
+def _scaled_nifti(path: Path, shape: tuple[int, ...] = (3, 4, 5)) -> np.ndarray:
+    data = np.arange(np.prod(shape), dtype=np.int16).reshape(shape)
+    image = nib.Nifti1Image(data, np.diag([2.0, 3.0, 4.0, 1.0]))
+    image.header.set_slope_inter(0.5, 1.0)
+    nib.save(image, path)
+    return data
+
+
+@pytest.mark.parametrize("name", ["scan.nii", "scan.nii.gz"])
+def test_load_study_lazy_keeps_proxy_and_same_metadata(tmp_path: Path, name: str) -> None:
+    from mri_dataset_tool.infrastructure.processing.arrays import load_array
+
+    path = tmp_path / name
+    _scaled_nifti(path, (3, 4, 5, 2))
+    eager = NIfTIReader().load_study(path).series[0]
+    lazy = NIfTIReader().load_study(path, lazy=True).series[0]
+
+    assert not isinstance(lazy.volume, np.ndarray)
+    assert lazy.volume.shape == eager.volume.shape
+    assert lazy.metadata.keys() == eager.metadata.keys()
+    for key, value in eager.metadata.items():
+        np.testing.assert_array_equal(lazy.metadata[key], value)
+    np.testing.assert_array_equal(load_array(lazy.volume, np.float64), eager.volume)
+
+
+def test_load_study_lazy_reads_no_voxel_and_opens_no_file_until_read(tmp_path: Path) -> None:
+    from mri_dataset_tool.infrastructure.processing.arrays import load_array
+
+    path = tmp_path / "scan.nii"
+    _scaled_nifti(path)
+    series = NIfTIReader().load_study(path, lazy=True).series[0]
+    path.unlink()  # on Windows this fails if loading left the file open or mapped
+
+    # Data was never read at load time, so materializing now fails.
+    with pytest.raises(ValueError, match=r"^Unable to read volume data\.$"):
+        load_array(series.volume)
+
+
+def test_load_study_lazy_truncated_gz_fails_only_when_materialized(tmp_path: Path) -> None:
+    from mri_dataset_tool.infrastructure.processing.arrays import load_array
+
+    good = tmp_path / "good.nii.gz"
+    nib.save(nib.Nifti1Image(np.arange(4096, dtype=np.int16).reshape(16, 16, 16), np.eye(4)), good)
+    path = tmp_path / "truncated.nii.gz"
+    raw = good.read_bytes()
+    path.write_bytes(raw[: len(raw) // 2])
+
+    with pytest.raises(ValueError):
+        NIfTIReader().load_study(path)
+    series = NIfTIReader().load_study(path, lazy=True).series[0]
+    with pytest.raises(ValueError, match=r"^Unable to read volume data\.$"):
+        load_array(series.volume)
+
+
+def test_nifti_writer_accepts_lazy_proxy_exactly_when_unscaled(tmp_path: Path) -> None:
+    from mri_dataset_tool.infrastructure.nifti.writer import NIfTIWriter
+
+    source = tmp_path / "source.nii.gz"
+    data = np.arange(60, dtype=np.int16).reshape(3, 4, 5)
+    nib.save(nib.Nifti1Image(data, np.eye(4)), source)
+    series = NIfTIReader().load_study(source, lazy=True).series[0]
+    written = nib.load(NIfTIWriter().write(series, tmp_path / "out.nii.gz"))
+
+    assert written.get_data_dtype() == np.int16
+    np.testing.assert_array_equal(written.get_fdata(), data)
+
+
+def test_nifti_writer_requantizes_scaled_lazy_proxy(tmp_path: Path) -> None:
+    from mri_dataset_tool.infrastructure.nifti.writer import NIfTIWriter
+
+    source = tmp_path / "source.nii.gz"
+    data = _scaled_nifti(source)
+    series = NIfTIReader().load_study(source, lazy=True).series[0]
+    written = nib.load(NIfTIWriter().write(series, tmp_path / "out.nii.gz")).get_fdata()
+
+    # nibabel recomputes slope/inter for the on-disk int16: close, not exact.
+    # Materialize with load_array(volume, dtype) first when exact values matter.
+    np.testing.assert_allclose(written, data * 0.5 + 1.0, atol=1e-2)
+
+
+@pytest.mark.parametrize("lazy", [False, True])
+def test_load_study_rejects_complex_data(tmp_path: Path, lazy: bool) -> None:
+    path = tmp_path / "complex.nii"
+    nib.save(nib.Nifti1Image((np.ones((2, 3, 4)) + 1j).astype(np.complex64), np.eye(4)), path)
+    with pytest.raises(ValueError, match=r"^Unsupported NIfTI data type\.$"):
+        NIfTIReader().load_study(path, lazy=lazy)
+
+
+@pytest.mark.parametrize("lazy", [False, True])
+def test_load_study_negative_dim_raises_fixed_message(tmp_path: Path, lazy: bool) -> None:
+    path = tmp_path / "x.nii"
+    nib.save(nib.Nifti1Image(np.zeros((2, 3, 4), dtype=np.int16), np.eye(4)), path)
+    raw = bytearray(path.read_bytes())
+    raw[42:44] = np.int16(-3).tobytes()  # dim[1], little-endian
+    path.write_bytes(bytes(raw))
+    with pytest.raises(ValueError, match=r"^Unable to load NIfTI image\.$"):
+        NIfTIReader().load_study(path, lazy=lazy)
+
+
+@pytest.mark.parametrize("name", ["UP.NII", "mixed.nii.GZ", "UP.NII.GZ"])
+def test_upper_case_extensions_are_loaded(tmp_path: Path, name: str) -> None:
+    nib.save(nib.Nifti1Image(np.zeros((2, 3, 4), dtype=np.int16), np.eye(4)), tmp_path / name)
+    assert NIfTIReader().load_study(tmp_path / name).series[0].volume.shape == (2, 3, 4)
+    studies = NIfTIBatchReader().load_studies(tmp_path)
+    assert [s.series[0].files[0].name for s in studies] == [name]
+
+
+@pytest.fixture
+def openers():
+    """Every ``ImageOpener`` nibabel creates during the test, to check open/closed files portably."""
+    created = []
+    original = ImageOpener.__init__
+
+    def init(self, *args, **kwargs):
+        original(self, *args, **kwargs)
+        created.append(self)
+
+    with mock.patch.object(ImageOpener, "__init__", init):
+        yield created
+
+
+def _gz_4d(path: Path, frames: int = 10) -> np.ndarray:
+    data = np.arange(4 * 4 * 3 * frames, dtype=np.int16).reshape(4, 4, 3, frames)
+    nib.save(nib.Nifti1Image(data, np.eye(4)), path)
+    return data
+
+
+def test_lazy_4d_gz_opens_the_file_once_per_pass(tmp_path: Path, openers) -> None:
+    # QA1-06: reopening per frame re-decompressed the .nii.gz from the start (O(T^2)).
+    path = tmp_path / "x.nii.gz"
+    data = _gz_4d(path)
+    volume = NIfTIReader().load_study(path, lazy=True).series[0].volume
+    before = len(openers)
+    frames = list(iter_volumes_3d(volume))
+    assert len(openers) - before == 1
+    np.testing.assert_array_equal(np.stack(frames, axis=-1), data)
+
+
+def test_lazy_4d_gz_matches_eager(tmp_path: Path) -> None:
+    path = tmp_path / "x.nii.gz"
+    _gz_4d(path)
+    eager = NIfTIReader().load_study(path).series[0]
+    lazy = NIfTIReader().load_study(path, lazy=True).series[0]
+    assert lazy.metadata.keys() == eager.metadata.keys()
+    for key, value in eager.metadata.items():
+        np.testing.assert_array_equal(lazy.metadata[key], value)
+    np.testing.assert_array_equal(np.stack(list(iter_volumes_3d(lazy.volume, np.float64)), -1), eager.volume)
+
+
+def test_lazy_file_stays_open_while_the_study_lives_and_is_released_when_dropped(tmp_path: Path, openers) -> None:
+    path = tmp_path / "x.nii.gz"
+    _gz_4d(path)
+    study = NIfTIReader().load_study(path, lazy=True)
+    before = len(openers)
+    load_array(study.series[0].volume)
+    (opener,) = openers[before:]
+    assert not opener.closed
+    del study  # no gc.collect(): dropping the last reference must be enough
+    assert opener.closed
+    path.unlink()  # fails on Windows if the file is still open
+
+
+def test_lazy_batch_keeps_only_the_current_study_open(tmp_path: Path, openers) -> None:
+    for index in range(3):
+        _gz_4d(tmp_path / f"s{index}.nii.gz", frames=2)
+    for study in NIfTIBatchReader().iter_studies(tmp_path, lazy=True):
+        list(iter_volumes_3d(study.series[0].volume))
+        assert sum(not o.closed for o in openers) == 1
+        del study
+    assert all(o.closed for o in openers)
+    for path in tmp_path.iterdir():
+        path.unlink()  # fails on Windows if a proxy kept its file open

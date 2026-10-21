@@ -25,6 +25,22 @@ class ProcessingStep(Protocol):
 - Es determinista dado `params`; sin estado oculto.
 - `params` debe ser **JSON puro**: `dict`, `list`, `str`, `int`, `float`, `bool`, `None`. Una tupla
   vuelve del JSON como lista y rompe `from_json(to_json(m)) == m` y la reproducción.
+- **Salidas calculadas (opcional, RF15):** un paso que calcula valores a registrar (media, forma
+  resultante, orientación de origen...) define además
+  `apply_with_outputs(study) -> tuple[MRIStudy, dict]`, y `apply` devuelve su primer elemento. El
+  runner usa `apply_with_outputs` si existe y guarda el dict en `StepRecord.outputs`; si no, llama a
+  `apply` y `outputs` queda `{}`. Convención obligatoria para los pasos de la etapa 3:
+  `{"series": [{"index": i, ...}]}`, con `i` la posición en `study.series`, solo para las series
+  transformadas. Solo tipos básicos JSON (convierte `np.float32`/`np.ndarray` con `float`/`tolist`);
+  nunca PHI, rutas, UIDs ni mensajes.
+  Las claves deben ser `str` (`json.dumps` convierte `{0: x}` en `{"0": x}` en silencio) y `apply` debe delegar en `apply_with_outputs(study)[0]`.
+- **Rutas de origen fuera del registro (opcional, RNF07):** un paso cuya salida no debe poder
+  vincularse con su entrada (p. ej. `anonymize`) declara `redacts_sources: ClassVar[bool] = True` en
+  su clase. No es un parámetro, así que la configuración no puede desactivarlo. Ver «Runner».
+- **Pasos incorporados:** viven en `application/pipeline/steps/` (`validate`, `anonymize`, `reorient`,
+  `resample`, `normalize`); su `__init__.py` importa cada módulo y `manifest.py` importa el paquete,
+  así que `pipeline_from_config`/`pipeline_from_manifest` los encuentran por nombre sin importarlos
+  a mano. Geometría: [processing/geometry.md](../processing/geometry.md).
 - `@register_step("nombre")` registra la factory (normalmente la clase). Un nombre repetido lanza
   `ValueError`. `name` debe coincidir con el nombre registrado.
 - `build_step(name, params=None)`: un nombre desconocido lanza `ValueError("Unknown processing step.")`.
@@ -34,9 +50,15 @@ class ProcessingStep(Protocol):
 
 ## Registro de transformaciones
 
-- `StepRecord(name, version, params, status, error_type=None)`. `status` es `"ok"` o `"failed"`.
-  `error_type` es `type(error).__name__` y está presente solo si falló. **Nunca** guarda el mensaje
-  de la excepción.
+- `StepRecord(name, version, params, status, error_type=None, outputs={})`. `status` es `"ok"` o
+  `"failed"`. `error_type` es `type(error).__name__` y está presente solo si falló. **Nunca** guarda el
+  mensaje de la excepción.
+- `outputs` guarda los valores calculados por el paso en su forma JSON (copia profunda; las tuplas
+  pasan a listas, así que `from_json(to_json(m)) == m`). Un paso `failed` no tiene `outputs`. Un valor
+  no serializable o no finito lanza `ValueError("Step outputs must be JSON-serializable.")` sin causa
+  ni valor; dentro del runner eso hace fallar el paso para ese estudio y el lote continúa.
+  `to_dict()` omite la clave cuando está vacío (un manifiesto sin salidas es idéntico al de la etapa 2)
+  y `from_dict()` acepta registros antiguos sin ella. `outputs` entra en la igualdad del manifiesto.
 - `StudyReport(index, source_path, steps)`. `index` empieza en 1 y sigue el orden de entrada.
   `source_path` es `str(series[0].files[0])`, o `None` si el estudio no tiene archivos. `steps`
   sigue el orden de ejecución; el último es el que falló, si alguno falló.
@@ -56,7 +78,7 @@ Pipeline(steps).run(
   `BIDSBatchReader.iter_studies`). Suelta cada estudio, de entrada y de salida, antes de leer el
   siguiente. No acumula estudios: solo los reportes, que son pequeños.
 - **Éxito:** se llama a `on_result(estudio_procesado, report)`.
-- **Fallo:** el borde es por estudio (`except Exception` alrededor de cada `apply`). Al fallar un
+- **Fallo:** el borde es por estudio (`except Exception` alrededor de cada `apply`/`apply_with_outputs` y de su `StepRecord`). Al fallar un
   paso, los siguientes de ese estudio no corren ni se registran. Se llama a
   `on_error(series[0].files[0], error)`, o a `on_error(Path(), error)` si el estudio no tiene
   archivos, y el lote continúa. `on_result` no se llama.
@@ -65,6 +87,14 @@ Pipeline(steps).run(
 - **Errores del iterable** (p. ej. `ValueError("No valid NIfTI studies were found.")` al agotarlo):
   se propagan, porque son globales.
 - **Devuelve** un `StudyReport` por estudio, éxitos y fallos, en orden de entrada.
+- **Redacción de rutas:** si algún paso del pipeline declara `redacts_sources` con valor verdadero
+  (se evalúa con `bool()` una vez por corrida), **todos** los `StudyReport` de la corrida guardan
+  `source_path=None`, también los de estudios que fallan antes de llegar a ese paso. `on_error`
+  sigue recibiendo la ruta real, solo en memoria; no se persiste. `StudyReport`, el manifiesto y
+  `from_json` no cambian. Al reproducir desde el manifiesto el paso se reconstruye desde su clase y
+  vuelve a redactar, así que la igualdad se mantiene. **Riesgo residual:** `index` sigue el orden
+  determinista del lector, así que quien tenga acceso al directorio de entrada puede volver a
+  vincular cada `index` con su archivo; exige acceso a los datos originales.
 - **Logs:** un warning por fallo con el tipo de excepción y un resumen final
   (`Pipeline finished: N studies, M failed`). Nunca rutas, UIDs ni mensajes.
 - **Advertencia de memoria:** si `on_error` guarda la excepción, su `__traceback__` mantiene vivo el
@@ -78,7 +108,7 @@ Pipeline(steps).run(
 - `versions`: `mri_dataset_tool`, `python`, `numpy`, `nibabel` y `pydicom`, leídas con
   `importlib.metadata`. Si un paquete no está instalado, su valor es `"unknown"`.
 - `steps`: `{"name", "version", "params"}` de cada paso tal como se ejecutó.
-- `reports`: la lista que devuelve `run`.
+- `reports`: la lista que devuelve `run`, con los `outputs` de cada paso por estudio (no van en `steps`).
 - `timestamps`: `{"created_at": ISO 8601 UTC}`. Se guarda en el JSON pero **no entra en la
   igualdad** (`compare=False`), así que dos corridas reproducidas son iguales.
 
@@ -151,3 +181,59 @@ El script corre `example.scale` sobre `data/raw/nifti_test_studies` con la confi
 ignora. Después reconstruye el pipeline desde ese manifiesto y lo vuelve a correr, e imprime
 `reproduced from manifest: True` si ambas corridas coinciden. Revisa que el JSON solo contenga rutas,
 pasos, parámetros, versiones y tipos de excepción, nunca mensajes ni valores de cabecera.
+
+## Ejemplo de la etapa 3 (E1)
+
+`config/stage3_example.yaml` define el pipeline completo solo con claves admitidas por el loader
+(`pipeline.steps`, `report.path`):
+
+```yaml
+pipeline:
+  steps:
+    - name: validate
+    - name: anonymize
+    - name: reorient
+      params: {target: RAS}
+    - name: resample
+      params: {spacing: [1.0, 1.0, 1.0], interpolation: linear}
+    - name: normalize
+      params: {method: zscore, mask: nonzero, per_volume: true}
+report:
+  path: data/output/stage3_run_manifest.json
+```
+
+`scripts/run_stage3_pipeline.py`:
+
+1. Si `MRI_ANON_KEY` falta o tiene menos de 32 caracteres, termina con un mensaje fijo (código 2)
+   sin traceback y sin crear nada; lo mismo si falta `data/raw/nifti_test_studies` (el mensaje
+   lleva solo esa ruta relativa fija). Si existen salidas de una corrida anterior
+   (`data/processed/study-*.nii.gz` o el manifiesto), se detiene sin sobrescribir (código 1).
+2. Lee `data/raw/nifti_test_studies` con `NIfTIBatchReader.iter_studies(lazy=True)`: un estudio a la
+   vez y sin leer vóxeles hasta que un paso los pide.
+3. `on_result` materializa con `load_array(volume, np.float32)` y escribe con `NIfTIWriter`
+   (`overwrite=False`) en `data/processed/study-NNN.nii.gz`, con `NNN` = posición en el orden de
+   entrada (`StudyReport.index`), nunca el nombre de origen. Un fallo de escritura se reporta como
+   cualquier otro error.
+4. `on_error` imprime solo el tipo de excepción y un contador; al final, conteos de estudios ok y
+   fallidos y errores por tipo.
+5. Escribe el manifiesto, comprueba que no contiene la ruta de entrada ni `sub-` (C1: `anonymize`
+   declara `redacts_sources`), lo reconstruye con `pipeline_from_manifest`, vuelve a correr sin
+   escribir y compara.
+
+La versión ejecutable con un lote sintético (NaN, otra orientación y otro espaciado) está en
+`tests/unit/test_pipeline_stage3_example.py`.
+
+Verificación manual (humano), desde la raíz del repositorio:
+
+```powershell
+$env:MRI_ANON_KEY = "<secreto de al menos 32 caracteres>"
+python scripts/run_stage3_pipeline.py
+```
+
+Abrir en un visor un volumen de `data/raw/nifti_test_studies` y su `data/processed/study-NNN.nii.gz`
+(orientación, espaciado de 1 mm, contraste normalizado). Revisar que
+`data/output/stage3_run_manifest.json` no contenga rutas, nombres `sub-`, la clave ni mensajes.
+
+Pico de memoria medido con `scripts/memory_check_nifti_batch.py` sobre `data/raw/nifti_test_studies`
+(6 archivos, 2026-10-20, Windows): carga eager +97.7 MB sobre la línea base; `--lazy` +1.3 MB. Mide
+solo la lectura del lote, no el pipeline completo.

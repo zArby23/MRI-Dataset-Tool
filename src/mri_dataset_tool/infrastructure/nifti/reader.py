@@ -13,15 +13,18 @@ logger = get_logger(__name__)
 
 def is_nifti_file(path: Path) -> bool:
     """Return whether *path* uses a supported single-file NIfTI suffix."""
-    return path.name.endswith((".nii", ".nii.gz"))
+    return path.name.lower().endswith((".nii", ".nii.gz"))
 
 
 class NIfTIReader:
-    def load_study(self, path: Path) -> MRIStudy:
+    def load_study(self, path: Path, lazy: bool = False) -> MRIStudy:
         """Load one NIfTI image as a study containing one MRI series.
 
         NIfTI has no DICOM study or series UIDs, so those fields are ``None``.
         Processing such as normalization and reorientation remains elsewhere.
+        With ``lazy=True`` the volume is nibabel's proxy (``image.dataobj``): no voxel
+        is read until it is materialized, so a truncated ``.nii.gz`` fails only then. The
+        file is opened on the first read and stays open until the study is released.
         """
         if not path.exists():
             raise FileNotFoundError(
@@ -38,8 +41,15 @@ class NIfTIReader:
 
         logger.info("Loading NIfTI study")
         try:
-            image = nib.load(path)
-            volume = image.get_fdata()
+            # Lazy: no mmap (it would lock the file on Windows); keep_file_open so a 4D .nii.gz
+            # is not reopened and re-decompressed from the start for every frame (QA1-06).
+            image = nib.load(path, mmap=False, keep_file_open=True) if lazy else nib.load(path)
+            if image.header.get_data_dtype().kind == "c":
+                # get_fdata() and float casts drop the imaginary part with only a warning.
+                raise ValueError("Unsupported NIfTI data type.")
+            if any(size < 0 for size in image.shape):
+                raise OSError("Negative NIfTI dimension.")  # numpy would fail with its own message
+            volume = image.dataobj if lazy else image.get_fdata()
         except (ImageFileError, OSError, EOFError) as error:
             logger.error("Unable to load NIfTI image")
             raise ValueError("Unable to load NIfTI image.") from error

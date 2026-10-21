@@ -1,0 +1,30 @@
+# Stage 3 pipeline for a BIDS batch (BIDSBatchReader; modality = BIDS suffix). QA2-cfg.
+# load_config(Path("config/stage3_bids.yaml")) layers it over default.yaml.
+# The anonymize step reads its HMAC key from the MRI_ANON_KEY environment variable (never here).
+#
+# Diffusion goes to 2 mm to bound RAM: a 144x144x78x140 dwi is ~5.3 GiB in float32 at 1 mm and
+# ~0.7 GiB at 2 mm (normalize adds another output of the same size).
+# WARNING: `modalities` only includes. A series whose modality is in neither list, or is None
+# (e.g. loose NIfTI files outside BIDS), is NOT resampled and keeps its original spacing.
+# Do not use this file for a plain NIfTI batch: use stage3_example.yaml.
+pipeline:
+  steps:
+    - name: validate
+    - name: anonymize
+    - name: reorient
+      params: {target: RAS}
+    - name: resample
+      params:
+        spacing: [1.0, 1.0, 1.0]
+        interpolation: linear
+        modalities: [T1w, T2w, magnitude1, magnitude2, phasediff]
+    - name: resample
+      params:
+        spacing: [2.0, 2.0, 2.0]
+        interpolation: linear
+        modalities: [dwi]
+    - name: normalize
+      params: {method: zscore, mask: nonzero, per_volume: true}
+
+report:
+  path: data/output/stage3_bids_run_manifest.json
