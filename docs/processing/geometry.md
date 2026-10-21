@@ -137,6 +137,13 @@ Algoritmo (`resample.py`), decisiones Q5:
   volumen (p. ej. `normalize`) suman su propia salida mientras la anterior sigue viva.
 - **`outputs`:** `{"series": [{"index": i, "shape": [...], "spacing": [...]}]}` (`int`/`float`
   nativos; `spacing` sale del affine resultante).
+- **Spacing por modalidad** (`config/stage3_bids.yaml`): dos pasos `resample` con `modalities`
+  disjuntas, anatómicas (`T1w`, `T2w`, `magnitude1`, `magnitude2`, `phasediff`) a 1 mm y `dwi` a 2 mm.
+  Una difusión 144×144×78×140 ocupa ≈ 5,3 GiB en `float32` a 1 mm y ≈ 0,7 GiB a 2 mm (y `normalize`
+  suma otra salida del mismo tamaño). **`modalities` solo incluye:** una serie cuya `modality` no está
+  en ninguna de las dos listas, o es `None` (NIfTI sueltos fuera de BIDS), **no se remuestrea** y
+  conserva su spacing original. Por eso ese archivo es solo para lotes BIDS; para NIfTI sueltos se usa
+  `config/stage3_example.yaml`.
 
 ## Limitaciones
 
