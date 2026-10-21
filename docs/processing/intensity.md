@@ -42,6 +42,9 @@ for study in NIfTIBatchReader().iter_studies(root, lazy=True):
     `"Unsupported volume dimensionality."` (no 3D/4D), `"Unable to read volume data."` (archivo
     truncado, corrupto o borrado al materializar) y `"Unsupported NIfTI data type."` (origen complejo:
     convertirlo a real perdería la parte imaginaria; `NIfTIReader` ya rechaza estos archivos al cargar, QA1-01).
+- Extensiones (QA1-02): `is_nifti_file` no distingue mayúsculas, así que los lectores NIfTI y BIDS
+  (`find_nifti_files`, `BIDSReader`, `BIDSBatchReader`) cargan `.NII`/`.nii.GZ`. BIDS exige minúsculas,
+  pero el lector las tolera: `metadata["bids"]["extension"]` conserva la extensión tal como está escrita (p. ej. `.NII.GZ`).
 - Con `lazy=True` el lector abre la imagen con `mmap=False` y nibabel no mantiene el archivo abierto
   (`keep_file_open=False`): el archivo se puede borrar o mover (también en Windows) mientras el proxy
   existe; materializarlo después falla con `"Unable to read volume data."`.

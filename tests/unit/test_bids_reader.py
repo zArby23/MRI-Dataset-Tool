@@ -155,3 +155,13 @@ def test_load_study_lazy_passes_through_to_nifti_reader(tmp_path: Path) -> None:
     assert not isinstance(lazy.series[0].volume, np.ndarray)
     assert lazy.series[0].metadata["bids"] == eager.series[0].metadata["bids"]
     np.testing.assert_array_equal(load_array(lazy.series[0].volume, np.float64), eager.series[0].volume)
+
+
+def test_upper_case_extension_is_tolerated(tmp_path: Path) -> None:
+    # BIDS requires lower-case extensions; the reader tolerates them (QA1-02).
+    anat = tmp_path / "sub-01" / "anat"
+    _nifti(anat / "sub-01_T2w.NII.GZ")
+    (anat / "sub-01_T2w.json").write_text('{"EchoTime": 0.1}')
+    (series,) = BIDSReader().load_study(tmp_path / "sub-01").series
+    assert series.metadata["bids"]["extension"] == ".NII.GZ"
+    assert series.metadata["sidecar"] == {"EchoTime": 0.1}
