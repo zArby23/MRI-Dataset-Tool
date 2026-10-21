@@ -229,23 +229,47 @@ máximo del proceso). Al terminar, `git status data/` estaba limpio: no se modif
 Conclusiones:
 - **RNF02 confirmado con datos reales:** la RAM pico se mantuvo en 446 MB a lo largo de 343 estudios y de toda la
   conversión, y vuelve a ~190 MB entre estudios.
-- **Errores de lectura del BIDS.** Las tres cifras miden cosas distintas:
-  - **84:** líneas de log `"Unable to load NIfTI image"` que emitió la primera corrida antes de detenerse. Ese mensaje
-    sale de `NIfTIReader` cuando no puede cargar una imagen.
-  - **86:** punteros de git-annex que hay en el dataset, contados después archivo por archivo: archivos de texto de
-    105–108 bytes con extensión `.nii.gz`, sin contenido descargado. Los otros 76 NIfTI cargan bien. Ningún otro archivo
-    del dataset falla al cargar, así que los 84 errores corresponden a punteros; la corrida se detuvo antes de leer los 2 restantes.
-  - **2:** los `ValueError` de la prueba de humo son `"Invalid BIDS file name: missing entities or suffix."`, es decir,
-    2 archivos con nombre BIDS inválido, no punteros. En un aviso anterior a @orquestador los había atribuido por error a punteros.
+- **Errores de lectura del BIDS (cifras conciliadas en QA2).** El dataset tiene **86 punteros de git-annex** sin
+  contenido descargado: archivos de texto de 105–108 bytes con extensión `.nii.gz`. Los otros 76 NIfTI cargan bien.
+  - **84** de esos punteros tienen nombre BIDS válido: fallan al cargar con `"Unable to load NIfTI image."`. Son los
+    84 errores de la primera corrida y los 84 de la corrida completa de QA2.
+  - **2** tienen nombre BIDS inválido: fallan antes, al interpretar el nombre, con
+    `"Invalid BIDS file name: missing entities or suffix."`. Son los 2 `ValueError` de la prueba de humo.
   
+  (Antes este informe decía que la primera corrida "se detuvo antes de leer los 2 restantes", y en un aviso anterior
+  atribuí los 2 `ValueError` a archivos sin relación con los punteros. Ambas cosas eran inexactas.)
   Todos se reportan con mensaje fijo y el lote sigue (RF16). No es un defecto: para correr el dataset entero hace falta `datalad get`.
 - **QA1-06 se descubrió aquí:** en BIDS, la difusión tardó ≈ 220 s solo en `validate` + `reorient`. Las corridas
   anteriores usaron el código previo a la corrección, así que sus tiempos no la reflejan.
 
+### 3.1 QA2 — verificaciones manuales sobre datos reales (2026-10-21)
+
+Se ejecutaron con HEAD `5ab5537`, con las salidas en `E:/qa_runs/` (fuera del repositorio, regla de `MEMORY.md` §2)
+y con 6,4–6,5 GiB de RAM disponibles de 13,9. Al terminar, `git status data/` estaba limpio.
+
+| Corrida | Resultado | Tiempo | CPU | RAM pico |
+|---|---|---|---|---|
+| **Pico eager vs lazy**, difusión `sub-01/ses-01` (144×144×78×140), leída volumen a volumen | eager `float64`: 2.169 MB; lazy `uint16`: **85 MB** | 2,9 s / 1,8 s | — | ver resultado |
+| `scripts/memory_check_nifti_batch.py` sin y con `--lazy` (ruta fija `nifti_test_studies`, 6 archivos) | Aumento del pico sobre la base: 97,3 MB en eager y 1,3 MB en lazy | — | — | 151 / 55 MB |
+| **Difusión** por el pipeline stage3 (límite nuevo 2³²), estudio completo de 9 series | `validate`, `anonymize`, `reorient` y **`resample` ok**. `normalize` falla con `"Insufficient available memory for the normalized volume."`; no se usó `allow_insufficient_memory`. El manifiesto no contiene rutas | 138 s | 137 s | 6.003 MB |
+| La misma sesión, serie por serie | Las 8 series que no son dwi (T2w, T1w, 2× magnitude1, 2× magnitude2, 2× phasediff) están ok, cada una en < 3 s y < 410 MB. dwi falla en `normalize` por RAM | 128 s (dwi) | 127 s | 5.648 MB (dwi) |
+| **BIDS completo** (27 sesiones, lazy), **dwi excluida** con `modalities` en validate/reorient/resample/normalize | **27/27 ok**, 0 fallos de paso. Errores de lectura: 84 punteros más 2 nombres inválidos. El manifiesto no contiene rutas | 97 s | 95 s | 544 MB |
+| **`anonymize_dicom_tree` completo** (43.719 archivos) | **43.718 escritos y 1 fallido** (`InvalidDicomError`: el archivo no DICOM del árbol). Hay 43.718 `.dcm` en disco y el informe guardado coincide | 11,2 min | 332 s | 77 MB |
+| **Reconversión** del DICOM anonimizado a NIfTI | **31 estudios y 343 series**, lo mismo que la conversión original. 1 `InvalidDicomError`: el `anonymization_report.json` de la carpeta de salida, que el lector reporta como no DICOM, según su contrato | 13,7 min | 274 s | 403 MB |
+
+Conclusiones de QA2:
+- **QA1-06 confirmado con datos reales:** lazy lee los 140 volúmenes de la difusión en 1,8 s (antes ≈ 220 s solo
+  `validate` + `reorient`) y con 25 veces menos RAM que eager.
+- **QA1-07/08/09 se comportan como se documentó:** `resample` de la difusión ya cabe (≈ 5,3 GiB de salida). La
+  comprobación de RAM rechaza `normalize` con su mensaje fijo, porque necesitaría otros ≈ 5,3 GiB con 6,5 disponibles.
+- **Observación:** el runner corta el estudio en el primer fallo, así que una sesión con difusión pierde también sus
+  8 series válidas cuando la difusión no cabe en RAM. Excluir dwi con `modalities` resuelve el caso. El árbol ya tiene
+  una configuración BIDS con `resample` por modalidad (commit `d3dc3fc`, posterior a esta corrida y no auditado por @qa).
+- **La anonimización a escala real conserva la reconstrucción:** el mismo número de estudios y series antes y después.
+
 **Pendiente de verificación manual del humano:**
-- la corrida BIDS completa (coincide con el punto 3 del checkpoint: pico eager vs lazy en ds005299);
-- `anonymize_dicom_tree` completo sobre DICOM real y su reconversión (coincide con el punto 4 del checkpoint, opcional,
-  que recomienda hacerlo fuera del repositorio).
+- la difusión **normalizada**, con ≥ 11–12 GiB de RAM libres (resample más normalize);
+- los puntos del checkpoint que requieren ojos humanos: el visor, y revisar el `AnonymizationReport` y las salidas en `E:/qa_runs/`.
 
 ## 4. Qué no se verificó (sospechas y límites)
 
@@ -278,12 +302,13 @@ Huecos reales relevantes:
 
 ## 6. Verificaciones manuales pendientes para el humano
 
-1. La corrida BIDS completa, la difusión real con el nuevo límite de `resample` y ≥ 8–10 GB de RAM libres
-   (QA1-07/08/09), y `anonymize_dicom_tree` completo sobre DICOM real con su reconversión (§3).
+1. La difusión real **normalizada** con ≥ 11–12 GiB de RAM libres (§3.1). El BIDS completo, la anonimización
+   completa y su reconversión ya se verificaron en QA2.
 2. Las del checkpoint final de `tasks/etapa-3/todo.md`:
    1. abrir en un visor un volumen antes y después de reorientar, remuestrear y normalizar;
-   2. revisar el `AnonymizationReport` y buscar identificadores en las salidas;
-   3. medir el pico de memoria eager vs `lazy` en BIDS ds005299;
-   4. opcional: anonimizar un DICOM real fuera del repositorio.
+   2. revisar el `AnonymizationReport` y buscar identificadores en las salidas (las de QA2 están en
+      `E:/qa_runs/qa2_anon/`);
+   3. ~~medir el pico de memoria eager vs `lazy` en BIDS ds005299~~: **hecho en QA2** (§3.1);
+   4. ~~opcional: anonimizar un DICOM real fuera del repositorio~~: **hecho en QA2** (§3.1), sobre `dicom_test_studies`.
 3. Correr `python -m pytest -q` en Linux (RNF04).
 4. Si hay a mano un DICOM real con compresión JPEG, comprobar fuera del repositorio que no conserva comentarios con identificadores (§4).
