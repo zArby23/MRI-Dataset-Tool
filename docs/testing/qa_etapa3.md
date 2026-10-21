@@ -267,8 +267,35 @@ Conclusiones de QA2:
   una configuración BIDS con `resample` por modalidad (commit `d3dc3fc`, posterior a esta corrida y no auditado por @qa).
 - **La anonimización a escala real conserva la reconstrucción:** el mismo número de estudios y series antes y después.
 
+### 3.2 QA3 — lanzador BIDS con `config/stage3_bids.yaml` (2026-10-21)
+
+Se usó `scripts/run_stage3_bids_pipeline.py` con HEAD `9ad5f95`: anatomía y mapas de campo a 1 mm, dwi a 2 mm. Las
+salidas fueron a `E:/qa_runs/qa3_*`, con 5,8–6,4 GiB de RAM disponibles. No se usó `allow_insufficient_memory`.
+`git status data/` quedó limpio. La RAM pico se midió sobre el árbol de procesos, porque el `python.exe` del venv es
+un lanzador y el intérprete real es su hijo.
+
+| Corrida | Resultado del lanzador | Salidas | Tiempo | RAM pico |
+|---|---|---|---|---|
+| `sub-01/ses-01` (la sesión con difusión), con la carpeta de la sesión como raíz | `Studies: 1 ok: 1 failed in a step: 0 files written: 9`, `Errors by type: none`, `Manifest without source paths: True reproduced from manifest: True` | dwi 130×130×71×140 a **2,0 mm**. 8 series a **1,0 mm** (p. ej. T1w 167×256×255). Todas `float32` y RAS | 95 s (con la reproducción) | 1.874 MB (primera pasada) |
+| Dataset completo (27 sesiones, lazy) | `Studies: 27 ok: 27 failed in a step: 0 files written: 76`, `Errors by type: {'ValueError': 86}`, `Manifest without source paths: True reproduced from manifest: True` | 71 series 3D a 1,0 mm y **5 dwi 4D a 2,0 mm**, todas `float32`. Son los 76 NIfTI reales del dataset | 610 s (con la reproducción) | 1.864 MB |
+
+Conclusiones de QA3:
+- **Éxito:** la sesión con difusión pasa entera, con la dwi normalizada con ~6 GiB disponibles. La RAM pico baja
+  de 6.003 MB (dwi a 1 mm, QA2) a ~1,9 GB.
+- Ni la consola ni el manifiesto contienen rutas ni `sub-`.
+- Los 86 `ValueError` son los 86 punteros de git-annex: 84 que fallan al cargar y 2 con nombre inválido (§3).
+- La consola muestra además el log `ERROR:...nifti.reader:Unable to load NIfTI image` una vez por puntero y por pasada
+  (172 líneas). No contiene PHI, pero repite lo que ya cuenta `error N: ValueError`. Es una observación menor de legibilidad.
+- Con la carpeta de la sesión como raíz, los sidecars solo se heredan desde la sesión. No afecta al procesamiento.
+- **Incidencias del script de medición de @qa, no del sistema:** un primer intento se bloqueó en la reproducción
+  porque la consola iba a una tubería que nadie vaciaba. Además medía solo el `python.exe` lanzador. Se corrigieron
+  las dos cosas: la consola va a un archivo y se mide el árbol de procesos. Durante ese intento el humano tenía
+  3D Slicer abierto, así que la caída de la RAM disponible del sistema en esa corrida no se usa como consumo del pipeline.
+
 **Pendiente de verificación manual del humano:**
-- la difusión **normalizada**, con ≥ 11–12 GiB de RAM libres (resample más normalize);
+- ~~la difusión **normalizada**~~: **hecho en QA3** a 2 mm con `config/stage3_bids.yaml`. A 1 mm (`stage3_example.yaml`)
+  sigue necesitando ≥ 11–12 GiB libres;
+- abrir en un visor las salidas de `E:/qa_runs/qa3_ses01/` (anatomía a 1 mm y dwi a 2 mm, RAS);
 - los puntos del checkpoint que requieren ojos humanos: el visor, y revisar el `AnonymizationReport` y las salidas en `E:/qa_runs/`.
 
 ## 4. Qué no se verificó (sospechas y límites)
@@ -302,8 +329,9 @@ Huecos reales relevantes:
 
 ## 6. Verificaciones manuales pendientes para el humano
 
-1. La difusión real **normalizada** con ≥ 11–12 GiB de RAM libres (§3.1). El BIDS completo, la anonimización
-   completa y su reconversión ya se verificaron en QA2.
+1. La difusión normalizada ya se verificó a 2 mm con `config/stage3_bids.yaml` (QA3, §3.2). A 1 mm necesita
+   ≥ 11–12 GiB de RAM libres. El BIDS completo, la anonimización completa y su reconversión ya se verificaron en
+   QA2 y QA3.
 2. Las del checkpoint final de `tasks/etapa-3/todo.md`:
    1. abrir en un visor un volumen antes y después de reorientar, remuestrear y normalizar;
    2. revisar el `AnonymizationReport` y buscar identificadores en las salidas (las de QA2 están en
