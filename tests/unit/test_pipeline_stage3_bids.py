@@ -1,6 +1,9 @@
 """QA2-cfg: config/stage3_bids.yaml over a tiny lazy BIDS batch (anatomy at 1 mm, dwi at 2 mm)."""
 
+import importlib.util
 import json
+import sys
+import tempfile
 from pathlib import Path
 
 import nibabel as nib
@@ -13,11 +16,12 @@ from mri_dataset_tool.infrastructure.bids.batch_reader import BIDSBatchReader
 from mri_dataset_tool.infrastructure.config.loader import load_config
 
 REPO = Path(__file__).resolve().parents[2]
+KEY = "k" * 40
 
 
 @pytest.fixture(autouse=True)
 def _key(monkeypatch: pytest.MonkeyPatch) -> None:
-    monkeypatch.setenv("MRI_ANON_KEY", "k" * 40)
+    monkeypatch.setenv("MRI_ANON_KEY", KEY)
 
 
 def _config() -> dict:
@@ -104,3 +108,79 @@ def test_manifest_reproduces_the_same_volumes(tmp_path: Path) -> None:
     for a, b in zip(first[0].series, again[0].series, strict=True):
         np.testing.assert_array_equal(a.volume, b.volume)
         np.testing.assert_array_equal(a.metadata["affine"], b.metadata["affine"])
+
+
+# --- scripts/run_stage3_bids_pipeline.py (QA2-script) ---
+
+_spec = importlib.util.spec_from_file_location("run_stage3_bids_pipeline", REPO / "scripts" / "run_stage3_bids_pipeline.py")
+script = importlib.util.module_from_spec(_spec)
+_spec.loader.exec_module(script)
+
+
+def _dataset_with_a_failing_study(root: Path) -> Path:
+    dataset = _dataset(root)
+    broken = np.ones((4, 4, 4), dtype=np.float32)
+    broken[1, 1, 1] = np.nan
+    (dataset / "sub-02" / "anat").mkdir(parents=True)
+    nib.save(nib.Nifti1Image(broken, np.eye(4)), dataset / "sub-02" / "anat" / "sub-02_T1w.nii.gz")
+    return dataset
+
+
+def test_script_writes_series_and_a_clean_reproducible_manifest(tmp_path: Path, capsys) -> None:
+    dataset = _dataset_with_a_failing_study(tmp_path)
+    output_dir, manifest_path = tmp_path / "out", tmp_path / "manifest" / "run.json"
+    args = [str(dataset), "--output-dir", str(output_dir), "--manifest-path", str(manifest_path)]
+
+    assert script.main(args) == 0
+    out = capsys.readouterr().out
+
+    assert sorted(p.name for p in output_dir.iterdir()) == [f"study-001_series-00{i}.nii.gz" for i in (1, 2, 3)]
+    assert all(nib.load(p).get_data_dtype() == np.float32 for p in output_dir.iterdir())
+    assert "Studies: 2  ok: 1  failed in a step: 1  files written: 3" in out
+    assert "Errors by type: {'ValueError': 1}" in out  # the NaN study; FLAIR outside both lists is not an error
+    assert "Manifest without source paths: True  reproduced from manifest: True" in out
+    assert "WARNING: an output is on drive C: or in the temporary directory" in out  # tmp_path is in the temp dir
+    assert "sub-" not in out and str(tmp_path) not in out and KEY not in out
+    text = manifest_path.read_text(encoding="utf-8")
+    assert "sub-" not in text and str(tmp_path) not in text and tmp_path.as_posix() not in text and KEY not in text
+
+    assert script.main(args) == 1  # nothing is overwritten
+    assert "remove them first" in capsys.readouterr().out
+
+
+def test_script_without_key_stops_before_creating_anything(monkeypatch, tmp_path: Path, capsys) -> None:
+    monkeypatch.delenv("MRI_ANON_KEY")
+    dataset = _dataset(tmp_path)
+
+    code = script.main([str(dataset), "--output-dir", str(tmp_path / "out"), "--manifest-path", str(tmp_path / "m.json")])
+
+    assert code == 2
+    assert capsys.readouterr().out == "MRI_ANON_KEY is not set or is shorter than 32 characters; nothing was run.\n"
+    assert not (tmp_path / "out").exists() and not (tmp_path / "m.json").exists()
+
+
+@pytest.mark.parametrize("missing", ["--output-dir", "--manifest-path"])
+def test_script_requires_output_dir_and_manifest_path(missing: str, tmp_path: Path, capsys) -> None:
+    args = {"--output-dir": str(tmp_path / "out"), "--manifest-path": str(tmp_path / "m.json")}
+    del args[missing]
+
+    with pytest.raises(SystemExit) as exit_info:
+        script.main([str(tmp_path), *[x for pair in args.items() for x in pair]])
+
+    assert exit_info.value.code == 2
+    assert f"the following arguments are required: {missing}" in capsys.readouterr().err
+    assert list(tmp_path.iterdir()) == []
+
+
+def test_script_with_missing_dataset_prints_a_fixed_message(tmp_path: Path, capsys) -> None:
+    missing = tmp_path / "sub-99"
+
+    code = script.main([str(missing), "--output-dir", str(tmp_path / "out"), "--manifest-path", str(tmp_path / "m.json")])
+
+    assert code == 2
+    assert capsys.readouterr().out == "Dataset directory not found.\n"
+
+
+def test_discouraged_location() -> None:
+    assert script.is_discouraged_location(Path(tempfile.gettempdir()) / "x")
+    assert script.is_discouraged_location(Path("C:/data/out")) == (sys.platform == "win32")
