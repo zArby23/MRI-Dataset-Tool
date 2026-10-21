@@ -184,3 +184,28 @@ def test_script_with_missing_dataset_prints_a_fixed_message(tmp_path: Path, caps
 def test_discouraged_location() -> None:
     assert script.is_discouraged_location(Path(tempfile.gettempdir()) / "x")
     assert script.is_discouraged_location(Path("C:/data/out")) == (sys.platform == "win32")
+
+
+def _raise_oserror_naming(path: Path):
+    def fail(*args, **kwargs):
+        raise OSError(f"cannot read {path}")
+
+    return fail
+
+
+@pytest.mark.parametrize("target", ["reader", "manifest_write"])
+def test_script_run_failure_prints_only_the_type(target: str, monkeypatch, tmp_path: Path, capsys) -> None:
+    dataset = _dataset(tmp_path)
+    secret = dataset / "sub-01" / "ses-01" / "anat" / "sub-01_ses-01_T1w.nii.gz"
+    if target == "reader":
+        monkeypatch.setattr(script.BIDSBatchReader, "iter_studies", _raise_oserror_naming(secret))
+    else:
+        monkeypatch.setattr(script.RunManifest, "write", _raise_oserror_naming(secret))
+
+    code = script.main([str(dataset), "--output-dir", str(tmp_path / "out"), "--manifest-path", str(tmp_path / "m.json")])
+
+    captured = capsys.readouterr()
+    assert code == 1
+    assert captured.out.splitlines()[-1] == "Run failed: OSError"
+    console = captured.out + captured.err
+    assert "sub-" not in console and str(tmp_path) not in console and tmp_path.as_posix() not in console

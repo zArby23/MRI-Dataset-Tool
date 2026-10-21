@@ -116,24 +116,24 @@ def main(argv: Sequence[str] | None = None) -> int:
 
     pipeline = pipeline_from_config(config)
     print("Running stage 3 BIDS pipeline...")
-    output_dir.mkdir(parents=True, exist_ok=True)
     try:
+        output_dir.mkdir(parents=True, exist_ok=True)
         reports, errors, written = run(pipeline, dataset_root, output_dir)
-    except ValueError as error:  # the reader itself failed (no valid studies, invalid dataset_description.json)
-        print(f"Reading the dataset failed: {type(error).__name__}")
+
+        manifest_path.parent.mkdir(parents=True, exist_ok=True)
+        manifest = RunManifest.from_run(config, pipeline, reports)
+        manifest.write(manifest_path)
+        text = manifest_path.read_text(encoding="utf-8")
+        root = dataset_root.resolve()
+        no_sources = all(p not in text for p in (str(root), root.as_posix(), "sub-"))
+
+        saved = RunManifest.from_json(text)
+        replay = pipeline_from_manifest(saved)
+        replay_reports, _, _ = run(replay, dataset_root, None)
+        reproduced = RunManifest.from_run(saved.config, replay, replay_reports) == saved
+    except Exception as error:  # the reader or a write failed: its message or traceback may name a file (sub-<id>)
+        print(f"Run failed: {type(error).__name__}")
         return 1
-
-    manifest_path.parent.mkdir(parents=True, exist_ok=True)
-    manifest = RunManifest.from_run(config, pipeline, reports)
-    manifest.write(manifest_path)
-    text = manifest_path.read_text(encoding="utf-8")
-    root = dataset_root.resolve()
-    no_sources = all(p not in text for p in (str(root), root.as_posix(), "sub-"))
-
-    saved = RunManifest.from_json(text)
-    replay = pipeline_from_manifest(saved)
-    replay_reports, _, _ = run(replay, dataset_root, None)
-    reproduced = RunManifest.from_run(saved.config, replay, replay_reports) == saved
 
     failed = sum(1 for report in reports if report.steps and report.steps[-1].status == "failed")
     print(f"Studies: {len(reports)}  ok: {len(reports) - failed}  failed in a step: {failed}  files written: {written}")
