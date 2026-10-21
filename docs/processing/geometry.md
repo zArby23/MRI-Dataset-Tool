@@ -158,6 +158,11 @@ Algoritmo (`resample.py`), decisiones Q5:
   `float32` completa mientras la anterior sigue viva; el lector puede tener el volumen materializado),
   y `available` es una estimación del sistema operativo (incluye caché reclamable; no cuenta el swap). En Linux con
   *overcommit*, con `allow_insufficient_memory: true` el proceso puede morir por OOM en lugar de fallar.
+- **Reproducibilidad de la comprobación de RAM:** que un estudio salga `ok` o `failed` por memoria
+  depende de la RAM libre en ese instante, y ese dato no se guarda en el manifiesto: reproducirlo en
+  otra máquina, o en otro momento, puede dar otro `status`. Además, `allow_insufficient_memory: true`
+  queda en `params`, así que al reproducir ese manifiesto el consentimiento se reutiliza sin volver a
+  preguntar.
 - **Memoria de `resample`:** el pico es la salida 4D completa en `float32` más un volumen 3D de
   entrada y sus copias de trabajo (≈ 5 GiB para una difusión 144×144×78×140 a 1 mm); no hay salida en
   disco ni por trozos, ni recorte o relleno a matriz fija (etapa 4).
