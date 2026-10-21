@@ -17,6 +17,11 @@ for study in NIfTIBatchReader().iter_studies(root, lazy=True):
         ...
 ```
 
+| Parámetro | Defecto | Dónde |
+|---|---|---|
+| `lazy` | `False` | lectores NIfTI y BIDS (abajo) |
+| `dtype` | `None` (dtype del volumen; en un proxy, el de disco o float si la cabecera escala) | `load_array`, `iter_volumes_3d` |
+
 `lazy` existe en `NIfTIReader.load_study`, `NIfTIBatchReader.iter_studies/load_studies`,
 `BIDSReader.load_study/load_files` y `BIDSBatchReader.iter_studies/load_studies`; por defecto es
 `False` y el comportamiento no cambia.
@@ -73,6 +78,10 @@ Pendiente (verificación manual del humano): medir sobre la sesión con difusió
 
 ## Paso `validate` (RF03, I1)
 
+| Parámetro | Defecto | Valores |
+|---|---|---|
+| `modalities` | `null` (todas las series con volumen) | lista de modalidades (Q12) |
+
 Comprobaciones puras en `infrastructure/processing/validation.py` (`validate_series`); el paso
 `validate` (`application/pipeline/steps/validate.py`, versión `1`) las aplica a las series con volumen
 seleccionadas por `params.modalities` (por defecto todas). No cambia el volumen ni la geometría.
@@ -94,6 +103,8 @@ seleccionadas por `params.modalities` (por defecto todas). No cambia el volumen 
 - El volumen se lee de a un volumen 3D en `float64` (`iter_volumes_3d`), también si es perezoso, y no
   se materializa en la serie de salida. Si el dtype en disco es entero, se omite la comprobación de
   NaN/Inf (no pueden existir). Un `.nii.gz` truncado cargado con `lazy=True` falla aquí.
+- **Conserva** todo: volumen (el mismo objeto, sin copia), `shape`, `affine`, `orientation`,
+  `voxel_size`, `dtype` y unidades; solo añade `metadata["validation"]`.
 - No duplica la etapa 1: los archivos ilegibles al cargar los reporta el `on_error` de los lectores y la
   geometría DICOM la valida `build_series_volume`.
 
@@ -143,12 +154,13 @@ básicos JSON (sin NaN). Es la parte «extraer» de RF04; «mostrar» es de la e
              "intensity": {"min", "max", "mean", "std", "non_finite_voxels"} | null}]}
 ```
 
-- **Lista blanca única**: importa `METADATA_WHITELIST`, `FILTERED_METADATA_KEYS` y `SIDECAR_WHITELIST`
-  de `infrastructure/anonymization/policy.py` (dueño @anonimizacion); no copia valores. De `metadata`
-  solo salen las claves de `METADATA_WHITELIST` que no se filtran por clave (`sidecar`, `bids`); del
-  sidecar, solo las de `SIDECAR_WHITELIST` con un escalar o una lista de escalares. `bids` no se incluye
-  (la modalidad ya es el sufijo BIDS). `validation` pasa por `filter_validation` de la política (estado
-  conocido y códigos de hallazgo con el patrón de códigos); si el filtro devuelve `{}`, se omite.
+- **Lista blanca única**: importa `METADATA_WHITELIST`, `FILTERED_METADATA_KEYS`, `SIDECAR_WHITELIST`
+  y `filter_validation` de `infrastructure/anonymization/policy.py` (dueño @anonimizacion); no copia
+  valores. De `metadata` salen directamente las claves de `METADATA_WHITELIST` que no están en
+  `FILTERED_METADATA_KEYS` (geometría y descripción del array). Las filtradas se tratan así:
+  `sidecar` → solo las claves de `SIDECAR_WHITELIST` con un escalar o una lista de escalares;
+  `validation` → `filter_validation` (estado conocido y códigos de hallazgo), omitida si queda `{}`;
+  `bids` y `provenance` **no** se incluyen (la modalidad ya es el sufijo BIDS).
 - **Nunca** salen UIDs, `files`/rutas, `subject_id`/`session_id` ni claves fuera de la lista. Un valor
   permitido que no es de tipo básico (p. ej. un `Path`) se descarta, no se convierte a texto. Un
   float NaN/Inf en `metadata` o en el sidecar también se descarta (con la lista que lo contiene): el

@@ -37,9 +37,10 @@ class ProcessingStep(Protocol):
 - **Rutas de origen fuera del registro (opcional, RNF07):** un paso cuya salida no debe poder
   vincularse con su entrada (p. ej. `anonymize`) declara `redacts_sources: ClassVar[bool] = True` en
   su clase. No es un parámetro, así que la configuración no puede desactivarlo. Ver «Runner».
-- **Pasos incorporados:** viven en `application/pipeline/steps/`; su `__init__.py` importa cada módulo
-  y `manifest.py` importa el paquete, así que `pipeline_from_config`/`pipeline_from_manifest` los
-  encuentran por nombre sin importarlos a mano.
+- **Pasos incorporados:** viven en `application/pipeline/steps/` (`validate`, `anonymize`, `reorient`,
+  `resample`, `normalize`); su `__init__.py` importa cada módulo y `manifest.py` importa el paquete,
+  así que `pipeline_from_config`/`pipeline_from_manifest` los encuentran por nombre sin importarlos
+  a mano. Geometría: [processing/geometry.md](../processing/geometry.md).
 - `@register_step("nombre")` registra la factory (normalmente la clase). Un nombre repetido lanza
   `ValueError`. `name` debe coincidir con el nombre registrado.
 - `build_step(name, params=None)`: un nombre desconocido lanza `ValueError("Unknown processing step.")`.
@@ -77,7 +78,7 @@ Pipeline(steps).run(
   `BIDSBatchReader.iter_studies`). Suelta cada estudio, de entrada y de salida, antes de leer el
   siguiente. No acumula estudios: solo los reportes, que son pequeños.
 - **Éxito:** se llama a `on_result(estudio_procesado, report)`.
-- **Fallo:** el borde es por estudio (`except Exception` alrededor de cada `apply`). Al fallar un
+- **Fallo:** el borde es por estudio (`except Exception` alrededor de cada `apply`/`apply_with_outputs` y de su `StepRecord`). Al fallar un
   paso, los siguientes de ese estudio no corren ni se registran. Se llama a
   `on_error(series[0].files[0], error)`, o a `on_error(Path(), error)` si el estudio no tiene
   archivos, y el lote continúa. `on_result` no se llama.

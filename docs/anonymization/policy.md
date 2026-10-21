@@ -1,7 +1,8 @@
 # Política de anonimización (RF09, RNF07)
 
 > **Versión de la política: `1`** (`POLICY_VERSION` en `infrastructure/anonymization/policy.py`).
-> Estado: **aprobada por el humano en el Checkpoint 1** (versión `1`).
+> Estado: **política v1 APROBADA por el humano el 2026-10-20** (Checkpoint 1 de la etapa 3).
+> Guía de uso en la sección 7.
 
 La política es **datos**: listas blancas y una tabla etiqueta → acción. Lo que no aparece en una
 lista se **descarta**.
@@ -11,10 +12,9 @@ cualquier cambio que altere un resultado anonimizado sube `POLICY_VERSION`.
 
 | Módulo | Contenido |
 |---|---|
-| `infrastructure/anonymization/policy.py` | `POLICY_VERSION`, `Action`, listas blancas del modelo y del sidecar, `DICOM_ACTIONS` |
-| `infrastructure/anonymization/pseudonym.py` | Clave (`MRI_ANON_KEY`) y seudónimos HMAC |
-| `application/pipeline/steps/anonymize.py` | Paso `anonymize` sobre `MRIStudy` (A1) |
-
+| `infrastructure/anonymization/policy.py` | `POLICY_VERSION`, `Action`, listas blancas (`METADATA_WHITELIST`, `SIDECAR_WHITELIST`, `PROVENANCE_WHITELIST`, entidades BIDS), `VALIDATION_STATUSES`, `filter_validation`, `DICOM_ACTIONS`, `DICOM_DEFAULT_ACTION`, `DICOM_FIXED_VALUES` |
+| `infrastructure/anonymization/pseudonym.py` | `load_key` (`MRI_ANON_KEY`), `pseudonymize_uid`, `pseudonymize_label` |
+| `application/pipeline/steps/anonymize.py` | Paso `anonymize` sobre `MRIStudy` (A1, sección 2) |
 | `infrastructure/anonymization/dicom.py` | `anonymize_dataset` (aplica la tabla de la sección 4) y `generalize_date`/`generalize_datetime`/`generalize_age` |
 | `infrastructure/anonymization/report.py` | `AnonymizationReport` |
 | `application/services/anonymize.py` | `anonymize_dicom_tree` sobre archivos DICOM (A2, sección 5) |
@@ -24,7 +24,8 @@ cualquier cambio que altere un resultado anonimizado sube `POLICY_VERSION`.
 - **HMAC-SHA256** con una clave secreta leída de la variable de entorno `MRI_ANON_KEY`. La clave se
   lee **al construir el paso** (`build_step`, `pipeline_from_config`, `pipeline_from_manifest`): sin
   ella, vacía o con menos de **32 caracteres** → `ValueError("Anonymization key is not set or too short.")`
-  antes de procesar nada. El mínimo evita adivinar una clave corta por fuerza bruta sobre IDs cortos.
+  antes de procesar nada. `anonymize_dicom_tree` la lee al llamarse, antes de crear nada. El mínimo
+  evita adivinar una clave corta por fuerza bruta sobre IDs cortos.
 - **Deterministas**: mismo valor + misma clave → mismo seudónimo, en la corrida y entre corridas.
   Otra clave → otros seudónimos. **No hay tabla de correspondencia.**
 - Dominios separados: el mismo texto como UID, sujeto o sesión da seudónimos sin relación.
@@ -45,6 +46,8 @@ cualquier cambio que altere un resultado anonimizado sube `POLICY_VERSION`.
 ## 2. Paso `anonymize` (modelo de dominio)
 
 `params = {"policy_version": "1"}` (llega al manifiesto); otra versión → `ValueError`.
+Declara `redacts_sources: ClassVar[bool] = True` (contrato C1; no está en `params` ni en `repr`): en
+un pipeline con `anonymize`, los `StudyReport` del manifiesto no guardan la ruta de origen.
 
 - `study_uid`, `series_uid` → seudónimo UID; `subject_id`, `session_id` → seudónimo de etiqueta;
   `None` se queda en `None`.
@@ -175,10 +178,56 @@ escritos se reportan entonces como `FileExistsError`.
   En conjunto, y en cohortes pequeñas, pueden reducir mucho el número de candidatos.
 - **Valores de claves permitidas**: una clave técnica permitida (p. ej. `Manufacturer`) que un equipo
   rellene con texto identificable se conservaría; la lista blanca filtra claves, no el contenido.
-- **Seudónimos**: quien tenga la clave puede comprobar si un ID conocido corresponde a un seudónimo.
-  También existe la verificación por azar de la sección 1.
+- **Clave HMAC**: quien la tenga puede comprobar si un ID conocido corresponde a un seudónimo (no
+  hay tabla, pero sí recálculo). Debe guardarse fuera del repositorio y no compartirse con el dataset.
+- **Verificación por azar** (sección 1): un ID original verifica como seudónimo con probabilidad 2⁻²⁴
+  (etiqueta) o 2⁻³² (UID) y se conservaría sin seudonimizar.
+- **Colisiones** (aceptadas): dos sujetos con el mismo seudónimo de 40 bits se fundirían (≈ 5·10⁻⁵
+  con 10⁴ sujetos); dos cortes con el mismo nombre de salida dan `FileExistsError` reportado (sección 5).
 - **Valores de entidades BIDS** permitidas (`acq-`, `task-`, …): texto libre del autor del dataset, sin filtrar.
 - **Manifiesto**: `StudyReport.source_path` guarda la ruta del archivo de **entrada** (en BIDS contiene
   `sub-<ID>`). El paso declara `redacts_sources = True` y, con el contrato C1, el runner deja
   `source_path = None` en las corridas con `anonymize` (C1, integrado). `on_error` sigue recibiendo
   la ruta: quien lo implemente no debe volcarla en salidas compartidas.
+- **Validación con datos sintéticos**: las pruebas usan solo DICOM sintéticos. La revisión de un
+  informe y de una salida reales queda pendiente del humano, fuera del repositorio (sección 7).
+
+## 7. Guía de uso
+
+1. **Definir la clave** (al menos 32 caracteres; guárdala fuera del repositorio; con otra clave, los
+   seudónimos cambian):
+
+   ```powershell
+   $env:MRI_ANON_KEY = python -c "import secrets; print(secrets.token_urlsafe(32))"   # Windows
+   ```
+
+   ```bash
+   export MRI_ANON_KEY="$(python -c 'import secrets; print(secrets.token_urlsafe(32))')"   # Linux
+   ```
+
+   Para reproducir una corrida (mismos UIDs y nombres), reutiliza la misma clave.
+
+2. **Anonimizar un árbol DICOM** en un directorio de salida que no esté dentro de la entrada:
+
+   ```python
+   from pathlib import Path
+   from mri_dataset_tool.application.services.anonymize import anonymize_dicom_tree
+
+   failed = []
+   report = anonymize_dicom_tree(Path("ruta/entrada"), Path("ruta/salida"),
+                                 on_error=lambda path, error: failed.append((path, type(error).__name__)))
+   print(report.files_written, report.files_failed)
+   ```
+
+   En un pipeline, añade el paso `anonymize` a `pipeline.steps` del YAML (sin `params`, o con
+   `policy_version: "1"`).
+
+3. **Leer el informe** `ruta/salida/anonymization_report.json`: `policy_version`, `files_written`,
+   `files_failed` y, por etiqueta, cuántas veces se aplicó cada acción. Comprueba que los conteos
+   cuadran con `files_written` y que no aparece ninguna etiqueta `kept` inesperada. Los errores de
+   `on_error` llevan la ruta de entrada: no los compartas con la salida.
+
+4. **Verificación manual (humano, fuera del repositorio):** correr el servicio sobre un DICOM real,
+   revisar el informe y buscar en la salida (abriéndola con un visor DICOM o volcando las cabeceras)
+   cualquier identificador: nombres, IDs, fechas completas, institución, texto libre. Nunca versionar
+   datos reales ni sus salidas.

@@ -5,6 +5,31 @@ Algoritmos en `infrastructure/processing/` (solo `numpy`, `nibabel`, `scipy`; no
 **RAS+** (convención NIfTI); para affines DICOM (LPS) están `lps_to_ras`/`ras_to_lps` en
 `infrastructure/dicom/volume_builder.py`.
 
+## Parámetros por defecto
+
+| Paso | Parámetro | Defecto | Valores admitidos | Error al construir (mensaje fijo) |
+|---|---|---|---|---|
+| `reorient` | `target` | `"RAS"` | 3 códigos en mayúsculas, uno por eje (`L/R`, `P/A`, `I/S`) | `Invalid target orientation.` |
+| `reorient` | `modalities` | `None` (todas) | lista de `str` | `Modalities must be a list of strings.` |
+| `resample` | `spacing` | `[1.0, 1.0, 1.0]` (mm) | 3 números finitos positivos (no `bool`) | `Spacing must be three finite positive numbers.` |
+| `resample` | `interpolation` | `"linear"` | `"nearest"`, `"linear"`, `"cubic"` | `Unknown interpolation.` |
+| `resample` | `modalities` | `None` (todas) | lista de `str` | `Modalities must be a list of strings.` |
+
+Errores al aplicar (el runner marca el estudio `failed` y el lote sigue): los de `validate_geometry`,
+`Unsupported volume dimensionality.` (ni 3D ni 4D) y, en `resample`,
+`Resampled volume would be too large.`.
+
+## Qué conserva cada paso
+
+| Propiedad | `reorient` | `resample` |
+|---|---|---|
+| Shape | Permutada con los ejes; eje temporal intacto | `ceil(shape * voxel / spacing)`; eje temporal intacto |
+| Affine | Nuevo; mismo punto del mundo por voxel | Nuevo, alineado a RAS (`diag(spacing)`), centrado en el FOV de entrada |
+| Orientación | `target` (la más cercana si es oblicua) | `RAS` |
+| Spacing | Conservado (permutado) | `spacing` |
+| dtype | El de entrada (proxy: ver limitaciones) | `float32` |
+| Unidades | mm; intensidades sin cambios | mm; intensidades interpoladas, sin reescalar |
+
 ## Base común (`geometry.py`)
 
 | Función | Qué hace |
@@ -31,7 +56,7 @@ voltea ejes; no interpola.**
 | Orientación | Pasa a `target`. Ya en destino → mismo volumen y affine; aplicarlo dos veces = una. |
 | Spacing | Se conserva, permutado junto con los ejes. |
 | Shape | Se permuta con los ejes espaciales; en 4D el eje temporal no se toca. |
-| dtype | Se conserva (con un volumen perezoso, el que da `load_array`: el de disco o `float` si la cabecera escala). |
+| dtype | Se conserva. Con un volumen perezoso es el que da `load_array(volume)`: el de disco, o `float64` si la cabecera escala intensidades (`scl_slope`/`scl_inter`). |
 | Unidades | Sin cambios. |
 
 - **Affine oblicuo:** se alcanza la orientación *más cercana*; la oblicuidad residual queda en el
@@ -92,3 +117,19 @@ Algoritmo (`resample.py`), decisiones Q5:
   liberan antes de leer el siguiente.
 - **`outputs`:** `{"series": [{"index": i, "shape": [...], "spacing": [...]}]}` (`int`/`float`
   nativos; `spacing` sale del affine resultante).
+
+## Limitaciones
+
+- **`reorient` con affine oblicuo:** solo llega a la orientación más cercana; la oblicuidad residual
+  queda en el affine.
+- **`reorient` con proxy escalado:** un NIfTI perezoso con `scl_slope`/`scl_inter` sale en `float64`
+  (no en el dtype de disco), el doble de memoria que `float32`.
+- **`resample` con affine oblicuo:** la caja de salida usa la extensión de los ejes más cercanos
+  (Q5), no la caja envolvente del volumen rotado: se pierden las esquinas del FOV rotado y las zonas
+  sin datos valen `0`.
+- **`resample` con `cubic`:** sobreoscilación (*ringing*) cerca de bordes marcados; puede dar valores
+  fuera del rango de entrada.
+- **`MAX_OUTPUT_VOXELS = 2**28`** (1 GiB en `float32`, eje temporal incluido): un `spacing` que pida
+  más se rechaza antes de reservar memoria.
+- **Memoria de `resample`:** el pico es la salida completa más un volumen 3D de entrada y sus copias
+  de trabajo; no hay recorte ni relleno a matriz fija (etapa 4).
