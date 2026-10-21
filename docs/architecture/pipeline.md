@@ -34,6 +34,9 @@ class ProcessingStep(Protocol):
   transformadas. Solo tipos básicos JSON (convierte `np.float32`/`np.ndarray` con `float`/`tolist`);
   nunca PHI, rutas, UIDs ni mensajes.
   Las claves deben ser `str` (`json.dumps` convierte `{0: x}` en `{"0": x}` en silencio) y `apply` debe delegar en `apply_with_outputs(study)[0]`.
+- **Rutas de origen fuera del registro (opcional, RNF07):** un paso cuya salida no debe poder
+  vincularse con su entrada (p. ej. `anonymize`) declara `redacts_sources: ClassVar[bool] = True` en
+  su clase. No es un parámetro, así que la configuración no puede desactivarlo. Ver «Runner».
 - **Pasos incorporados:** viven en `application/pipeline/steps/`; su `__init__.py` importa cada módulo
   y `manifest.py` importa el paquete, así que `pipeline_from_config`/`pipeline_from_manifest` los
   encuentran por nombre sin importarlos a mano.
@@ -83,6 +86,14 @@ Pipeline(steps).run(
 - **Errores del iterable** (p. ej. `ValueError("No valid NIfTI studies were found.")` al agotarlo):
   se propagan, porque son globales.
 - **Devuelve** un `StudyReport` por estudio, éxitos y fallos, en orden de entrada.
+- **Redacción de rutas:** si algún paso del pipeline declara `redacts_sources` con valor verdadero
+  (se evalúa con `bool()` una vez por corrida), **todos** los `StudyReport` de la corrida guardan
+  `source_path=None`, también los de estudios que fallan antes de llegar a ese paso. `on_error`
+  sigue recibiendo la ruta real, solo en memoria; no se persiste. `StudyReport`, el manifiesto y
+  `from_json` no cambian. Al reproducir desde el manifiesto el paso se reconstruye desde su clase y
+  vuelve a redactar, así que la igualdad se mantiene. **Riesgo residual:** `index` sigue el orden
+  determinista del lector, así que quien tenga acceso al directorio de entrada puede volver a
+  vincular cada `index` con su archivo; exige acceso a los datos originales.
 - **Logs:** un warning por fallo con el tipo de excepción y un resumen final
   (`Pipeline finished: N studies, M failed`). Nunca rutas, UIDs ni mensajes.
 - **Advertencia de memoria:** si `on_error` guarda la excepción, su `__traceback__` mantiene vivo el

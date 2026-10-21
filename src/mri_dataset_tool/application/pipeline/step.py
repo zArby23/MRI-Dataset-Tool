@@ -18,6 +18,10 @@ class ProcessingStep(Protocol):
     stores the dict in ``StepRecord.outputs``, and ``apply`` returns its first item.
     Convention: ``{"series": [{"index": i, ...}]}`` with ``i`` the position in
     ``study.series``, only for the series the step transformed.
+
+    A step whose output must not be linkable to its input (e.g. ``anonymize``) declares
+    ``redacts_sources: ClassVar[bool] = True`` (not a param, so config cannot turn it off);
+    the runner then stores ``source_path=None`` in every report of the run.
     """
 
     @property

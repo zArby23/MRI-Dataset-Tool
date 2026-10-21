@@ -298,3 +298,34 @@ def test_manifest_with_invalid_outputs_raises_fixed_value_error(tmp_path: Path) 
 
     with pytest.raises(ValueError, match="^Invalid run manifest.$"):
         RunManifest.from_json(json.dumps(data))
+
+
+@register_step("manifest.redact")
+@dataclass(frozen=True)
+class RedactingStep:
+    name: ClassVar[str] = "manifest.redact"
+    version: ClassVar[str] = "1"
+    params: ClassVar[dict[str, Any]] = {}
+    redacts_sources: ClassVar[bool] = True
+
+    def apply(self, study: MRIStudy) -> MRIStudy:
+        return replace(study, series=[replace(s, files=[]) for s in study.series])
+
+
+REDACT_CONFIG = {**CONFIG, "pipeline": {"steps": [*CONFIG["pipeline"]["steps"], {"name": "manifest.redact"}]}}
+
+
+def test_redacting_pipeline_manifest_has_no_source_paths_and_is_reproduced(tmp_path: Path) -> None:
+    pipeline = pipeline_from_config(REDACT_CONFIG)
+    _, reports = _run(pipeline, tmp_path)
+    manifest = RunManifest.from_run(REDACT_CONFIG, pipeline, reports)
+    text = manifest.to_json()
+
+    assert str(tmp_path) not in text and "sub-0" not in text
+    assert [r["source_path"] for r in json.loads(text)["reports"]] == [None, None, None]
+    assert "redacts_sources" not in text  # a class attribute, not a param
+
+    saved = RunManifest.from_json(text)
+    replay = pipeline_from_manifest(saved)
+    _, replay_reports = _run(replay, tmp_path)
+    assert RunManifest.from_run(saved.config, replay, replay_reports) == saved == manifest

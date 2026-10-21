@@ -253,3 +253,46 @@ def test_non_json_outputs_fail_the_study_and_the_batch_continues(tmp_path: Path)
 
     assert results == [] and errors == ["ValueError"]
     assert reports[0].steps == [StepRecord("test.mean", "1", {"leak": True}, "failed", "ValueError")]
+
+
+@dataclass(frozen=True)
+class RedactingStep:
+    name: ClassVar[str] = "test.redact"
+    version: ClassVar[str] = "1"
+    params: ClassVar[dict[str, Any]] = {}
+    redacts_sources: ClassVar[Any] = True
+
+    def apply(self, study: MRIStudy) -> MRIStudy:
+        return replace(study, series=[replace(s, files=[]) for s in study.series])
+
+
+def test_redacting_step_keeps_paths_out_of_every_report(tmp_path: Path) -> None:
+    errors: list[Path] = []
+    results: list[StudyReport] = []
+
+    # study 02 fails before the redacting step runs: its path must not be stored either
+    reports = Pipeline([FailOnSubjectStep("02"), RedactingStep(), AddStep()]).run(
+        [_study(s, tmp_path) for s in ("01", "02", "03")], lambda s, r: results.append(r), lambda p, e: errors.append(p)
+    )
+
+    assert [r.source_path for r in reports] == [None, None, None]
+    assert [r.source_path for r in results] == [None, None]
+    assert errors == [tmp_path / "sub-SECRET02_T1w.nii.gz"]  # on_error still gets the real path
+    assert "SECRET" not in json.dumps([r.to_dict() for r in reports])
+    assert [r.index for r in reports] == [1, 2, 3]
+
+
+@pytest.mark.parametrize(("value", "redacted"), [(1, True), ("yes", True), (False, False), (0, False), (None, False)])
+def test_redacts_sources_is_read_as_a_truth_value(tmp_path: Path, value: Any, redacted: bool) -> None:
+    step = AddStep()
+    object.__setattr__(step, "redacts_sources", value)
+
+    reports = Pipeline([step]).run([_study("01", tmp_path)], lambda s, r: None)
+
+    assert (reports[0].source_path is None) is redacted
+
+
+def test_steps_without_redacts_sources_keep_the_source_path(tmp_path: Path) -> None:
+    reports = Pipeline([AddStep()]).run([_study("01", tmp_path)], lambda s, r: None)
+
+    assert reports[0].source_path == str(tmp_path / "sub-SECRET01_T1w.nii.gz")
