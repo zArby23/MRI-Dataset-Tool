@@ -8,6 +8,7 @@ from nibabel.orientations import io_orientation
 from scipy import ndimage
 
 from mri_dataset_tool.infrastructure.processing.arrays import iter_volumes_3d
+from mri_dataset_tool.infrastructure.processing.memory import check_allow_insufficient_memory, check_available_memory
 
 INTERPOLATION_ORDERS = {"nearest": 0, "linear": 1, "cubic": 3}
 
@@ -64,6 +65,7 @@ def resample(
     spacing: Any = (1.0, 1.0, 1.0),
     interpolation: str = "linear",
     max_output_voxels: int = MAX_OUTPUT_VOXELS,
+    allow_insufficient_memory: bool = False,
 ) -> tuple[np.ndarray, np.ndarray]:
     """Resample *volume* (3D or 4D, ``ndarray`` or lazy) to *spacing* on an RAS-aligned grid.
 
@@ -73,11 +75,13 @@ def resample(
     The input is edge-padded by one voxel so the field of view's outer half voxel takes the
     edge value; output points beyond it are 0. 4D is processed one 3D volume at a time and the
     time axis is left as is. An output of more than *max_output_voxels* voxels (time axis
-    included) is rejected before allocating.
+    included) is rejected before allocating, and so is one that does not fit in the available RAM
+    unless *allow_insufficient_memory* (explicit user consent).
     """
     check_spacing(spacing)
     check_interpolation(interpolation)
     check_max_output_voxels(max_output_voxels)
+    check_allow_insufficient_memory(allow_insufficient_memory)
     if len(volume.shape) not in (3, 4):
         raise ValueError("Unsupported volume dimensionality.")
     affine = np.asarray(affine, dtype=float)
@@ -97,6 +101,9 @@ def resample(
             sigma[axis] = max(0.0, (factor - 1) / 2)
 
     frames = iter_volumes_3d(volume, np.float32)
+    # output + one output frame + input frame, smoothed and padded copies (float32); measured peak is below
+    required = 4 * (math.prod(out_shape) + math.prod(new_shape) + 3 * math.prod(shape[:3]))
+    check_available_memory(required, allow_insufficient_memory)
     out = np.empty(out_shape, dtype=np.float32)
     t = 0  # no enumerate(): its cached tuple would keep the previous frame alive
     for frame in frames:

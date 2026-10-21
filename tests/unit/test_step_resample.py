@@ -5,9 +5,11 @@ import sys
 import weakref
 from collections.abc import Iterator
 from pathlib import Path
+from types import SimpleNamespace
 
 import nibabel as nib
 import numpy as np
+import psutil
 import pytest
 
 from mri_dataset_tool.application.pipeline.manifest import RunManifest, pipeline_from_config, pipeline_from_manifest
@@ -51,6 +53,7 @@ def test_step_is_registered_with_json_params_and_defaults() -> None:
         "interpolation": "linear",
         "modalities": None,
         "max_output_voxels": 2**32,
+        "allow_insufficient_memory": False,
     }
     assert json.loads(json.dumps(step.params)) == step.params
     custom = build_step(
@@ -61,6 +64,7 @@ def test_step_is_registered_with_json_params_and_defaults() -> None:
         "interpolation": "nearest",
         "modalities": ["T1w"],
         "max_output_voxels": 10,
+        "allow_insufficient_memory": False,
     }
 
 
@@ -82,6 +86,8 @@ def test_builtin_step_is_found_by_name_from_config_in_a_clean_interpreter() -> N
         ({"modalities": "T1w"}, "Modalities must be a list of strings."),
         ({"max_output_voxels": 0}, "Max output voxels must be a positive integer."),
         ({"max_output_voxels": 1e9}, "Max output voxels must be a positive integer."),
+        ({"allow_insufficient_memory": "yes"}, "Allow insufficient memory must be a boolean."),
+        ({"allow_insufficient_memory": 1}, "Allow insufficient memory must be a boolean."),
     ],
 )
 def test_invalid_params_are_rejected_when_building(params, message: str) -> None:
@@ -175,6 +181,21 @@ def test_manifest_without_max_output_voxels_rebuilds_with_the_default() -> None:
     step = build_step("resample", old_params)
 
     assert step.version == "1" and step.max_output_voxels == 2**32
+    assert step.allow_insufficient_memory is False
+
+
+def test_insufficient_memory_fails_only_that_study_unless_allowed(monkeypatch) -> None:
+    monkeypatch.setattr(psutil, "virtual_memory", lambda: SimpleNamespace(available=1024))
+    errors: list[str] = []
+
+    refused = Pipeline([ResampleStep()]).run([_study(), _study()], lambda s, r: None, lambda p, e: errors.append(str(e)))
+    allowed = pipeline_from_config(
+        {"pipeline": {"steps": [{"name": "resample", "params": {"allow_insufficient_memory": True}}]}}
+    ).run([_study()], lambda s, r: None)
+
+    assert [r.steps[0].status for r in refused] == ["failed", "failed"]
+    assert errors == ["Insufficient available memory for the resampled volume."] * 2
+    assert allowed[0].steps[0].status == "ok"
 
 
 def test_outputs_reach_the_manifest_and_are_reproduced() -> None:

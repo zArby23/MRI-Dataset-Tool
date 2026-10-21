@@ -15,10 +15,11 @@ Algoritmos en `infrastructure/processing/` (solo `numpy`, `nibabel`, `scipy`; no
 | `resample` | `interpolation` | `"linear"` | `"nearest"`, `"linear"`, `"cubic"` | `Unknown interpolation.` |
 | `resample` | `modalities` | `None` (todas) | lista de `str` | `Modalities must be a list of strings.` |
 | `resample` | `max_output_voxels` | `4294967296` (`2**32`) | entero positivo (no `bool` ni `float`) | `Max output voxels must be a positive integer.` |
+| `resample` | `allow_insufficient_memory` | `false` | `true`/`false` (solo `bool`) | `Allow insufficient memory must be a boolean.` |
 
 Errores al aplicar (el runner marca el estudio `failed` y el lote sigue): los de `validate_geometry`,
 `Unsupported volume dimensionality.` (ni 3D ni 4D) y, en `resample`,
-`Resampled volume would be too large.`.
+`Resampled volume would be too large.` y `Insufficient available memory for the resampled volume.`.
 
 ## Qué conserva cada paso
 
@@ -101,6 +102,16 @@ Algoritmo (`resample.py`), decisiones Q5:
   YAML (`params: {max_output_voxels: ...}`). Antes valía `2**28` y rechazaba una difusión real
   (144×144×78×140 a 1,8 mm → 260×260×141×140 ≈ 1.330 millones de voxels a 1 mm). Los manifiestos
   anteriores, sin este parámetro, se reconstruyen con el defecto nuevo (la versión del paso sigue en `"1"`).
+- **Comprobación de RAM** (`infrastructure/processing/memory.py`, `check_available_memory`): justo
+  antes de reservar la salida compara los bytes necesarios
+  (`4 × (salida + un frame de salida + 3 frames de entrada)`, un poco por encima del pico medido) con
+  `psutil.virtual_memory().available`. Si no caben, lanza
+  `ValueError("Insufficient available memory for the resampled volume.")` (el runner marca el estudio
+  `failed` y el lote sigue), salvo que el usuario dé su consentimiento explícito con
+  `allow_insufficient_memory: true`. Con consentimiento continúa y registra un WARNING sin cifras.
+  Si `psutil` falla, la comprobación no bloquea (WARNING con el tipo de error) y la red queda en `MemoryError`.
+  Los mensajes y logs nunca incluyen cifras de memoria. El parámetro queda en `params` y en el manifiesto.
+  Los manifiestos sin él se reconstruyen con `false`.
 
 | Propiedad | Qué pasa |
 |---|---|
@@ -142,6 +153,11 @@ Algoritmo (`resample.py`), decisiones Q5:
   que pida más se rechaza antes de reservar memoria. El límite no mira la RAM libre: una salida
   permitida que no cabe da `MemoryError` al reservarla (el runner marca el estudio `failed` y sigue);
   en Linux con *overcommit* el proceso puede morir por OOM en vez de fallar.
+- **Comprobación de RAM:** es una foto en un instante. No garantiza que la memoria siga libre al
+  reservarla (otros procesos), no cuenta el pico de otros pasos (`normalize` crea otra salida
+  `float32` completa mientras la anterior sigue viva; el lector puede tener el volumen materializado),
+  y `available` es una estimación del sistema operativo (incluye caché reclamable; no cuenta el swap). En Linux con
+  *overcommit*, con `allow_insufficient_memory: true` el proceso puede morir por OOM en lugar de fallar.
 - **Memoria de `resample`:** el pico es la salida 4D completa en `float32` más un volumen 3D de
   entrada y sus copias de trabajo (≈ 5 GiB para una difusión 144×144×78×140 a 1 mm); no hay salida en
   disco ni por trozos, ni recorte o relleno a matriz fija (etapa 4).
