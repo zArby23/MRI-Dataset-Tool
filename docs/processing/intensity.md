@@ -96,3 +96,68 @@ seleccionadas por `params.modalities` (por defecto todas). No cambia el volumen 
   NaN/Inf (no pueden existir). Un `.nii.gz` truncado cargado con `lazy=True` falla aquí.
 - No duplica la etapa 1: los archivos ilegibles al cargar los reporta el `on_error` de los lectores y la
   geometría DICOM la valida `build_series_volume`.
+
+## Paso `normalize` (RF06, I3)
+
+Algoritmos en `infrastructure/processing/normalize.py` (`normalize_volume`, `check_params`); paso
+`normalize` (`application/pipeline/steps/normalize.py`, versión `1`).
+
+| Parámetro | Defecto | Valores |
+|---|---|---|
+| `method` | `"zscore"` | `zscore` (resta la media y divide por la desviación), `minmax` (a `[0, 1]`), `percentile` (recorta a los valores de los percentiles `[p_low, p_high]` y reescala a `[0, 1]`) |
+| `mask` | `"nonzero"` | `nonzero` (estadísticos sobre los vóxeles de entrada ≠ 0), `none` (todos) |
+| `per_volume` | `true` | 4D: estadísticos por volumen 3D (`true`) o globales (`false`); sin efecto en 3D |
+| `percentiles` | `null` | obligatorio con `method: percentile` (`0 ≤ p_low < p_high ≤ 100`); con otro método, error |
+| `modalities` | `null` | filtro de series (Q12) |
+
+- **Fuera de la máscara** los vóxeles quedan en `0` (el fondo sigue siendo fondo; decisión del humano,
+  igual para los tres métodos). Por eso, con `mask: nonzero`, `normalize` **no es una transformación
+  afín global** del volumen: solo se transforma la máscara. Con `mask: none` no hay fondo y sí lo es.
+- **Conserva:** `shape`, `affine`, `orientation` y `voxel_size` (recalculados con `replace_volume`
+  desde el mismo affine). **Cambia:** `dtype` → `float32`; unidades → adimensionales (z-score) o `[0, 1]`.
+  La desviación es poblacional (`ddof=0`).
+- **Errores (mensaje fijo):** `"Normalization mask is empty."`, `"Volume is constant within the
+  normalization mask."` (desviación o rango nulo), `"Volume contains non-finite values."` (NaN/Inf en
+  la máscara; nunca se propagan en silencio), parámetros inválidos.
+- **4D y memoria:** se lee un volumen 3D a la vez en `float64` (`iter_volumes_3d`) y la salida se
+  escribe en un único `float32`. En modo global hay dos pasadas: la primera combina media y varianza por
+  volumen (Chan et al.) o mín/máx, sin materializar el 4D en `float64`. Límite: `percentile` global
+  guarda todos los valores de la máscara en `float32` (≈ el 4D en `float32`) para calcular los
+  percentiles exactos.
+- **Invariancia:** escala positiva previa → misma salida; desplazamiento previo → misma salida con
+  `mask: none` (con `nonzero` un desplazamiento cambia la máscara).
+- `StepRecord.outputs`: `{"series": [{"index": i, "method": m, ...}]}` con `mean`/`std` (zscore),
+  `min`/`max` (minmax) o `low`/`high` (percentile: los valores de intensidad en esos percentiles); en 4D
+  con `per_volume` esos valores van en `"volumes": [{...}, ...]`, uno por volumen. Floats nativos;
+  sin valores de vóxeles ni PHI.
+
+## Resumen de metadatos: `summarize_study` (RF04, I2)
+
+`application/services/summary.py`: `summarize_study(study) -> dict`, determinista y con solo tipos
+básicos JSON (sin NaN). Es la parte «extraer» de RF04; «mostrar» es de la etapa 5.
+
+```
+{"series_count": n,
+ "series": [{"modality": ..., <claves permitidas de metadata>, "sidecar": {...}, "validation": {...},
+             "dtype": "int16" | null,
+             "intensity": {"min", "max", "mean", "std", "non_finite_voxels"} | null}]}
+```
+
+- **Lista blanca única**: importa `METADATA_WHITELIST`, `FILTERED_METADATA_KEYS` y `SIDECAR_WHITELIST`
+  de `infrastructure/anonymization/policy.py` (dueño @anonimizacion); no copia valores. De `metadata`
+  solo salen las claves de `METADATA_WHITELIST` que no se filtran por clave (`sidecar`, `bids`); del
+  sidecar, solo las de `SIDECAR_WHITELIST` con un escalar o una lista de escalares. `bids` no se incluye
+  (la modalidad ya es el sufijo BIDS). `validation` pasa por `filter_validation` de la política (estado
+  conocido y códigos de hallazgo con el patrón de códigos); si el filtro devuelve `{}`, se omite.
+- **Nunca** salen UIDs, `files`/rutas, `subject_id`/`session_id` ni claves fuera de la lista. Un valor
+  permitido que no es de tipo básico (p. ej. un `Path`) se descarta, no se convierte a texto. Un
+  float NaN/Inf en `metadata` o en el sidecar también se descarta (con la lista que lo contiene): el
+  resumen pasa `json.dumps(..., allow_nan=False)`.
+- `dtype`: el del volumen (con carga perezosa, el dtype **en disco**; con eager, `float64`). Sin volumen,
+  `dtype` e `intensity` son `null` y el resto son solo metadatos.
+- `intensity` se calcula sobre los vóxeles finitos, un volumen 3D a la vez en `float64`
+  (`iter_volumes_3d`), sin materializar el 4D ni la serie perezosa; los NaN/Inf se cuentan en
+  `non_finite_voxels`. Desviación poblacional.
+- **Q10:** con los metadatos actuales (NIfTI: geometría y cabecera; DICOM: `rows`, `columns`,
+  `pixel_spacing`, `slice_thickness`, `spacing_between_slices`, `image_orientation`, `Modality`; BIDS:
+  sidecar técnico) RF04 queda cubierto; no se amplió el lector DICOM.
