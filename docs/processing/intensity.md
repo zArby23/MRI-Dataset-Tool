@@ -45,9 +45,19 @@ for study in NIfTIBatchReader().iter_studies(root, lazy=True):
 - Extensiones (QA1-02): `is_nifti_file` no distingue mayúsculas, así que los lectores NIfTI y BIDS
   (`find_nifti_files`, `BIDSReader`, `BIDSBatchReader`) cargan `.NII`/`.nii.GZ`. BIDS exige minúsculas,
   pero el lector las tolera: `metadata["bids"]["extension"]` conserva la extensión tal como está escrita (p. ej. `.NII.GZ`).
-- Con `lazy=True` el lector abre la imagen con `mmap=False` y nibabel no mantiene el archivo abierto
-  (`keep_file_open=False`): el archivo se puede borrar o mover (también en Windows) mientras el proxy
-  existe; materializarlo después falla con `"Unable to read volume data."`.
+- Con `lazy=True` el lector abre la imagen con `nib.load(path, mmap=False, keep_file_open=True)` (QA1-06).
+  Cargar no abre el archivo. La primera lectura de vóxeles lo abre y queda abierto mientras viva el proxy,
+  es decir, el estudio. Se cierra al soltar la última referencia (no hace falta `gc.collect()`). El runner
+  y los lectores por lote sueltan cada estudio antes de leer el siguiente, así que solo queda abierto el
+  archivo del estudio actual. Antes de la primera lectura el archivo se puede borrar o mover (también en
+  Windows), y materializarlo después falla con `"Unable to read volume data."`. Después de leer, en
+  Windows no se puede borrar ni mover mientras el estudio exista.
+- **4D `.nii.gz` (QA1-06).** gzip no permite acceso aleatorio. Sin un archivo abierto persistente, cada
+  `volume[..., t]` reabría y descomprimía desde el principio, así que la lectura era O(T²): con T=80,
+  4,25 s en lazy frente a 0,25 s en eager. Con el archivo abierto, `iter_volumes_3d` lee los volúmenes
+  en orden y avanza sobre el mismo flujo, así que la lectura es lineal en T (≈ eager). Un acceso en
+  orden inverso o aleatorio sigue costando una descompresión desde el inicio, porque `indexed_gzip` no
+  está instalado.
 
 ### Límites
 

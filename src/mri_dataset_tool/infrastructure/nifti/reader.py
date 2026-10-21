@@ -23,7 +23,8 @@ class NIfTIReader:
         NIfTI has no DICOM study or series UIDs, so those fields are ``None``.
         Processing such as normalization and reorientation remains elsewhere.
         With ``lazy=True`` the volume is nibabel's proxy (``image.dataobj``): no voxel
-        is read until it is materialized, so a truncated ``.nii.gz`` fails only then.
+        is read until it is materialized, so a truncated ``.nii.gz`` fails only then. The
+        file is opened on the first read and stays open until the study is released.
         """
         if not path.exists():
             raise FileNotFoundError(
@@ -40,8 +41,9 @@ class NIfTIReader:
 
         logger.info("Loading NIfTI study")
         try:
-            # No mmap when lazy: a memory map would keep the file open (locked on Windows).
-            image = nib.load(path, mmap=False) if lazy else nib.load(path)
+            # Lazy: no mmap (it would lock the file on Windows); keep_file_open so a 4D .nii.gz
+            # is not reopened and re-decompressed from the start for every frame (QA1-06).
+            image = nib.load(path, mmap=False, keep_file_open=True) if lazy else nib.load(path)
             if image.header.get_data_dtype().kind == "c":
                 # get_fdata() and float casts drop the imaginary part with only a warning.
                 raise ValueError("Unsupported NIfTI data type.")
