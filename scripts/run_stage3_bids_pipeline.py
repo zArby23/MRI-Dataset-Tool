@@ -16,6 +16,7 @@ or the temporary directory (a warning is printed, the run is not blocked). Nothi
 overwritten: if outputs of a previous run exist the script stops before running. The pipeline
 is then rebuilt from the saved manifest and run again to check reproducibility. Errors print
 only their exception type; neither the console nor the manifest show paths, names or messages.
+After "Run failed", delete the partial outputs (study-*.nii.gz) before retrying.
 """
 
 import argparse

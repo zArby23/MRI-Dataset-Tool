@@ -202,6 +202,48 @@ def test_main_with_missing_input_directory_prints_a_fixed_message(
     assert stage3.main() == 2
 
     captured = capsys.readouterr()
-    assert captured.out == "Input directory not found: data/raw/nifti_test_studies\n"
+    assert captured.out == "Input directory not found.\n"
     assert captured.err == "" and str(tmp_path) not in captured.out
     assert list(tmp_path.iterdir()) == []
+
+
+def test_main_with_output_options_writes_there_and_warns_in_the_temp_dir(
+    monkeypatch: pytest.MonkeyPatch, tmp_path: Path, capsys: pytest.CaptureFixture[str]
+) -> None:
+    batch = _batch(tmp_path)
+    monkeypatch.setattr(stage3, "INPUT_DIR", batch)
+    monkeypatch.setattr(stage3, "OUTPUT_DIR", tmp_path / "default-not-used")
+    output_dir, manifest_path = tmp_path / "out", tmp_path / "manifests" / "run.json"
+
+    assert stage3.main(["--output-dir", str(output_dir), "--manifest-path", str(manifest_path)]) == 0
+
+    out = capsys.readouterr().out
+    assert "WARNING: an output is on drive C: or in the temporary directory" in out
+    assert len(list(output_dir.glob("study-*.nii.gz"))) == 3 and manifest_path.is_file()
+    assert not (tmp_path / "default-not-used").exists()
+    assert "sub-" not in out and str(tmp_path) not in out and tmp_path.as_posix() not in out and "data/" not in out
+
+
+@pytest.mark.parametrize("target", ["reader", "manifest_write"])
+def test_main_run_failure_prints_only_the_type(
+    target: str, monkeypatch: pytest.MonkeyPatch, tmp_path: Path, capsys: pytest.CaptureFixture[str]
+) -> None:
+    batch = _batch(tmp_path)
+    secret = batch / "sub-01_ses-01_T1w.nii.gz"
+
+    def fail(*args, **kwargs):
+        raise OSError(f"cannot read {secret}")
+
+    monkeypatch.setattr(stage3, "INPUT_DIR", batch)
+    if target == "reader":
+        monkeypatch.setattr(stage3.NIfTIBatchReader, "iter_studies", fail)
+    else:
+        monkeypatch.setattr(stage3.RunManifest, "write", fail)
+
+    code = stage3.main(["--output-dir", str(tmp_path / "out"), "--manifest-path", str(tmp_path / "m.json")])
+
+    captured = capsys.readouterr()
+    assert code == 1
+    assert captured.out.splitlines()[-1] == "Run failed: OSError"
+    console = captured.out + captured.err
+    assert "sub-" not in console and str(tmp_path) not in console and tmp_path.as_posix() not in console

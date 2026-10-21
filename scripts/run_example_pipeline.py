@@ -69,7 +69,7 @@ def main() -> int:
     reproduced = RunManifest.from_run(saved.config, replay, replay_reports) == saved
 
     print(f"Studies: {len(reports)}  errors reported: {errors}  reproduced from manifest: {reproduced}")
-    print(f"Manifest: {manifest_path.relative_to(REPO)}")
+    print("Manifest written to report.path of config/example_run.yaml.")
     return 0 if reproduced else 1
 
 
