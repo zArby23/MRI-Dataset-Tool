@@ -172,6 +172,11 @@ Algoritmos en `infrastructure/processing/normalize.py` (`normalize_volume`, `che
     salida `float32` de `resample`, que sigue viva mientras se normaliza) ni el pico de otros pasos.
     `available` es una estimación del sistema operativo (incluye caché reclamable y no cuenta el swap).
     En Linux con *overcommit*, con `true` el proceso puede morir por OOM en vez de fallar.
+  - **Reproducibilidad:** el status `ok` o `failed` depende de la RAM libre de la máquina en ese instante,
+    y ese dato no se guarda en el manifiesto, así que reproducirlo en otra máquina puede dar otro status.
+    `allow_insufficient_memory: true` queda en `params`, así que al reproducir el manifiesto se
+    reutiliza el consentimiento. Ver la viñeta «Reproducibilidad de la comprobación de RAM» de
+    `docs/processing/geometry.md`.
 - **Invariancia:** escala positiva previa → misma salida; desplazamiento previo → misma salida con
   `mask: none` (con `nonzero` un desplazamiento cambia la máscara).
 - `StepRecord.outputs`: `{"series": [{"index": i, "method": m, ...}]}` con `mean`/`std` (zscore),
