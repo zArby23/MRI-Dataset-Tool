@@ -6,10 +6,12 @@ from pydicom.datadict import tag_for_keyword
 from mri_dataset_tool.infrastructure.anonymization.policy import (
     DICOM_ACTIONS,
     DICOM_DEFAULT_ACTION,
+    DICOM_FIXED_VALUES,
     METADATA_WHITELIST,
     POLICY_VERSION,
     SIDECAR_WHITELIST,
     Action,
+    filter_validation,
 )
 from mri_dataset_tool.infrastructure.anonymization.pseudonym import (
     KEY_ENV_VAR,
@@ -76,6 +78,12 @@ def test_policy_version_is_a_string():
     assert isinstance(POLICY_VERSION, str) and POLICY_VERSION
 
 
+def test_deidentification_marks_have_fixed_values_with_the_policy_version():
+    assert DICOM_FIXED_VALUES["PatientIdentityRemoved"] == "YES"
+    assert POLICY_VERSION in DICOM_FIXED_VALUES["DeidentificationMethod"]
+    assert all(DICOM_ACTIONS[keyword] is Action.REPLACED for keyword in DICOM_FIXED_VALUES)
+
+
 def test_dicom_actions_use_known_keywords_and_actions():
     assert DICOM_DEFAULT_ACTION is Action.REMOVED
     for keyword, action in DICOM_ACTIONS.items():
@@ -88,7 +96,9 @@ def test_dicom_actions_use_known_keywords_and_actions():
     [
         ("PatientName", Action.EMPTIED),
         ("PatientID", Action.REPLACED),
-        ("PatientBirthDate", Action.GENERALIZED),
+        ("PatientBirthDate", Action.EMPTIED),
+        ("PatientIdentityRemoved", Action.REPLACED),
+        ("DeidentificationMethod", Action.REPLACED),
         ("PatientAge", Action.GENERALIZED),
         ("PatientSex", Action.KEPT),
         ("StudyInstanceUID", Action.REPLACED),
@@ -120,6 +130,20 @@ def test_identifying_and_free_text_dicom_elements_are_removed_by_default(keyword
 )
 def test_sidecar_whitelist_excludes_identifying_keys(key):
     assert key not in SIDECAR_WHITELIST
+
+
+@pytest.mark.parametrize(
+    ("value", "expected"),
+    [
+        ({"status": "ok", "findings": ["CONSTANT_VOLUME", "Doe^John", 3], "note": "x"},
+         {"status": "ok", "findings": ["CONSTANT_VOLUME"]}),
+        ({"status": "Doe^John", "findings": "CONSTANT_VOLUME"}, {}),
+        ("ok", {}),
+        (None, {}),
+    ],
+)
+def test_filter_validation_keeps_only_known_status_and_codes(value, expected):
+    assert filter_validation(value) == expected
 
 
 def test_metadata_whitelist_excludes_files_and_identifiers():

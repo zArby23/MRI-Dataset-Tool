@@ -5,7 +5,11 @@
 > secciones 3 y 4 son propuesta; las reglas de fechas, edad, seudónimos y clave ya las decidió el humano.
 
 La política es **datos**: listas blancas y una tabla etiqueta → acción. Lo que no aparece en una
-lista se **descarta**. Cualquier cambio que altere un resultado anonimizado sube `POLICY_VERSION`.
+lista se **descarta**.
+
+**Versionado:** la versión `1` es la que apruebe el humano en el Checkpoint 1; hasta entonces el
+borrador se ajusta sin cambiar la versión (no se ha producido ninguna salida real con él). Desde esa
+aprobación, cualquier cambio que altere un resultado anonimizado sube `POLICY_VERSION`.
 
 | Módulo | Contenido |
 |---|---|
@@ -33,6 +37,9 @@ no está implementado.
   **Supuesto:** quien no tiene la clave no puede fabricar un valor que verifique. Un valor original
   verifica por azar con probabilidad 2⁻³² (UID) o 2⁻²⁴ (etiqueta de 16 hex); en ese caso se conservaría
   sin seudonimizar. Es un riesgo aceptado, pero distinto de cero.
+- **Colisiones (aceptado):** la parte `h` de la etiqueta tiene 40 bits. Con 10 000 sujetos, la
+  probabilidad de que dos tengan el mismo seudónimo es ≈ 5·10⁻⁵ (n²/2⁴¹); si ocurre, los dos sujetos se
+  fundirían en uno. Para UIDs (`h` de 96 bits) es despreciable.
 - La clave nunca aparece en `params`, `repr`, logs, errores, manifiesto ni informes. Si se filtra,
   permite recalcular seudónimos de IDs conocidos: debe guardarse fuera del repositorio.
 
@@ -55,8 +62,17 @@ no está implementado.
 | Grupo | Claves | Por qué se conservan |
 |---|---|---|
 | Geometría y arreglo | `shape`, `voxel_size`, `affine`, `orientation`, `datatype`, `bitpix`, `qform_code`, `sform_code`, `rows`, `columns`, `pixel_spacing`, `slice_thickness`, `spacing_between_slices`, `image_orientation` | Describen la malla de voxels, no a la persona; el pipeline los necesita (contrato de geometría) |
-| Escritas por la herramienta | `provenance`, `validation` | Las genera este código con valores fijos o códigos constantes, nunca valores de cabecera |
-| Filtradas | `sidecar`, `bids` | Se filtran clave por clave (abajo) |
+| Filtradas | `sidecar`, `bids`, `provenance`, `validation` | Se filtran clave por clave (abajo) |
+
+**`provenance` (`PROVENANCE_WHITELIST`)**: la escribe `application/services/conversion.py` con
+valores fijos. Solo se conservan sus claves conocidas (`tool`, `source_format`, `target_format`,
+`nibabel_version`, `compression`, `sop_class`, `image_type`) con valor `str`. Cualquier clave nueva,
+p. ej. un directorio de origen, se descarta hasta que se añada aquí.
+
+**`validation`**: la escribe el paso `validate`. Se conservan `status` si está en `VALIDATION_STATUSES`
+(`ok`) y, de `findings`, solo los códigos en `UPPER_SNAKE_CASE` (p. ej. `CONSTANT_VOLUME`). Lo demás
+se descarta. El filtro es `filter_validation(value) -> dict` en `policy.py` (devuelve `{}` si el valor
+no es un diccionario); lo usan `anonymize` y `summarize_study`.
 
 **`sidecar` (`SIDECAR_WHITELIST`)**: solo parámetros técnicos de adquisición. De cada clave
 permitida solo se conserva un escalar (`str`, número, `bool`) o una lista de escalares; un diccionario
@@ -78,9 +94,10 @@ y fechas y horas.
 **`bids`**: `sub`/`ses` → los mismos seudónimos que `subject_id`/`session_id`. Se conservan `suffix`
 y `extension`. De `other` solo quedan las entidades de adquisición de la especificación BIDS MRI
 (`task`, `acq`, `ce`, `rec`, `dir`, `run`, `echo`, `flip`, `inv`, `mt`, `part`, `chunk`); una entidad
-no estándar se descarta. Estas entidades describen la adquisición (contraste, dirección de fase,
-repetición) y no a la persona. Riesgo residual: sus etiquetas las elige quien organiza el dataset, y
-un `acq-<nombre>` mal elegido podría llevar texto identificable.
+no estándar se descarta. Las **claves** de estas entidades describen la adquisición (contraste,
+dirección de fase, repetición), pero sus **valores** (`acq-<etiqueta>`, `task-<etiqueta>`, …) son
+**texto libre** que elige quien organiza el dataset y no se filtran. Un `acq-<nombre>` mal elegido
+llevaría texto identificable a la salida (riesgo residual, sección 5).
 
 ## 4. Tabla DICOM (para A2; propuesta)
 
@@ -90,8 +107,9 @@ las secuencias no listadas (con todo su contenido anidado). `DICOM_ACTIONS` usa 
 | Acción | Elementos | Regla |
 |---|---|---|
 | `replaced` | `StudyInstanceUID`, `SeriesInstanceUID`, `SOPInstanceUID`, `MediaStorageSOPInstanceUID`, `FrameOfReferenceUID`, `PatientID` | Seudónimo HMAC (sección 1), consistente en toda la serie |
-| `emptied` | `PatientName`, `ReferringPhysicianName`, `StudyID`, `AccessionNumber`, `StudyTime` | Tipo 2: deben existir, pero llevan identidad u hora |
-| `generalized` | `PatientBirthDate`, `StudyDate`, `SeriesDate`, `AcquisitionDate`, `ContentDate`, `AcquisitionDateTime`, `PatientAge` | Ver reglas abajo |
+| `replaced` | `PatientIdentityRemoved` = `YES`, `DeidentificationMethod` = `MRI-Dataset-Tool anonymization policy <POLICY_VERSION>` | Marcas de desidentificación de PS3.15 E.1.1 (`DICOM_FIXED_VALUES`); se añaden si faltan |
+| `emptied` | `PatientName`, `PatientBirthDate`, `ReferringPhysicianName`, `StudyID`, `AccessionNumber`, `StudyTime` | Tipo 2: deben existir, pero llevan identidad, fecha de nacimiento u hora |
+| `generalized` | `StudyDate`, `SeriesDate`, `AcquisitionDate`, `ContentDate`, `AcquisitionDateTime`, `PatientAge` | Ver reglas abajo |
 | `kept` | `PatientSex` | Decisión del humano |
 | `kept` | `SpecificCharacterSet`, `SOPClassUID`, `MediaStorageSOPClassUID`, `TransferSyntaxUID`, `Modality`, `ImageType` | Codificación y tipo de objeto |
 | `kept` | Módulo de píxel y geometría: `Rows`, `Columns`, `SamplesPerPixel`, `PhotometricInterpretation`, `BitsAllocated`, `BitsStored`, `HighBit`, `PixelRepresentation`, `PixelData`, `RescaleSlope`, `RescaleIntercept`, `RescaleType`, `WindowCenter`, `WindowWidth`, `PixelSpacing`, `SliceThickness`, `SpacingBetweenSlices`, `ImageOrientationPatient`, `ImagePositionPatient`, `SliceLocation`, `PatientPosition`, `SeriesNumber`, `InstanceNumber`, `AcquisitionNumber`, `TemporalPositionIdentifier`, `NumberOfTemporalPositions` | Los necesita `build_series_volume` para reconstruir el volumen; no describen a la persona |
@@ -99,7 +117,8 @@ las secuencias no listadas (con todo su contenido anidado). `DICOM_ACTIONS` usa 
 | `removed` | Todo lo demás: dirección, otros IDs, peso y talla, institución, estación, número de serie, médicos y operadores, descripciones y comentarios, horas, secuencias de referencia, privados | Perfil básico de PS3.15 más la lista blanca |
 
 **Fechas** (decisión del humano): DA → `AAAA0101`; DT → `AAAA` (DT admite solo el año); TM eliminado
-(o vacío si es tipo 2, como `StudyTime`).
+(o vacío si es tipo 2, como `StudyTime`). **Excepción:** `PatientBirthDate` se vacía (no conserva
+el año). La edad solo se conserva a través del rango de `PatientAge`.
 
 **Edad** (decisión del humano): `PatientAge` (AS, `nnnD/W/M/Y`) → límite inferior de su rango de 10
 años, p. ej. `047Y` → `040Y`. 90 años o más → `090Y`. D/W/M se pasan a años antes; menos de 1 año → `000Y`.
@@ -109,12 +128,14 @@ El VR AS no admite `90+` ni rangos, por eso se escribe el límite inferior.
 
 - **La imagen** puede reidentificar: reconstrucción de la cara en volúmenes 3D (*defacing* fuera de
   alcance) y texto quemado en los píxeles (fuera de alcance, Q11).
-- **Cuasi-identificadores conservados**: año de las fechas, rango de edad, sexo y modelo de escáner.
+- **Cuasi-identificadores conservados**: año de las fechas del estudio, rango de edad, sexo y modelo de escáner.
   En conjunto, y en cohortes pequeñas, pueden reducir mucho el número de candidatos.
 - **Valores de claves permitidas**: una clave técnica permitida (p. ej. `Manufacturer`) que un equipo
   rellene con texto identificable se conservaría; la lista blanca filtra claves, no el contenido.
 - **Seudónimos**: quien tenga la clave puede comprobar si un ID conocido corresponde a un seudónimo.
   También existe la verificación por azar de la sección 1.
-- **Manifiesto**: `StudyReport.source_path` guarda la ruta del archivo de **entrada** tal cual (la del
-  estudio antes de anonimizar). En BIDS esa ruta contiene `sub-<ID>`. Es la deuda de rutas absolutas
-  del manifiesto (etapa 4) y el paso `anonymize` no la resuelve.
+- **Valores de entidades BIDS** permitidas (`acq-`, `task-`, …): texto libre del autor del dataset, sin filtrar.
+- **Manifiesto**: `StudyReport.source_path` guarda la ruta del archivo de **entrada** (en BIDS contiene
+  `sub-<ID>`). El paso declara `redacts_sources = True` y, con el contrato C1, el runner deja
+  `source_path = None` en las corridas con `anonymize`. Hasta que C1 esté integrado, la ruta sigue
+  apareciendo.

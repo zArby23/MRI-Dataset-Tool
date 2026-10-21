@@ -5,7 +5,9 @@ file that changes an anonymized result must bump ``POLICY_VERSION``. Rationale p
 ``docs/anonymization/policy.md``.
 """
 
+import re
 from enum import StrEnum
+from typing import Any
 
 POLICY_VERSION = "1"
 
@@ -26,12 +28,34 @@ GEOMETRY_METADATA_KEYS = frozenset({
     "datatype", "bitpix", "qform_code", "sform_code",
     "rows", "columns", "pixel_spacing", "slice_thickness", "spacing_between_slices", "image_orientation",
 })
-# Written by this tool with fixed values or constant codes, never header values.
-TOOL_METADATA_KEYS = frozenset({"provenance", "validation"})
 # Filtered key by key with the allow lists below.
-FILTERED_METADATA_KEYS = frozenset({"sidecar", "bids"})
+FILTERED_METADATA_KEYS = frozenset({"sidecar", "bids", "provenance", "validation"})
 
-METADATA_WHITELIST = GEOMETRY_METADATA_KEYS | TOOL_METADATA_KEYS | FILTERED_METADATA_KEYS
+METADATA_WHITELIST = GEOMETRY_METADATA_KEYS | FILTERED_METADATA_KEYS
+
+# provenance (written by application/services/conversion.py): known keys, string values only.
+PROVENANCE_WHITELIST = frozenset({
+    "tool", "source_format", "target_format", "nibabel_version", "compression", "sop_class", "image_type",
+})
+# validation (written by the validate step): a known status and finding codes (UPPER_SNAKE_CASE).
+VALIDATION_STATUSES = frozenset({"ok"})
+_FINDING_CODE = re.compile(r"[A-Z][A-Z0-9_]*")
+
+
+def filter_validation(validation: Any) -> dict[str, Any]:
+    """Keep only a known ``status`` and the finding codes of ``metadata["validation"]``; anything else → ``{}``.
+
+    Single definition shared by the ``anonymize`` step and ``summarize_study``.
+    """
+    if not isinstance(validation, dict):
+        return {}
+    result: dict[str, Any] = {}
+    if validation.get("status") in VALIDATION_STATUSES:
+        result["status"] = validation["status"]
+    findings = validation.get("findings")
+    if isinstance(findings, list):
+        result["findings"] = [code for code in findings if isinstance(code, str) and _FINDING_CODE.fullmatch(code)]
+    return result
 
 # BIDS sidecar: technical acquisition parameters only. A kept key keeps only a scalar
 # (str, int, float, bool) or a list of scalars; any other value is discarded.
@@ -69,14 +93,18 @@ DICOM_ACTIONS: dict[str, Action] = {
     "MediaStorageSOPInstanceUID": Action.REPLACED,
     "FrameOfReferenceUID": Action.REPLACED,
     "PatientID": Action.REPLACED,
-    # Type 2 attributes that must exist but carry identity or clock time.
+    # De-identification marks (PS3.15 E.1.1), set to DICOM_FIXED_VALUES.
+    "PatientIdentityRemoved": Action.REPLACED,
+    "DeidentificationMethod": Action.REPLACED,
+    # Type 2 attributes that must exist but carry identity or clock time. The birth date is
+    # emptied (decision of the human): age survives only as the PatientAge range.
     "PatientName": Action.EMPTIED,
+    "PatientBirthDate": Action.EMPTIED,
     "ReferringPhysicianName": Action.EMPTIED,
     "StudyID": Action.EMPTIED,
     "AccessionNumber": Action.EMPTIED,
     "StudyTime": Action.EMPTIED,
     # Dates keep only the year; age keeps only its 10-year range.
-    "PatientBirthDate": Action.GENERALIZED,
     "StudyDate": Action.GENERALIZED,
     "SeriesDate": Action.GENERALIZED,
     "AcquisitionDate": Action.GENERALIZED,
@@ -136,3 +164,9 @@ DICOM_ACTIONS: dict[str, Action] = {
     "PixelBandwidth": Action.KEPT,
 }
 DICOM_DEFAULT_ACTION = Action.REMOVED
+
+# Fixed values written (or added when missing) for the de-identification marks.
+DICOM_FIXED_VALUES: dict[str, str] = {
+    "PatientIdentityRemoved": "YES",
+    "DeidentificationMethod": f"MRI-Dataset-Tool anonymization policy {POLICY_VERSION}",
+}

@@ -49,7 +49,13 @@ def _study(volume: Any = None) -> MRIStudy:
             "voxel_size": (1.0, 1.0, 2.0),
             "affine": affine,
             "orientation": ("R", "A", "S"),
-            "provenance": {"tool": "mri_dataset_tool.convert_dicom_to_nifti", "source_format": "DICOM"},
+            "provenance": {
+                "tool": "mri_dataset_tool.convert_dicom_to_nifti",
+                "source_format": "DICOM",
+                "source_dir": "C:/hospital/JohnDoe",
+                "compression": {"by": "Doe^John"},
+            },
+            "validation": {"status": "ok", "findings": ["CONSTANT_VOLUME", "Doe^John", 3], "note": "JohnDoe"},
             "PatientName": "Doe^John",
             "source_path": "C:/hospital/JohnDoe",
             "bids": {
@@ -142,7 +148,11 @@ def test_identifiers_are_pseudonymized_and_files_dropped():
 def test_metadata_and_sidecar_keep_only_whitelisted_plain_values():
     original = _study()
     series = AnonymizeStep().apply(original).series[0]
-    assert set(series.metadata) == {"shape", "voxel_size", "affine", "orientation", "provenance", "bids", "sidecar"}
+    assert set(series.metadata) == {
+        "shape", "voxel_size", "affine", "orientation", "provenance", "validation", "bids", "sidecar",
+    }
+    assert series.metadata["provenance"] == {"tool": "mri_dataset_tool.convert_dicom_to_nifti", "source_format": "DICOM"}
+    assert series.metadata["validation"] == {"status": "ok", "findings": ["CONSTANT_VOLUME"]}
     assert series.metadata["sidecar"] == {
         "RepetitionTime": 2.3,
         "EchoTime": 0.00298,
@@ -227,6 +237,12 @@ def test_params_hold_the_policy_version_and_never_the_key():
     assert KEY not in repr(step) and KEY not in str(step.params)
 
 
+def test_step_declares_redacts_sources_outside_params():
+    step = AnonymizeStep()
+    assert AnonymizeStep.redacts_sources is True
+    assert "redacts_sources" not in step.params and "redacts_sources" not in repr(step)
+
+
 def test_other_policy_version_is_rejected():
     with pytest.raises(ValueError, match=r"^Unsupported anonymization policy version\.$"):
         build_step("anonymize", {"policy_version": "0"})
@@ -241,8 +257,9 @@ def test_pipeline_logs_and_manifest_hold_no_key_nor_original_values(caplog):
     manifest = RunManifest.from_run(config, pipeline, reports)
     text = manifest.to_json()
     assert KEY not in text and KEY not in caplog.text
-    # shortcut: source_path keeps the absolute input path (stage-4 debt in the plan); excluded here.
-    without_paths = text.replace(str(_study().series[0].files[0]).replace("\\", "\\\\"), "")
-    assert _leaks([without_paths, caplog.text]) == []
+    # C1: a pipeline with anonymize records no source path, so the input path never reaches the JSON.
+    assert all(report.source_path is None for report in reports)
+    assert _leaks([text.replace("\\\\", "/"), caplog.text]) == []
+    assert "sub-" not in text
     assert manifest.steps[0]["params"] == {"policy_version": POLICY_VERSION}
     assert _plain(pipeline_from_manifest(manifest).steps[0].apply(_study())) == _plain(results[0])

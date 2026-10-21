@@ -16,7 +16,9 @@ from mri_dataset_tool.infrastructure.anonymization.policy import (
     BIDS_KEPT_FIELDS,
     METADATA_WHITELIST,
     POLICY_VERSION,
+    PROVENANCE_WHITELIST,
     SIDECAR_WHITELIST,
+    filter_validation,
 )
 from mri_dataset_tool.infrastructure.anonymization.pseudonym import (
     load_key,
@@ -31,6 +33,8 @@ _SCALARS = (str, int, float, bool)
 class AnonymizeStep:
     name: ClassVar[str] = "anonymize"
     version: ClassVar[str] = "1"
+    # Contract C1: the runner records no source path for a pipeline with this step.
+    redacts_sources: ClassVar[bool] = True
 
     def __init__(self, policy_version: str = POLICY_VERSION) -> None:
         if policy_version != POLICY_VERSION:
@@ -65,6 +69,10 @@ class AnonymizeStep:
             metadata["sidecar"] = _filter_sidecar(metadata["sidecar"])
         if "bids" in metadata:
             metadata["bids"] = self._bids(metadata["bids"])
+        if "provenance" in metadata:
+            metadata["provenance"] = _filter_provenance(metadata["provenance"])
+        if "validation" in metadata:
+            metadata["validation"] = filter_validation(metadata["validation"])
         return replace(series, series_uid=self._uid(series.series_uid), files=[], metadata=metadata)
 
     def _bids(self, entities: Any) -> dict[str, Any]:
@@ -88,6 +96,12 @@ def _filter_sidecar(sidecar: Any) -> dict[str, Any]:
     if not isinstance(sidecar, dict):
         return {}
     return {key: value for key, value in sidecar.items() if key in SIDECAR_WHITELIST and _is_plain(value)}
+
+
+def _filter_provenance(provenance: Any) -> dict[str, str]:
+    if not isinstance(provenance, dict):
+        return {}
+    return {key: value for key, value in provenance.items() if key in PROVENANCE_WHITELIST and isinstance(value, str)}
 
 
 def _is_plain(value: Any) -> bool:
