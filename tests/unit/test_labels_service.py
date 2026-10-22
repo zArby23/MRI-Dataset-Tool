@@ -59,6 +59,21 @@ def test_dataset_pairs_from_tree(tree):
     assert dataset_pairs(tree) == [("01", "01"), ("01", "02"), ("02", "01"), ("03", None)]
 
 
+def test_folders_without_layout_images_are_not_pairs(tree):
+    (tree / "sub-ghost").mkdir()
+    (tree / "sub-empty" / "ses-01" / "anat").mkdir(parents=True)
+    (tree / "sub-01" / "ses-03" / "anat").mkdir(parents=True)
+    (tree / "sub-hidden" / "anat").mkdir(parents=True)
+    (tree / "sub-hidden" / "anat" / ".x.nii.gz.tmp.nii.gz").write_bytes(b"")
+    (tree / "sub-other" / "func").mkdir(parents=True)
+    (tree / "sub-other" / "func" / "x.nii.gz").write_bytes(b"")
+    (tree / "sub-loose").mkdir()
+    (tree / "sub-loose" / "x.nii.gz").write_bytes(b"")
+    (tree / "sub-json" / "anat").mkdir(parents=True)
+    (tree / "sub-json" / "anat" / "x.json").write_text("{}", encoding="utf-8")
+    assert dataset_pairs(tree) == [("01", "01"), ("01", "02"), ("02", "01"), ("03", None)]
+
+
 def test_dataset_pairs_from_written_dataset(tmp_path):
     root = tmp_path / "ds"
     writer = BIDSDatasetWriter(root)

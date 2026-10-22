@@ -9,6 +9,7 @@ tab or carriage return (CSV injection). Messages are fixed: never ids, labels or
 import csv
 import json
 import os
+import re
 from collections.abc import Iterator
 from contextlib import contextmanager
 from dataclasses import dataclass, field
@@ -31,6 +32,9 @@ _FORBIDDEN_IN_CLASS = ("\t", "\r", "\n")
 # A class name ends up in every labelled row, so it may not look like a spreadsheet formula
 # (CSV injection; decision of the human).
 _FORMULA_PREFIXES = ("=", "+", "-", "@", "\t", "\r")
+# Same rule as exporters.py (XML 1.0 characters; also excludes lone surrogates): a class must be
+# reportable, otherwise every report of the dataset fails (QA4-04).
+_INVALID_CHARS = re.compile(r"[^\x09\x0a\x0d\x20-\ud7ff\ue000-\ufffd\U00010000-\U0010ffff]")
 
 LabelKey = tuple[str, str | None]
 
@@ -60,7 +64,7 @@ def parse_label_rows(path: Path) -> list[tuple[str, str, str]]:
     """Read ``labels.tsv`` checking only its structure; cells are returned as written.
 
     Returns ``(participant_id, session_id, label)`` per non-blank row, in file order.
-    Extra columns are ignored. Missing columns, a malformed row or no rows → ``ValueError``.
+    Extra columns are ignored. Missing columns, a malformed row or no rows -> ``ValueError``.
     """
     try:
         with path.open(encoding="utf-8-sig", newline="") as handle:  # -sig: Excel adds a BOM
@@ -83,7 +87,7 @@ def parse_label_rows(path: Path) -> list[tuple[str, str, str]]:
 
 
 def parse_label_key(participant_cell: str, session_cell: str) -> LabelKey:
-    """Turn the id cells of a row into a table key; invalid → ``ValueError``."""
+    """Turn the id cells of a row into a table key; invalid -> ``ValueError``."""
     participant = _strip_prefix(participant_cell, _SUB_PREFIX)
     session = None if session_cell == "" else _strip_prefix(session_cell, _SES_PREFIX)
     if participant is None or (session_cell != "" and session is None):
@@ -113,7 +117,7 @@ def read_classes(root: Path) -> tuple[dict[str, str], str]:
 
 
 def read_labels(root: Path) -> LabelTable:
-    """Strict read of ``labels.json`` + ``labels.tsv``; any defect → fixed ``ValueError``."""
+    """Strict read of ``labels.json`` + ``labels.tsv``; any defect -> fixed ``ValueError``."""
     classes, description = read_classes(root)
     labels: dict[LabelKey, str | None] = {}
     for participant_cell, session_cell, label in parse_label_rows(root / LABELS_TSV):
@@ -137,7 +141,7 @@ def serialize_labels(table: LabelTable) -> tuple[str, str]:
 def write_labels(table: LabelTable, root: Path, overwrite: bool = False) -> tuple[Path, Path]:
     """Write ``labels.tsv`` and ``labels.json`` (``serialize_labels``).
 
-    Without ``overwrite``, if either file exists → ``FileExistsError`` and nothing is written.
+    Without ``overwrite``, if either file exists -> ``FileExistsError`` and nothing is written.
     Both files are staged as temporaries first and then moved with ``os.replace``; a failure
     leaves no temporaries and, without ``overwrite``, no half table. ``root`` must exist.
     """
@@ -186,14 +190,8 @@ def _check_classes(classes: object) -> None:
 
 
 def _is_text(value: object) -> bool:
-    """A ``str`` that encodes as UTF-8 (rejects lone surrogates)."""
-    if not isinstance(value, str):
-        return False
-    try:
-        value.encode("utf-8")
-    except UnicodeEncodeError:
-        return False
-    return True
+    """A ``str`` that the report can hold: no control characters XML 1.0/XLSX reject, no lone surrogates."""
+    return isinstance(value, str) and _INVALID_CHARS.search(value) is None
 
 
 def _is_id(value: object) -> bool:
@@ -257,7 +255,7 @@ def appended_label_changes(root: Path, text: str) -> Iterator[None]:
 
 
 def write_final_labels(root: Path, data: dict) -> Path:
-    """Write ``labels_final.json`` atomically; an existing one → ``FileExistsError``."""
+    """Write ``labels_final.json`` atomically; an existing one -> ``FileExistsError``."""
     path = root / FINAL_JSON
     if path.exists():
         raise FileExistsError("Labels are already finalized.")

@@ -69,14 +69,12 @@ def _write_one(tmp_path: Path, volume: np.ndarray) -> tuple[list[Path], list[Exc
 # --- Writer: volumes the stage 3 pipeline would reject reach the writer through export_dataset(pipeline=None)
 
 
-@pytest.mark.xfail(strict=True, reason="QA4-05: the writer exports 2D and 5D volumes into anat/")
 @pytest.mark.parametrize("shape", [(4, 4), (3, 3, 3, 2, 2)])
 def test_writer_rejects_volumes_that_are_not_3d_or_4d(tmp_path: Path, shape) -> None:
     written, errors = _write_one(tmp_path, np.ones(shape, np.float32))
     assert written == [] and [type(e) for e in errors] == [ValueError]
 
 
-@pytest.mark.xfail(strict=True, reason="QA4-06: float64 beyond the float32 range is written as inf with only a RuntimeWarning")
 def test_writer_does_not_silently_turn_finite_values_into_inf(tmp_path: Path) -> None:
     with warnings.catch_warnings():
         warnings.simplefilter("ignore", RuntimeWarning)
@@ -116,12 +114,16 @@ def test_truncated_lazy_gz_is_reported_and_the_rest_is_exported(tmp_path: Path) 
 # --- Labels: classes and manipulated files
 
 
-@pytest.mark.xfail(strict=True, reason="QA4-04: a class with a control character is accepted, then every report fails")
 def test_a_class_accepted_by_the_label_table_can_be_reported(tmp_path: Path) -> None:
+    # QA4-04 (fixed): a class the report cannot hold is rejected when declared.
     classes = {"A\x01": "x", "B": "y"}
-    LabelTable(classes)  # accepted: this is what the launcher's --classes check runs
+    with pytest.raises(ValueError, match=r"^Label classes are invalid\.$"):
+        LabelTable(classes)  # this is what the launcher's --classes check runs
     root = _dataset(tmp_path / "ds")
-    write_label_template(root, classes)
+    with pytest.raises(ValueError, match=r"^Label classes are invalid\.$"):
+        write_label_template(root, classes)
+    assert not (root / "labels.tsv").exists()
+    write_label_template(root, {"Ñandú 漢": "x", "B": "y"})  # unusual but accepted → reportable
     assert len(report_dataset(root, tmp_path / "report")) == 4
 
 
@@ -216,7 +218,6 @@ def test_bidsignore_and_hidden_folders_are_ignored(tmp_path: Path) -> None:
     assert (summary["participants"], summary["warnings"]) == (4, [{"code": "UNLABELED_SESSIONS", "count": 4}])
 
 
-@pytest.mark.xfail(strict=True, reason="QA4-07: an empty sub- folder becomes a pair that must be labelled")
 def test_a_subject_folder_without_images_is_not_a_dataset_pair(tmp_path: Path) -> None:
     root = _dataset(tmp_path / "ds")
     (root / "sub-ghost").mkdir()
@@ -261,7 +262,6 @@ def test_hand_edited_manifest_cannot_put_a_formula_in_the_xlsx(tmp_path: Path) -
     assert summary["pipeline"]["steps"][0]["name"].startswith("=HYPERLINK")  # the hostile text really reached the report
 
 
-@pytest.mark.xfail(strict=True, reason="QA4-09: with labels.json and labels_final.json but no labels.tsv, exports go out unlabeled")
 def test_finalized_labels_without_their_table_block_the_ml_exports(tmp_path: Path) -> None:
     root = _labelled(tmp_path / "ds")
     (root / "labels.tsv").rename(root / "labels.txt")  # a rename or an Excel "save as"
@@ -274,7 +274,6 @@ launcher = importlib.util.module_from_spec(_spec)
 _spec.loader.exec_module(launcher)
 
 
-@pytest.mark.xfail(strict=True, reason="QA4-10: a repeated --classes name silently keeps the last description")
 def test_repeated_class_names_are_rejected() -> None:
     with pytest.raises(ValueError):
         launcher.parse_classes(["A=first", "A=second"])

@@ -20,6 +20,12 @@ contiene datos reales; los valores plantados son sintéticos y todos contienen `
 | QA4-10 | menor | `--classes A=uno A=dos` se queda en silencio con la última descripción | `parse_classes(["A=first", "A=second"])` | `Invalid --classes.` | `scripts/run_stage4_dataset.py` | Abierto |
 | QA4-11 | observación (RNF03) | La consola imprime `errors: 0` al exportar y después `Errors by type: {'ValueError': 86}`: `DatasetReport.errors` no cuenta los errores del lector, que llegan directo al `on_error` | Corrida real (§3) | Una sola cifra, o etiquetarlas | `dataset.py` / lanzador | Abierto, sin prueba |
 
+**Estado tras las correcciones (verificado por @qa el 2026-10-22):** QA4-04, 05, 06, 07, 09, 10 y 11 están
+corregidos. Sus pruebas pasan sin `xfail`. La de QA4-04 la reescribió @etiquetas (ahora exige el rechazo en
+`LabelTable` y en `write_label_template`, y suma un caso positivo con una clase Unicode) y @qa la revisó y aprobó.
+La prueba de QA4-11 está en `tests/unit/test_run_stage4_dataset.py`. `tests/qa/` da 242 pruebas que pasan y 2
+`xfail`, que son los que siguen abiertos: QA4-03 (código congelado) y QA4-08 (solo Windows, sin `anonymize`; @dataset lo documentó en `docs/dataset/structure.md`).
+
 **Sospechas no confirmadas como defecto:**
 - Un NIfTI ajeno dentro del dataset bloquea las exportaciones para ML (documentado), pero el reporte lo cuenta y usa
   su sufijo como nombre de modalidad (texto de un nombre de archivo).

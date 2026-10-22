@@ -102,7 +102,7 @@ def test_formula_chars_inside_names_and_descriptions_are_data(tmp_path):
 
 
 def test_reads_excel_bom_crlf_extra_columns_and_blank_lines(tmp_path):
-    tsv = "﻿notes\tlabel\tsession_id\tparticipant_id\r\nx\tAD\t\tsub-01\r\n\r\n"
+    tsv = "\ufeffnotes\tlabel\tsession_id\tparticipant_id\r\nx\tAD\t\tsub-01\r\n\r\n"
     write_files(tmp_path, tsv)
     assert read_labels(tmp_path).labels == {("01", None): "AD"}
 
@@ -166,6 +166,10 @@ def test_tolerant_parse_keeps_defects_for_review(tmp_path):
         json.dumps({"label": {"Levels": {"AD": 1}}}),
         json.dumps({"label": {"Levels": {" AD": ""}}}),
         json.dumps({"label": {"Levels": {"A\tD": ""}}}),
+        json.dumps({"label": {"Levels": {"A\x01": ""}}}),
+        json.dumps({"label": {"Levels": {"AD": "x\x1f"}}}),
+        json.dumps({"label": {"Levels": {"AD": ""}, "Description": "\x00"}}),
+        json.dumps({"label": {"Levels": {"A\ufffe": ""}}}),
         json.dumps({"label": {"Levels": {"AD": ""}, "Description": 3}}),
     ],
 )

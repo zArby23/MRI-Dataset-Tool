@@ -11,7 +11,7 @@ from dataclasses import dataclass
 from datetime import UTC, datetime
 from pathlib import Path
 
-from mri_dataset_tool.infrastructure.dataset.bids_layout import validate_label
+from mri_dataset_tool.infrastructure.dataset.bids_layout import SUFFIX_DATATYPES, validate_label
 from mri_dataset_tool.infrastructure.dataset.labels import (
     FINAL_JSON,
     LABELS_TSV,
@@ -69,8 +69,10 @@ class LabelReview:
 def dataset_pairs(dataset_root: Path) -> list[LabelKey]:
     """(participant, session) pairs of the dataset tree, sorted; ``None`` = no session level.
 
-    Hidden entries and folders whose name is not ``sub-``/``ses-`` + a valid BIDS label are
-    ignored.
+    A pair counts only if its folder holds at least one visible ``.nii.gz`` file directly in a
+    datatype folder of the layout (``anat``, ``dwi``, ``fmap``): empty ``sub-``/``ses-`` folders
+    are not pairs (QA4-07). Hidden entries and folders whose name is not ``sub-``/``ses-`` + a
+    valid BIDS label are ignored.
     """
     _check_root(dataset_root)
     pairs: list[LabelKey] = []
@@ -78,8 +80,9 @@ def dataset_pairs(dataset_root: Path) -> list[LabelKey]:
         subject = _folder_label(subject_dir, "sub-")
         if subject is None:
             continue
-        sessions = [s for d in sorted(subject_dir.iterdir()) if (s := _folder_label(d, "ses-")) is not None]
-        pairs.extend((subject, session) for session in sessions or [None])
+        session_dirs = [(s, d) for d in sorted(subject_dir.iterdir()) if (s := _folder_label(d, "ses-")) is not None]
+        candidates = session_dirs or [(None, subject_dir)]
+        pairs.extend((subject, session) for session, folder in candidates if _has_images(folder))
     return pairs
 
 
@@ -129,8 +132,8 @@ def review_labels(dataset_root: Path) -> LabelReview:
 def write_label_template(dataset_root: Path, classes: dict[str, str], description: str = "") -> Path:
     """Write ``labels.json`` with *classes* and ``labels.tsv`` with every dataset pair unlabeled.
 
-    Returns the ``labels.tsv`` path. Existing label files → ``FileExistsError``; a dataset
-    without participants → ``ValueError``. Labels are then assigned with ``apply_label_corrections``.
+    Returns the ``labels.tsv`` path. Existing label files -> ``FileExistsError``; a dataset
+    without participants -> ``ValueError``. Labels are then assigned with ``apply_label_corrections``.
     """
     pairs = dataset_pairs(dataset_root)
     if not pairs:
@@ -193,7 +196,7 @@ def finalize_labels(dataset_root: Path) -> Path:
     """Close the labels: every dataset pair labeled with a known class, nothing else in the table.
 
     Writes ``labels_final.json`` (label count, count per class and the SHA-256 of the canonical
-    table, no date) and logs a ``finalize`` row. Already finalized → ``FileExistsError``.
+    table, no date) and logs a ``finalize`` row. Already finalized -> ``FileExistsError``.
     """
     if (dataset_root / FINAL_JSON).exists():
         raise FileExistsError("Labels are already finalized.")
@@ -238,6 +241,14 @@ def _check_root(dataset_root: Path) -> None:
         raise FileNotFoundError("Dataset directory not found.")
     if not dataset_root.is_dir():
         raise NotADirectoryError("Dataset path is not a directory.")
+
+
+def _has_images(folder: Path) -> bool:
+    return any(
+        path.is_file() and path.name.endswith(".nii.gz") and not path.name.startswith(".")
+        for datatype in sorted(set(SUFFIX_DATATYPES.values()))
+        for path in (folder / datatype).glob("*")
+    )
 
 
 def _folder_label(path: Path, prefix: str) -> str | None:
