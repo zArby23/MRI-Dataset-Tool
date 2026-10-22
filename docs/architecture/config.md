@@ -35,7 +35,7 @@ Solo existen estas claves; cualquier otra lanza `ValueError`.
 
 - Cada elemento de `pipeline.steps` es lo que recibe `build_step(name, params)`
   (`application/pipeline/step.py`); los pasos corren en el orden de la lista.
-- `report.path` se devuelve tal cual, sin resolver. Lo interpreta el manifiesto de corrida (P4).
+- `report.path` se devuelve tal cual, sin resolver. Lo interpreta el manifiesto de corrida.
 
 Cómo usa estos valores el pipeline: [pipeline.md](pipeline.md). `config/example_run.yaml` es el
 archivo de corrida de `scripts/run_example_pipeline.py`.
@@ -67,7 +67,7 @@ Gana la última aparición, que es el comportamiento de PyYAML. Por ejemplo,
 `pipeline: {steps: [], steps: [{name: validate}]}` ejecuta `validate`. El manifiesto registra la
 configuración que se ejecutó realmente, así que conviene revisarlo cuando un archivo de corrida se edita a mano.
 
-## Decisiones (del humano, etapa 2)
+## Decisiones de diseño (etapa 2)
 
 1. El entorno se elige con el parámetro explícito `environment`; no hay variable de entorno. Con
    `None` solo se aplican `default.yaml` y el archivo de corrida. Un entorno sin archivo lanza

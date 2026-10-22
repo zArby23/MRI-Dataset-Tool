@@ -106,7 +106,7 @@ def test_dicom_actions_use_known_keywords_and_actions():
         ("StudyTime", Action.EMPTIED),
     ],
 )
-def test_dicom_actions_follow_the_human_decisions(keyword, action):
+def test_dicom_actions_follow_the_policy(keyword, action):
     assert DICOM_ACTIONS[keyword] is action
 
 

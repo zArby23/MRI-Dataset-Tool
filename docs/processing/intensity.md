@@ -1,6 +1,6 @@
 # Procesamiento de intensidad
 
-## Carga perezosa de volúmenes (M0)
+## Carga perezosa de volúmenes
 
 Por defecto los lectores NIfTI cargan el volumen completo en `float64` (`image.get_fdata()`). Con
 `lazy=True` dejan en `MRISeries.volume` el proxy de nibabel (`image.dataobj`, un `ArrayProxy`) y **no
@@ -61,7 +61,7 @@ for study in NIfTIBatchReader().iter_studies(root, lazy=True):
 
 ### Límites
 
-- **Archivos truncados (decisión del humano).** Con `lazy=True` un `.nii.gz` truncado tiene la cabecera
+- **Archivos truncados (decisión de diseño).** Con `lazy=True` un `.nii.gz` truncado tiene la cabecera
   intacta: el lector lo carga y su `on_error` **no** lo reporta. Falla al materializar, con
   `ValueError("Unable to read volume data.")`, en el primer paso que lee el volumen; el runner lo
   reporta por su `on_error` y el lote sigue (RF16). Con `lazy=False` se sigue detectando al cargar.
@@ -88,19 +88,19 @@ for study in NIfTIBatchReader().iter_studies(root, lazy=True):
 | eager (`float64`) | 97,3 MB |
 | `lazy=True` | 1,3 MB |
 
-Pendiente (verificación manual del humano): medir sobre la sesión con difusión de BIDS ds005299.
+Pendiente (verificación manual): medir sobre la sesión con difusión de BIDS ds005299.
 
 ## Paso `validate` (RF03, I1)
 
 | Parámetro | Defecto | Valores |
 |---|---|---|
-| `modalities` | `null` (todas las series con volumen) | lista de modalidades (Q12) |
+| `modalities` | `null` (todas las series con volumen) | lista de modalidades |
 
 Comprobaciones puras en `infrastructure/processing/validation.py` (`validate_series`); el paso
 `validate` (`application/pipeline/steps/validate.py`, versión `1`) las aplica a las series con volumen
 seleccionadas por `params.modalities` (por defecto todas). No cambia el volumen ni la geometría.
 
-- **Graves (Q6): rechazan el estudio** con `ValueError` de mensaje fijo; el runner lo marca `failed` y
+- **Graves: rechazan el estudio** con `ValueError` de mensaje fijo; el runner lo marca `failed` y
   el lote sigue:
   - geometría ausente o incoherente (`validate_geometry`: affine no 4×4, no finita, última fila distinta
     de `[0, 0, 0, 1]` o no invertible; `shape` distinta de la del volumen);
@@ -133,10 +133,10 @@ Algoritmos en `infrastructure/processing/normalize.py` (`normalize_volume`, `che
 | `mask` | `"nonzero"` | `nonzero` (estadísticos sobre los vóxeles de entrada ≠ 0), `none` (todos) |
 | `per_volume` | `true` | 4D: estadísticos por volumen 3D (`true`) o globales (`false`); sin efecto en 3D |
 | `percentiles` | `null` | obligatorio con `method: percentile` (`0 ≤ p_low < p_high ≤ 100`); con otro método, error |
-| `modalities` | `null` | filtro de series (Q12) |
+| `modalities` | `null` | filtro de series |
 | `allow_insufficient_memory` | `false` | `true`/`false` (solo `bool`; si no, `"Allow insufficient memory must be a boolean."`) |
 
-- **Fuera de la máscara** los vóxeles quedan en `0` (el fondo sigue siendo fondo; decisión del humano,
+- **Fuera de la máscara** los vóxeles quedan en `0` (el fondo sigue siendo fondo; decisión de diseño,
   igual para los tres métodos). Por eso, con `mask: nonzero`, `normalize` **no es una transformación
   afín global** del volumen: solo se transforma la máscara. Con `mask: none` no hay fondo y sí lo es.
 - **Conserva:** `shape`, `affine`, `orientation` y `voxel_size` (recalculados con `replace_volume`
@@ -212,6 +212,6 @@ básicos JSON (sin NaN). Es la parte «extraer» de RF04; «mostrar» es de la e
 - `intensity` se calcula sobre los vóxeles finitos, un volumen 3D a la vez en `float64`
   (`iter_volumes_3d`), sin materializar el 4D ni la serie perezosa; los NaN/Inf se cuentan en
   `non_finite_voxels`. Desviación poblacional.
-- **Q10:** con los metadatos actuales (NIfTI: geometría y cabecera; DICOM: `rows`, `columns`,
+- **Metadatos:** con los metadatos actuales (NIfTI: geometría y cabecera; DICOM: `rows`, `columns`,
   `pixel_spacing`, `slice_thickness`, `spacing_between_slices`, `image_orientation`, `Modality`; BIDS:
   sidecar técnico) RF04 queda cubierto; no se amplió el lector DICOM.

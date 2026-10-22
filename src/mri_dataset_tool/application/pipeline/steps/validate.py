@@ -11,7 +11,7 @@ from mri_dataset_tool.infrastructure.processing.validation import validate_serie
 
 @register_step("validate")
 class ValidateStep:
-    """Reject studies with serious integrity problems; annotate the rest (RF03, Q6).
+    """Reject studies with serious integrity problems; annotate the rest (RF03).
 
     The volume is not changed. Each checked series gains
     ``metadata["validation"] = {"status": "ok", "findings": [codes]}``.

@@ -42,7 +42,7 @@ class NIfTIReader:
         logger.info("Loading NIfTI study")
         try:
             # Lazy: no mmap (it would lock the file on Windows); keep_file_open so a 4D .nii.gz
-            # is not reopened and re-decompressed from the start for every frame (QA1-06).
+            # is not reopened and re-decompressed from the start for every frame.
             image = nib.load(path, mmap=False, keep_file_open=True) if lazy else nib.load(path)
             if image.header.get_data_dtype().kind == "c":
                 # get_fdata() and float casts drop the imaginary part with only a warning.

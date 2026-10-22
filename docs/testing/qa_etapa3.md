@@ -1,6 +1,6 @@
 # QA1 — Auditoría adversarial de las etapas 1–3
 
-> Fecha: 2026-10-21 · Rama `etapa-3-procesamiento`, HEAD `ff0769b` · Autor: agente @qa.
+> Fecha: 2026-10-21 · Rama `etapa-3-procesamiento`, HEAD `ff0769b`
 > Alcance: `tasks/etapa-3/todo.md` (QA1) y `.claude/roles/qa.md`. No se editó código de producción.
 
 ## Resumen
@@ -8,7 +8,7 @@
 | | |
 |---|---|
 | Suite completa | `python -m pytest -q`: **832 passed** en HEAD `bd372db` (180 de ellas en `tests/qa/`) |
-| Bloqueantes | 0. QA1-01 se avisó como bloqueante; el humano lo fijó en **importante** |
+| Bloqueantes | 0. QA1-01 se avisó como bloqueante; la severidad se fijó en **importante** (decisión de diseño) |
 | Importantes | 2: QA1-01 y QA1-06 (rendimiento, hallado con datos reales) **corregidos** |
 | Menores | 4: QA1-02, QA1-03 y QA1-05 **corregidos**; QA1-04 **límite documentado** |
 | Fugas de PHI nuevas | **Ninguna**. Solo aparecen los riesgos residuales ya documentados en `docs/anonymization/policy.md` §6 |
@@ -20,12 +20,12 @@ aserciones del comportamiento corregido.
 
 | Id | Severidad | Estado | Prueba |
 |---|---|---|---|
-| QA1-01 | importante (decisión del humano) | **Corregido** (commit `6a0602f`) | `test_complex_nifti_is_rejected_by_the_reader`, `test_complex_ndarray_volume_fails_its_study`, `test_complex_nifti_to_dicom_writes_nothing` |
+| QA1-01 | importante (decisión de diseño) | **Corregido** (commit `6a0602f`) | `test_complex_nifti_is_rejected_by_the_reader`, `test_complex_ndarray_volume_fails_its_study`, `test_complex_nifti_to_dicom_writes_nothing` |
 | QA1-02 | menor | **Corregido**: se aceptan `.NII`/`.nii.GZ` | `test_uppercase_extensions_are_read_and_written_compressed` |
 | QA1-03 | menor | **Corregido** | `test_negative_dim_error_has_a_fixed_message` |
 | QA1-04 | menor | **Límite documentado** en `docs/architecture/config.md` | `test_duplicate_yaml_key_keeps_the_last_one` |
 | QA1-05 | menor | **Corregido** | `test_step_output_does_not_alias_input_metadata` |
-| QA1-06 | importante | **Corregido** (`keep_file_open=True`; aprobado por el humano, commit `9139d25`) | `test_lazy_4d_gz_is_read_with_one_open_per_pass` (una apertura por pasada y archivo liberado al soltar el estudio) |
+| QA1-06 | importante | **Corregido** (`keep_file_open=True`; decisión de diseño aprobada, commit `9139d25`) | `test_lazy_4d_gz_is_read_with_one_open_per_pass` (una apertura por pasada y archivo liberado al soltar el estudio) |
 
 ## 1. Hallazgos
 
@@ -50,7 +50,7 @@ aserciones del comportamiento corregido.
   `if image.header.get_data_dtype().kind == "c": raise ValueError("Unsupported NIfTI data type.")`.
   - Cubre las cargas eager y lazy, `NIfTIBatchReader`, `BIDSReader`/`BIDSBatchReader` y `convert_nifti_to_dicom`.
   - Requiere una prueba en `tests/unit/test_nifti_reader.py`.
-  - Archivos: `infrastructure/nifti/reader.py` (código congelado de la etapa 1; la excepción M0 era de @intensidad) y su prueba.
+  - Archivos: `infrastructure/nifti/reader.py` (código congelado de la etapa 1; la excepción M0 era del responsable del módulo) y su prueba.
   - Defensa opcional: que `processing/arrays.load_array` rechace un origen de tipo `c`, para un `ndarray` complejo llegado por otra vía.
 - **Corrección aplicada:** `NIfTIReader` rechaza los datos complejos con `ValueError("Unsupported NIfTI data type.")`
   y `arrays.load_array` rechaza un origen complejo (defensa para un `ndarray`).
@@ -76,7 +76,7 @@ aserciones del comportamiento corregido.
   - El lote sigue, y el estudio se reporta y se omite.
 - **Reproducción:** escribir un NIfTI válido y poner `int16` = -3 en el byte 42 (`dim[1]`). Luego cargarlo
   con `NIfTIBatchReader().iter_studies(..., lazy=False/True)` y correr el pipeline.
-- **Archivos:** `infrastructure/nifti/reader.py` (congelado) y `infrastructure/processing/arrays.py` (@intensidad).
+- **Archivos:** `infrastructure/nifti/reader.py` (congelado) y `infrastructure/processing/arrays.py`.
 - **Corrección aplicada:** `NIfTIReader` convierte un `dim` negativo en `"Unable to load NIfTI image."`.
 
 ### QA1-04 — Menor — Límite documentado — Claves YAML duplicadas: gana la última, sin aviso
@@ -85,7 +85,7 @@ aserciones del comportamiento corregido.
   lista. Es el comportamiento de PyYAML. Un archivo de corrida editado a mano puede ejecutar un pipeline
   distinto del que el autor cree ver, aunque el manifiesto registra el efectivo.
 - **Archivos:** `infrastructure/config/loader.py` (congelado). Se arregla con un `SafeLoader` que rechace claves duplicadas.
-- **Decisión del humano:** se conserva y se documenta como límite en `docs/architecture/config.md`.
+- **Decisión de diseño:** se conserva y se documenta como límite en `docs/architecture/config.md`.
 
 ### QA1-05 — Menor — Corregido — `validate` y `anonymize` comparten objetos anidados de `metadata` con la entrada
 
@@ -100,7 +100,7 @@ aserciones del comportamiento corregido.
   out = build_step("validate").apply(study)
   out.series[0].metadata["affine"][0, 3] += 1   # cambia también study.series[0].metadata["affine"]
   ```
-- **Archivos:** `application/pipeline/steps/validate.py` (@intensidad) y `application/pipeline/steps/anonymize.py` (@anonimizacion).
+- **Archivos:** `application/pipeline/steps/validate.py` y `application/pipeline/steps/anonymize.py`.
 - **Corrección aplicada:** las salidas de `validate` y `anonymize` ya no comparten objetos anidados con la entrada.
 
 ### QA1-06 — Importante — Corregido — La lectura lazy de un 4D `.nii.gz` es cuadrática en el número de volúmenes
@@ -128,11 +128,11 @@ aserciones del comportamiento corregido.
   - Coste: el archivo queda abierto mientras el estudio vive en memoria, lo que contradice la decisión de M0
     ("el archivo no queda abierto"). El runner suelta cada estudio antes de leer el siguiente, así que solo hay uno abierto a la vez.
   - No hace falta `indexed_gzip`, que no está instalado.
-  - El humano aprobó el cambio.
-- **Archivos:** `infrastructure/nifti/reader.py` (M0, @intensidad) y una prueba de liberación del archivo.
-- **Corrección aplicada** (@intensidad): `NIfTIReader` con `lazy=True` usa `keep_file_open=True`. La docstring
+  - Cambio aprobado como decisión de diseño.
+- **Archivos:** `infrastructure/nifti/reader.py` (M0, responsable del módulo) y una prueba de liberación del archivo.
+- **Corrección aplicada** (responsable del módulo): `NIfTIReader` con `lazy=True` usa `keep_file_open=True`. La docstring
   documenta que el archivo queda abierto hasta soltar el estudio. Se verificó con una apertura por pasada y con el
-  archivo renombrable en Windows tras soltar el estudio. El humano aprobó el cambio a la decisión de M0 (commit `9139d25`).
+  archivo renombrable en Windows tras soltar el estudio. El cambio a la decisión de M0 se aprobó como decisión de diseño (commit `9139d25`).
 
 ### Observaciones (no son defectos)
 
@@ -144,7 +144,7 @@ aserciones del comportamiento corregido.
   de 144×144×78×140 con `"Resampled volume would be too large."`, porque saldrían ≈ 1.300 millones de vóxeles,
   por encima del límite de entonces, `MAX_OUTPUT_VOXELS` = 2²⁸. El estudio se cortaba entero y se perdían también
   sus otras 8 series.
-  **Resuelto después de esta auditoría** (commits sin revisar por @qa):
+  **Resuelto después de esta auditoría** (commits no auditados):
   - **QA1-07** (`8563e53`): el límite por defecto sube a 2³² y pasa a ser el parámetro `max_output_voxels` de `resample`.
   - **QA1-08** (`717c85f`) y **QA1-09** (`9e155eb`): `resample` y `normalize` comprueban la RAM disponible antes de reservar
     la salida; el parámetro `allow_insufficient_memory` permite seguir de forma explícita.
@@ -264,7 +264,7 @@ Conclusiones de QA2:
   comprobación de RAM rechaza `normalize` con su mensaje fijo, porque necesitaría otros ≈ 5,3 GiB con 6,5 disponibles.
 - **Observación:** el runner corta el estudio en el primer fallo, así que una sesión con difusión pierde también sus
   8 series válidas cuando la difusión no cabe en RAM. Excluir dwi con `modalities` resuelve el caso. El árbol ya tiene
-  una configuración BIDS con `resample` por modalidad (commit `d3dc3fc`, posterior a esta corrida y no auditado por @qa).
+  una configuración BIDS con `resample` por modalidad (commit `d3dc3fc`, posterior a esta corrida y no auditado).
 - **La anonimización a escala real conserva la reconstrucción:** el mismo número de estudios y series antes y después.
 
 ### 3.2 QA3 — lanzador BIDS con `config/stage3_bids.yaml` (2026-10-21)
@@ -287,16 +287,16 @@ Conclusiones de QA3:
 - La consola muestra además el log `ERROR:...nifti.reader:Unable to load NIfTI image` una vez por puntero y por pasada
   (172 líneas). No contiene PHI, pero repite lo que ya cuenta `error N: ValueError`. Es una observación menor de legibilidad.
 - Con la carpeta de la sesión como raíz, los sidecars solo se heredan desde la sesión. No afecta al procesamiento.
-- **Incidencias del script de medición de @qa, no del sistema:** un primer intento se bloqueó en la reproducción
+- **Incidencias del script de medición de la auditoría, no del sistema:** un primer intento se bloqueó en la reproducción
   porque la consola iba a una tubería que nadie vaciaba. Además medía solo el `python.exe` lanzador. Se corrigieron
-  las dos cosas: la consola va a un archivo y se mide el árbol de procesos. Durante ese intento el humano tenía
+  las dos cosas: la consola va a un archivo y se mide el árbol de procesos. Durante ese intento había
   3D Slicer abierto, así que la caída de la RAM disponible del sistema en esa corrida no se usa como consumo del pipeline.
 
-**Pendiente de verificación manual del humano:**
+**Verificaciones manuales pendientes:**
 - ~~la difusión **normalizada**~~: **hecho en QA3** a 2 mm con `config/stage3_bids.yaml`. A 1 mm (`stage3_example.yaml`)
   sigue necesitando ≥ 11–12 GiB libres;
 - abrir en un visor las salidas de `E:/qa_runs/qa3_ses01/` (anatomía a 1 mm y dwi a 2 mm, RAS);
-- los puntos del checkpoint que requieren ojos humanos: el visor, y revisar el `AnonymizationReport` y las salidas en `E:/qa_runs/`.
+- los puntos del checkpoint que requieren revisión manual: el visor, y revisar el `AnonymizationReport` y las salidas en `E:/qa_runs/`.
 
 ## 4. Qué no se verificó (sospechas y límites)
 
@@ -327,7 +327,7 @@ Huecos reales relevantes:
 | `bids/reader.py`, `conversion.py`, lectores por lote | Callback `on_error` que lanza (solo se registra su tipo) |
 | `processing/{arrays,validation}.py`, `pipeline/{manifest,step}.py`, `anonymization/{policy,pseudonym,report}.py` | 100 % |
 
-## 6. Verificaciones manuales pendientes para el humano
+## 6. Verificaciones manuales pendientes
 
 1. La difusión normalizada ya se verificó a 2 mm con `config/stage3_bids.yaml` (QA3, §3.2). A 1 mm necesita
    ≥ 11–12 GiB de RAM libres. El BIDS completo, la anonimización completa y su reconversión ya se verificaron en

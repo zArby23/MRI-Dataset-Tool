@@ -1,4 +1,4 @@
-"""E1 integration: synthetic DICOM through conversion, anonymization and the stage 3 pipeline."""
+"""Integration: synthetic DICOM through conversion, anonymization and the stage 3 pipeline."""
 
 import dataclasses
 import gzip

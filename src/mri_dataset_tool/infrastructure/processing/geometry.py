@@ -60,7 +60,7 @@ def apply_to_series(
     transform: Callable[[MRISeries], tuple[MRISeries, dict[str, Any]]],
     modalities: Sequence[str] | None = None,
 ) -> tuple[MRIStudy, dict[str, Any]]:
-    """Apply *transform* to the selected series (Q12); return the new study and its outputs.
+    """Apply *transform* to the selected series; return the new study and its outputs.
 
     Selected: series with a volume and, when *modalities* is given, a ``modality`` in it
     (``modality=None`` is then left out; ``[]`` selects nothing). The other series are kept

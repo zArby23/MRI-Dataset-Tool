@@ -222,7 +222,7 @@ def _gz_4d(path: Path, frames: int = 10) -> np.ndarray:
 
 
 def test_lazy_4d_gz_opens_the_file_once_per_pass(tmp_path: Path, openers) -> None:
-    # QA1-06: reopening per frame re-decompressed the .nii.gz from the start (O(T^2)).
+    # Reopening per frame re-decompressed the .nii.gz from the start (O(T^2)).
     path = tmp_path / "x.nii.gz"
     data = _gz_4d(path)
     volume = NIfTIReader().load_study(path, lazy=True).series[0].volume

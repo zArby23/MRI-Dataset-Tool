@@ -158,7 +158,7 @@ def test_load_study_lazy_passes_through_to_nifti_reader(tmp_path: Path) -> None:
 
 
 def test_upper_case_extension_is_tolerated(tmp_path: Path) -> None:
-    # BIDS requires lower-case extensions; the reader tolerates them (QA1-02).
+    # BIDS requires lower-case extensions; the reader tolerates them.
     anat = tmp_path / "sub-01" / "anat"
     _nifti(anat / "sub-01_T2w.NII.GZ")
     (anat / "sub-01_T2w.json").write_text('{"EchoTime": 0.1}')
