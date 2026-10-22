@@ -2,6 +2,7 @@
 
 import importlib.util
 import json
+import re
 from pathlib import Path
 
 import nibabel as nib
@@ -164,11 +165,16 @@ def test_full_run_never_writes_source_ids(tmp_path: Path, capsys) -> None:
     out_dir = tmp_path / "out"
     assert script.main([str(_dataset(tmp_path)), "--output-dir", str(out_dir), "--classes", "AD"]) == 0
     capsys.readouterr()
+    participants = (out_dir / "dataset" / "participants.tsv").read_text(encoding="utf-8").splitlines()
+    assert participants[0] == "participant_id" and len(participants) == 3
+    assert all(re.fullmatch(r"sub-[0-9a-f]{16}", row) for row in participants[1:])
+    # every sub-/ses- label anywhere in names or text files is a pseudonym, never a source id
     for path in out_dir.rglob("*"):
-        for source_id in ("sub-01", "sub-02", "sub-03"):
-            assert source_id not in path.name
-            if path.is_file() and path.suffix in (".tsv", ".json", ".csv", ".md", ".xml"):
-                assert source_id not in path.read_text(encoding="utf-8")
+        texts = [path.name]
+        if path.is_file() and path.suffix in (".tsv", ".json", ".csv", ".md", ".xml"):
+            texts.append(path.read_text(encoding="utf-8"))
+        for label in re.findall(r"(?:sub|ses)-([A-Za-z0-9]+)", "\n".join(texts)):
+            assert re.fullmatch(r"[0-9a-f]{16}", label)
 
 
 @pytest.mark.parametrize("relative", [".", "derivatives/out"])
