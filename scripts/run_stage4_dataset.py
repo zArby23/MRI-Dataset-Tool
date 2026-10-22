@@ -8,8 +8,9 @@ Usage, from the repository root (the key is a secret of at least 32 characters):
         --classes AD=Alzheimer CN=Control --corrections labels_fix.tsv --ratios 0.7 0.15 0.15 --seed 0
 
 Studies are read lazily from <dataset_root> (default data/raw/bids_test_studies), processed
-with --config (default config/stage3_bids.yaml) and written to <output-dir>/dataset; the
-report goes to <output-dir>/report. With --classes a label template (every session unlabeled)
+with --config (default config/stage3_bids.yaml; it must include the anonymize step, so the
+dataset ids are pseudonyms) and written to <output-dir>/dataset; the report goes to
+<output-dir>/report. With --classes a label template (every session unlabeled)
 is written; --corrections (same columns as labels.tsv) then assigns labels and needs --classes.
 Complete labels are finalized (finalize_labels) before the ML exports; incomplete ones skip the
 ML exports with a warning (codes and counts) unless --allow-unfinalized. --output-dir must not exist; large runs should go to
@@ -117,8 +118,12 @@ def main(argv: Sequence[str] | None = None) -> int:
 
     try:
         config = load_config(args.config, config_dir=REPO / "config")
+        pipeline = pipeline_from_config(config)
     except Exception as error:
         print(f"Invalid config: {type(error).__name__}")
+        return 2
+    if not any(step.name == "anonymize" for step in pipeline.steps):  # ids would be the source ones (QA4-01)
+        print("The pipeline must include the anonymize step.")
         return 2
     logging.basicConfig(level=config["logging"]["level"])
     dataset, report_dir = output_dir / "dataset", output_dir / "report"
@@ -134,7 +139,7 @@ def main(argv: Sequence[str] | None = None) -> int:
         output_dir.mkdir(parents=True)
         studies = BIDSBatchReader().iter_studies(args.dataset_root, on_error=on_error, lazy=True)
         exported = export_dataset(
-            studies, dataset, on_error, pipeline=pipeline_from_config(config), config=config, source_dir=args.dataset_root
+            studies, dataset, on_error, pipeline=pipeline, config=config, source_dir=args.dataset_root
         )
         print(f"Studies written: {exported.studies_written}  series: {exported.series_written}  "
               f"participants: {exported.participants}  errors: {exported.errors}")

@@ -16,14 +16,14 @@ python scripts/run_stage4_dataset.py <dataset_root> --output-dir E:/mri/stage4 `
 |---|---|---|
 | `dataset_root` | `data/raw/bids_test_studies` | BIDS de entrada, leído con `BIDSBatchReader(lazy=True)` |
 | `--output-dir` | obligatorio | Directorio **nuevo**; si ya existe, código 1. En `C:` o en el temporal sale un WARNING fijo (no bloquea): las corridas grandes van en `E:/` |
-| `--config` | `config/stage3_bids.yaml` | Configuración de la corrida (pasos del pipeline) |
+| `--config` | `config/stage3_bids.yaml` | Configuración de la corrida (pasos del pipeline). **Debe incluir el paso `anonymize`**: si no, «The pipeline must include the anonymize step.» y código 2 antes de crear nada (QA4-01) |
 | `--classes NAME[=DESCRIPCIÓN] ...` | — | Clases de las etiquetas; escribe la plantilla (`write_label_template`, todas las sesiones sin etiquetar) |
 | `--corrections` | — | TSV con las columnas de `labels.tsv`; se aplica con `apply_label_corrections`. Exige `--classes` |
 | `--ratios TRAIN VAL TEST` | `0.7 0.15 0.15` | Proporciones de las particiones |
 | `--seed` | `0` | Semilla de las particiones |
 | `--allow-unfinalized` | no | Escribe las exportaciones para ML aunque las etiquetas estén incompletas (`write_ml_exports(..., allow_unfinalized=True)`) |
 
-Los ids del dataset son seudónimos (paso `anonymize`, HMAC con `MRI_ANON_KEY`): son deterministas para
+Los ids del dataset son seudónimos porque el lanzador exige el paso `anonymize` (HMAC con `MRI_ANON_KEY`); son deterministas para
 la misma clave, así que un archivo de correcciones se prepara con el `labels.tsv` de una corrida previa
 hecha con la misma clave.
 
@@ -56,7 +56,7 @@ de `dataset_root` (o igual) se rechaza antes de crear nada, con código 2.
 |---|---|
 | 0 | Corrida completa |
 | 1 | `--output-dir` ya existe, o falla una etapa |
-| 2 | Falta `MRI_ANON_KEY`, argumentos inválidos, `--output-dir` dentro de la entrada, dataset o configuración inexistentes o inválidos |
+| 2 | Falta `MRI_ANON_KEY`, argumentos inválidos, `--output-dir` dentro de la entrada, dataset o configuración inexistentes o inválidos, pipeline sin `anonymize` |
 
 La consola muestra solo textos fijos, conteos y tipos de excepción: nunca rutas, ids ni mensajes.
 Pruebas: `tests/unit/test_run_stage4_dataset.py`.

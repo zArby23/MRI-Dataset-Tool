@@ -149,6 +149,28 @@ def test_invalid_arguments_exit_2_before_creating_anything(tmp_path: Path, capsy
     assert not (tmp_path / "out").exists()
 
 
+def test_a_pipeline_without_anonymize_is_rejected_before_creating_anything(tmp_path: Path, capsys) -> None:
+    source = _dataset(tmp_path)
+    before = sorted(source.rglob("*"))
+    config = tmp_path / "validate_only.yaml"
+    config.write_text("pipeline:\n  steps:\n    - name: validate\n", encoding="utf-8")
+    assert script.main([str(source), "--output-dir", str(tmp_path / "out"), "--config", str(config)]) == 2
+    assert capsys.readouterr().out.endswith("The pipeline must include the anonymize step.\n")
+    assert not (tmp_path / "out").exists()
+    assert sorted(source.rglob("*")) == before
+
+
+def test_full_run_never_writes_source_ids(tmp_path: Path, capsys) -> None:
+    out_dir = tmp_path / "out"
+    assert script.main([str(_dataset(tmp_path)), "--output-dir", str(out_dir), "--classes", "AD"]) == 0
+    capsys.readouterr()
+    for path in out_dir.rglob("*"):
+        for source_id in ("sub-01", "sub-02", "sub-03"):
+            assert source_id not in path.name
+            if path.is_file() and path.suffix in (".tsv", ".json", ".csv", ".md", ".xml"):
+                assert source_id not in path.read_text(encoding="utf-8")
+
+
 @pytest.mark.parametrize("relative", [".", "derivatives/out"])
 def test_output_inside_the_input_creates_nothing(tmp_path: Path, capsys, relative: str) -> None:
     source = _dataset(tmp_path)

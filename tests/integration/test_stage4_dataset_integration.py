@@ -7,6 +7,7 @@ import importlib.util
 import io
 import json
 import logging
+import re
 import zipfile
 from pathlib import Path
 
@@ -138,6 +139,7 @@ def test_invalid_study_is_reported_and_the_rest_is_exported(pipeline_run) -> Non
     assert (report.studies_written, report.series_written, report.participants, report.errors) == (3, 5, 3, 1)
     participants = (dataset / "participants.tsv").read_text(encoding="utf-8").splitlines()
     assert participants[0] == "participant_id" and len(participants) == 4
+    assert all(re.fullmatch(r"sub-[0-9a-f]{16}", row) for row in participants[1:])  # pseudonyms, never source ids
     assert sorted(p.relative_to(dataset).parts[2] for p in dataset.rglob("*.nii.gz")) == ["anat"] * 4 + ["dwi"]
     for image in dataset.rglob("*.nii.gz"):
         sidecar = json.loads(image.with_name(image.name.replace(".nii.gz", ".json")).read_text(encoding="utf-8"))
