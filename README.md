@@ -92,17 +92,19 @@ python -m pytest
 
 ## Status
 
-In development. Stages 1 to 3 are complete; stage 4 (dataset) is being planned.
+In development. Stages 1 to 3 are complete and stage 4 (dataset) has code and tests; the manual checks and the merge into `main` are pending.
 
 **Implemented** (library code under `src/mri_dataset_tool`)
 - Loading of DICOM, NIfTI and BIDS studies, and DICOM <-> NIfTI conversion.
 - Processing pipeline core: step contract, batch runner, run manifest and YAML configuration.
 - Processing steps: validation, anonymization, reorientation, resampling and normalization.
+- Dataset: BIDS writer, labels with review, correction and closing, train/val/test splits by participant, ML/DL index files (`dataset_index.csv`, `datalist.json`) and a statistical report in JSON, Markdown, XML and XLSX.
 
 **How to run the processing steps**
 - `scripts/run_stage3_pipeline.py` for loose NIfTI files.
 - `scripts/run_stage3_bids_pipeline.py` for BIDS datasets.
-- Both need the `MRI_ANON_KEY` environment variable (at least 32 characters).
+- `scripts/run_stage4_dataset.py` builds the full dataset (BIDS, labels, splits and report).
+- All of them need the `MRI_ANON_KEY` environment variable (at least 32 characters).
 - Send large outputs to a drive with enough free space, outside the repository.
 
 **Memory**
@@ -111,7 +113,7 @@ In development. Stages 1 to 3 are complete; stage 4 (dataset) is being planned.
 - You can force it with `allow_insufficient_memory: true`; the choice is recorded in the run manifest.
 
 **Verification so far**
-- Stage 3 was audited with synthetic data and with the local test datasets.
+- Stages 3 and 4 were audited with synthetic data and with the local test datasets.
 - The NIfTI output was checked in a viewer.
 - Still pending: runs on Linux and with compressed DICOM.
 
@@ -121,9 +123,10 @@ In development. Stages 1 to 3 are complete; stage 4 (dataset) is being planned.
 - Review the report and the output before sharing real data.
 - The generated DICOM does not conform to the strict MR IOD.
 - Visual checks of converted DICOM volumes are pending.
+- The exported dataset has no `.bval`/`.bvec` for `dwi` and no `EchoTime1/2` for `phasediff`: the official BIDS validator will flag them.
+- Labels are assigned through files; there is no review interface yet.
 
 **Not implemented yet**
-- Dataset organization, labels, export and reports (stage 4).
 - CLI and GUI.
 
 ---
@@ -222,7 +225,7 @@ python -m pytest
 
 ## Estado
 
-En desarrollo. Las etapas 1 a 3 están completas y la etapa 4 (dataset) tiene código y pruebas, a falta de la auditoría final y de las verificaciones manuales.
+En desarrollo. Las etapas 1 a 3 están completas y la etapa 4 (dataset) tiene código y pruebas, a falta de las verificaciones manuales y de la fusión en `main`.
 
 **Implementado** (código de biblioteca en `src/mri_dataset_tool`)
 - Carga de estudios DICOM, NIfTI y BIDS, y conversión DICOM <-> NIfTI.
@@ -243,7 +246,7 @@ En desarrollo. Las etapas 1 a 3 están completas y la etapa 4 (dataset) tiene c�
 - Puedes forzarlo con `allow_insufficient_memory: true`; la decisión queda registrada en el manifiesto de la corrida.
 
 **Verificación hasta ahora**
-- La etapa 3 se auditó con datos sintéticos y con los datasets locales de prueba.
+- Las etapas 3 y 4 se auditaron con datos sintéticos y con los datasets locales de prueba.
 - La salida NIfTI se revisó en un visor.
 - Siguen pendientes las corridas en Linux y con DICOM comprimido.
 

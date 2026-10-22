@@ -13,11 +13,11 @@ Estos requisitos son obligatorios para el correcto funcionamiento del sistema.
 | RF07 | El sistema debe reorientar los volúmenes a un sistema de coordenadas estándar definido para el procesamiento. | Normalización |
 | RF08 | El sistema debe realizar remuestreo _(resampling)_ para homogenizar resolución y espaciado entre estudios de distintas fuentes. | Normalización |
 | RF09 | El sistema debe anonimizar o eliminar los metadatos sensibles del paciente presentes en los archivos `DICOM`. | Anonimización |
-| RF10 | El sistema debe organizar los estudios procesados en una estructura de carpetas estandarizada. | Organización |
+| RF10 | El sistema debe organizar los estudios procesados en una estructura de carpetas estandarizada, siguiendo la organización BIDS. | Organización |
 | RF11 | El sistema debe permitir asignar etiquetas/clases a cada estudio. | Etiquetado |
 | RF12 | El sistema debe permitir revisar y corregir etiquetas antes de finalizar el dataset. | Validación |
-| RF13 | El sistema debe exportar el ***dataset*** final en un formato compatible con _frameworks_ de _ML/DL_ y herramientas de procesamiento de neuroimágen. | Exportación |
-| RF14 | El sistema debe generar un reporte/resumen estadístico del ***dataset***. | Evaluación |
+| RF13 | El sistema debe exportar el ***dataset*** final en un formato compatible con _frameworks_ de _ML/DL_ y herramientas de procesamiento de neuroimágen (dataset BIDS con NIfTI, particiones y archivos de índice para ML/DL). | Exportación |
+| RF14 | El sistema debe generar un reporte/resumen estadístico del ***dataset*** en formatos JSON, Markdown, XML y XLSX. | Evaluación |
 | RF15 | El sistema debe registrar cada transformación aplicada a un estudio. | Evaluación |
 | RF16 | El sistema debe informar al usuario los errores encontrados durante el procesamiento y permitir continuar con los estudios restantes cuando el error no comprometa la ejecución general. | Evaluación |
 
