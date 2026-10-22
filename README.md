@@ -222,17 +222,19 @@ python -m pytest
 
 ## Estado
 
-En desarrollo. Las etapas 1 a 3 están completas; la etapa 4 (dataset) está en planificación.
+En desarrollo. Las etapas 1 a 3 están completas y la etapa 4 (dataset) tiene código y pruebas, a falta de la auditoría final y de las verificaciones manuales.
 
 **Implementado** (código de biblioteca en `src/mri_dataset_tool`)
 - Carga de estudios DICOM, NIfTI y BIDS, y conversión DICOM <-> NIfTI.
 - Núcleo del pipeline de procesamiento: contrato de paso, runner por lotes, manifiesto de corrida y configuración YAML.
 - Pasos de procesamiento: validación, anonimización, reorientación, remuestreo y normalización.
+- Dataset: escritura en formato BIDS, etiquetas con revisión, corrección y cierre, particiones train/val/test por participante, índices para ML/DL (`dataset_index.csv`, `datalist.json`) y reporte estadístico en JSON, Markdown, XML y XLSX.
 
 **Cómo ejecutar los pasos de procesamiento**
 - `scripts/run_stage3_pipeline.py` para archivos NIfTI sueltos.
 - `scripts/run_stage3_bids_pipeline.py` para datasets BIDS.
-- Ambos requieren la variable de entorno `MRI_ANON_KEY` (de al menos 32 caracteres).
+- `scripts/run_stage4_dataset.py` para construir el dataset completo (BIDS, etiquetas, particiones y reporte).
+- Todos requieren la variable de entorno `MRI_ANON_KEY` (de al menos 32 caracteres).
 - Dirige las salidas grandes a un disco con espacio libre, fuera del repositorio.
 
 **Memoria**
@@ -251,7 +253,8 @@ En desarrollo. Las etapas 1 a 3 están completas; la etapa 4 (dataset) está en 
 - Revisa el informe y la salida antes de compartir datos reales.
 - El DICOM generado no es conforme al IOD MR estricto.
 - La verificación visual de los volúmenes DICOM convertidos está pendiente.
+- El dataset exportado no incluye `.bval`/`.bvec` para `dwi` ni `EchoTime1/2` para `phasediff`: el validador oficial de BIDS los marcará.
+- Las etiquetas las asigna el usuario por archivos; no hay interfaz de revisión todavía.
 
 **Todavía no implementado**
-- Organización del dataset, etiquetas, exportación y reportes (etapa 4).
 - CLI y GUI.
