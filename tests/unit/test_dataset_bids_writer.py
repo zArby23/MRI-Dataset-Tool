@@ -150,6 +150,26 @@ def test_bad_series_are_reported_and_the_rest_is_written(tmp_path: Path) -> None
     ]
 
 
+@pytest.mark.parametrize("shape", [(4, 4), (3, 3, 3, 2, 2)])
+def test_volumes_that_are_not_3d_or_4d_are_reported(tmp_path: Path, shape) -> None:
+    """QA4-05."""
+    errors: list[Exception] = []
+    root = tmp_path / "ds"
+    assert BIDSDatasetWriter(root).add_study(_study("a1", "01", _series(shape=shape)), lambda _p, e: errors.append(e)) == []
+    assert [str(e) for e in errors] == ["Unsupported volume dimensionality."] and _tree(root) == []
+
+
+def test_values_beyond_float32_are_reported_not_written_as_inf(tmp_path: Path) -> None:
+    """QA4-06: finite float64 values that overflow float32 are rejected; existing inf is kept as is."""
+    errors: list[Exception] = []
+    root = tmp_path / "ds"
+    huge = _series(volume=np.full((3, 4, 5), 1e300))
+    assert BIDSDatasetWriter(root).add_study(_study("a1", "01", huge), lambda _p, e: errors.append(e)) == []
+    assert [str(e) for e in errors] == ["Volume values exceed the float32 range."] and _tree(root) == []
+    already_inf = _series(volume=np.full((3, 4, 5), np.inf))
+    assert len(BIDSDatasetWriter(tmp_path / "ds2").add_study(_study("a1", "01", already_inf))) == 1
+
+
 def test_study_with_no_written_series_is_not_a_participant(tmp_path: Path) -> None:
     root = tmp_path / "ds"
     writer = BIDSDatasetWriter(root)

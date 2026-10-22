@@ -264,3 +264,15 @@ def test_dataset_without_labels_needs_no_closure(tmp_path: Path) -> None:
     root = _dataset(tmp_path, 3)
     write_ml_exports(root)
     assert json.loads((root / "splits.json").read_text(encoding="utf-8"))["labels_finalized"] is None
+
+
+@pytest.mark.parametrize(("lost", "message"), [("labels.tsv", "Label table not found."), ("labels.json", "Label classes file not found.")])
+def test_label_files_without_their_pair_block_the_exports(tmp_path: Path, lost, message) -> None:
+    """QA4-09: a renamed labels.tsv must not turn a labelled dataset into an unlabelled export."""
+    root = _labelled_dataset(tmp_path)
+    finalize_labels(root)
+    (root / lost).rename(root / f"{lost}.bak")
+    with pytest.raises(FileNotFoundError) as info:
+        write_ml_exports(root, allow_unfinalized=True)
+    assert str(info.value) == message
+    assert not any((root / name).exists() for name in EXPORTS)

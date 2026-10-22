@@ -158,12 +158,20 @@ class BIDSDatasetWriter:
         if image.exists() or sidecar.exists():
             raise FileExistsError("Dataset file already exists.")
         validate_geometry(series)
+        if len(series.volume.shape) not in (3, 4):
+            raise ValueError("Unsupported volume dimensionality.")
         sidecar_data = _json_bytes(_filter_sidecar(series.get("sidecar")))  # encoded before writing anything
 
         image.parent.mkdir(parents=True, exist_ok=True)
         image_written = False
         try:
-            output = MRISeries(volume=load_array(series.volume, np.float32), metadata={"affine": series.get("affine")})
+            try:
+                with np.errstate(over="raise"):
+                    volume = load_array(series.volume, np.float32)
+            except FloatingPointError:
+                raise ValueError("Volume values exceed the float32 range.") from None
+            output = MRISeries(volume=volume, metadata={"affine": series.get("affine")})
+            del volume
             self._nifti.write(output, image)
             image_written = True
             del output  # one volume alive at a time

@@ -12,7 +12,7 @@ from mri_dataset_tool.application.services.labels import label_fingerprint
 from mri_dataset_tool.domain.models.study import MRIStudy
 from mri_dataset_tool.infrastructure.dataset.bids_writer import BIDSDatasetWriter
 from mri_dataset_tool.infrastructure.dataset.index import scan_images, write_ml_files
-from mri_dataset_tool.infrastructure.dataset.labels import FINAL_JSON, LABELS_TSV, LabelTable, read_labels
+from mri_dataset_tool.infrastructure.dataset.labels import FINAL_JSON, LABELS_JSON, LABELS_TSV, LabelTable, read_labels
 from mri_dataset_tool.infrastructure.dataset.splits import (
     DEFAULT_RATIOS,
     DEFAULT_SEED,
@@ -103,7 +103,8 @@ def write_ml_exports(
 
     Reads only file names and the label table, never volumes. Invalid ratios/seed, a dataset
     without images or with files outside the layout → ``ValueError``; existing exports → ``FileExistsError``.
-    With ``labels.tsv``, the labels must be closed (``labels_final.json`` whose ``sha256`` matches the
+    With any label file (``labels.tsv``, ``labels.json``, ``labels_final.json``) the table is read
+    (a missing file → ``FileNotFoundError``) and the labels must be closed (``labels_final.json`` whose ``sha256`` matches the
     current table) unless *allow_unfinalized* is true (decision of the human); otherwise
     ``ValueError("Labels are not finalized.")`` before writing anything. ``splits.json`` records it.
     """
@@ -113,8 +114,9 @@ def write_ml_exports(
     if not root.is_dir():
         raise NotADirectoryError("Dataset path is not a directory.")
     labels, finalized = None, None
-    if (root / LABELS_TSV).exists():
-        labels = read_labels(root)
+    # any label file present means a labelled dataset: a lost labels.tsv must not export unlabelled (QA4-09)
+    if any((root / name).exists() for name in (LABELS_TSV, LABELS_JSON, FINAL_JSON)):
+        labels = read_labels(root)  # a missing file → FileNotFoundError with a fixed message
         finalized = _labels_finalized(root, labels)
         if not finalized and not allow_unfinalized:
             raise ValueError("Labels are not finalized.")

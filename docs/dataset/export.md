@@ -12,7 +12,7 @@ from mri_dataset_tool.application.services.dataset import write_ml_exports
 write_ml_exports(Path("E:/salida/dataset"), ratios=(0.7, 0.15, 0.15), seed=0, allow_unfinalized=False)
 ```
 
-**Etiquetas cerradas** (decisión del humano): si el dataset tiene `labels.tsv`, por defecto se exige
+**Etiquetas cerradas** (decisión del humano): si el dataset tiene algún archivo de etiquetas (`labels.tsv`, `labels.json` o `labels_final.json`), por defecto se exige
 `labels_final.json` (escrito por `finalize_labels`) con una huella `sha256` igual a `label_fingerprint`
 de la tabla actual. Si falta, es ilegible o la tabla cambió después del cierre →
 `ValueError("Labels are not finalized.")` antes de escribir nada. `allow_unfinalized=True` exporta
@@ -68,6 +68,7 @@ volúmenes. Escribe en la raíz del dataset:
 | Dataset sin imágenes | `ValueError("No dataset images were found.")` |
 | Un NIfTI cuya ruta no es exactamente la de `bids_path` (otra entidad, `.nii`, otra carpeta, `run-01`) | `ValueError("Dataset contains a file outside the BIDS layout.")` |
 | Tabla de etiquetas inválida | errores de `read_labels` (`labels.md`) |
+| Hay `labels.json` o `labels_final.json` pero falta `labels.tsv` (renombrado, "guardar como"), o al revés (QA4-09) | `FileNotFoundError("Label table not found.")` / `FileNotFoundError("Label classes file not found.")`, también con `allow_unfinalized`, antes de leer las imágenes |
 | Etiquetas sin cerrar o cierre desactualizado (sin `allow_unfinalized`) | `ValueError("Labels are not finalized.")` |
 | Algún archivo de exportación ya existe | `FileExistsError("Dataset file already exists.")`, sin escribir ninguno |
 

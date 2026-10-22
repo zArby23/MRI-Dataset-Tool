@@ -73,6 +73,8 @@ report = export_dataset(studies, Path("E:/salida/dataset"), on_error,
 | Raíz dentro de `source_dir` o igual | `ValueError` antes de crear nada |
 | Estudio sin `subject_id` / id inválido / estudio repetido / mezcla con y sin sesión en un sujeto | `ValueError` del estudio, no escribe nada; `export_dataset` lo pasa a `on_error(Path(), error)` y sigue |
 | Serie con sufijo no soportado, geometría inválida, volumen ilegible o destino existente | `on_error(<sub-…/ses-…>, error)`; el resto del estudio se escribe (RF16) |
+| Volumen que no es 3D ni 4D (QA4-05) | `on_error` con `ValueError("Unsupported volume dimensionality.")`, sin escribir la serie |
+| Valores finitos que desbordan `float32` al convertir, p. ej. `1e300` en float64 (QA4-06) | `on_error` con `ValueError("Volume values exceed the float32 range.")`, sin escribir la serie (un `inf`/`NaN` que ya venía en el origen se escribe tal cual) |
 | `finalize` con archivos de nivel superior ya existentes | `FileExistsError("Dataset file already exists.")`, sin escribir ninguno |
 | Manifiesto que no es JSON con `steps` y `reports` | `ValueError("Invalid run manifest.")` |
 | Manifiesto con algún `source_path` | `ValueError("Run manifest must not contain source paths.")` |
@@ -88,5 +90,9 @@ todo o nada: si falla un archivo, borra los de nivel superior que ya había escr
   esas series.
 - **`phasediff` sin `EchoTime1`/`EchoTime2`**: `SIDECAR_WHITELIST` solo tiene `EchoTime` y no se amplía;
   el `bids-validator` reportará error en esas series.
+- **Ids que solo difieren en mayúsculas** (`AB` y `ab`, QA4-08): en Windows (sistema de archivos sin
+  distinción de mayúsculas) comparten carpeta y el dataset queda incoherente (`write_ml_exports` falla con
+  "outside the BIDS layout"). Solo puede pasar sin el paso `anonymize`: los seudónimos son hex en minúsculas
+  y el lanzador de la etapa 4 exige `anonymize`. No se detecta al escribir.
 - La validación con el `bids-validator` oficial es una verificación manual del humano (requiere Node).
 - Riesgo residual heredado de la etapa 3: cuasi-identificadores en la imagen (rostro, texto quemado).
