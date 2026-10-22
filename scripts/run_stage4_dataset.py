@@ -24,7 +24,7 @@ import logging
 import sys
 import tempfile
 from collections import Counter
-from collections.abc import Sequence
+from collections.abc import Callable, Sequence
 from pathlib import Path
 
 from mri_dataset_tool.application.pipeline.manifest import pipeline_from_config
@@ -54,8 +54,23 @@ def is_discouraged_location(path: Path) -> bool:
 
 
 def parse_classes(items: Sequence[str]) -> dict[str, str]:
-    """``NAME`` or ``NAME=description`` → class → description."""
-    return {name: description for name, _, description in (item.partition("=") for item in items)}
+    """``NAME`` or ``NAME=description`` → class → description; a repeated name → ``ValueError`` (QA4-10)."""
+    pairs = [item.partition("=")[::2] for item in items]
+    classes = dict(pairs)
+    if len(classes) != len(pairs):
+        raise ValueError("Repeated class name.")
+    return classes
+
+
+def _counter(label: str) -> tuple[Counter[str], Callable[[Path, Exception], None]]:
+    """An ``on_error`` that counts by exception type and prints only the type (the path may be PHI)."""
+    counts: Counter[str] = Counter()
+
+    def on_error(path: Path, error: Exception) -> None:
+        counts[type(error).__name__] += 1
+        print(f"  {label} {sum(counts.values())}: {type(error).__name__}")
+
+    return counts, on_error
 
 
 def parse_args(argv: Sequence[str] | None) -> argparse.Namespace:
@@ -89,8 +104,8 @@ def main(argv: Sequence[str] | None = None) -> int:
         return 2
     classes = None
     if args.classes:
-        classes = parse_classes(args.classes)
         try:
+            classes = parse_classes(args.classes)
             LabelTable(classes)
         except ValueError:
             print("Invalid --classes.")
@@ -127,17 +142,16 @@ def main(argv: Sequence[str] | None = None) -> int:
         return 2
     logging.basicConfig(level=config["logging"]["level"])
     dataset, report_dir = output_dir / "dataset", output_dir / "report"
-    errors: Counter[str] = Counter()
-
-    def on_error(path: Path, error: Exception) -> None:  # path is never printed (PHI)
-        errors[type(error).__name__] += 1
-        print(f"  error {sum(errors.values())}: {type(error).__name__}")
+    # Separate counts (QA4-11): files the reader skips (e.g. git-annex pointers) are not export errors.
+    skipped, on_skipped = _counter("input file skipped")
+    errors, on_error = _counter("error")  # the same events as DatasetReport.errors
+    report_errors, on_report_error = _counter("report read error")
 
     stage, labels_open = "export", False
     try:
         print("Exporting the dataset (stage 3 pipeline)...")
         output_dir.mkdir(parents=True)
-        studies = BIDSBatchReader().iter_studies(args.dataset_root, on_error=on_error, lazy=True)
+        studies = BIDSBatchReader().iter_studies(args.dataset_root, on_error=on_skipped, lazy=True)
         exported = export_dataset(
             studies, dataset, on_error, pipeline=pipeline, config=config, source_dir=args.dataset_root
         )
@@ -178,12 +192,14 @@ def main(argv: Sequence[str] | None = None) -> int:
             print(f"ML export files written: {len(written)}")
 
         stage = "report"
-        print(f"Report files written: {len(report_dataset(dataset, report_dir, on_error))}")
+        print(f"Report files written: {len(report_dataset(dataset, report_dir, on_report_error))}")
     except Exception as error:  # its message or traceback may name a file (sub-<id>)
         print(f"Run failed at {stage}: {type(error).__name__}")
         return 1
 
     print(f"Errors by type: {dict(sorted(errors.items())) or 'none'}")
+    print(f"Input files skipped by the reader: {dict(sorted(skipped.items())) or 'none'}")
+    print(f"Report read errors: {dict(sorted(report_errors.items())) or 'none'}")
     return 0
 
 

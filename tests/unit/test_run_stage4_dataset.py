@@ -63,7 +63,8 @@ def test_full_run_writes_dataset_labels_exports_and_report(tmp_path: Path, capsy
     assert "Label template written (2 classes)." in out and "Label corrections applied: 2" in out
     assert "Labels finalized (2 labels)." in out
     assert "ML export files written: 4" in out and "Report files written: 4" in out
-    assert "Errors by type: {'ValueError': 1}" in out
+    assert "Errors by type: {'ValueError': 1}" in out  # the NaN study, also in "errors: 1" above
+    assert "Input files skipped by the reader: none" in out and "Report read errors: none" in out
     assert "WARNING: the output is on drive C: or in the temporary directory" in out  # tmp_path
     _assert_clean(out, tmp_path)
     dataset = out_dir / "dataset"
@@ -114,6 +115,18 @@ def test_allow_unfinalized_writes_the_ml_exports(tmp_path: Path, capsys) -> None
     assert not (out_dir / "dataset" / "labels_final.json").exists()
 
 
+def test_reader_skips_are_counted_apart_from_export_errors(tmp_path: Path, capsys) -> None:
+    """QA4-11: a file the reader skips (e.g. a git-annex pointer) is not an export error."""
+    source = _dataset(tmp_path)
+    (source / "sub-04" / "anat").mkdir(parents=True)
+    (source / "sub-04" / "anat" / "sub-04_T1w.nii.gz").write_bytes(b"annex pointer")
+    assert script.main([str(source), "--output-dir", str(tmp_path / "out")]) == 0
+    out = capsys.readouterr().out
+    assert "  input file skipped 1: ValueError" in out
+    assert "errors: 1" in out and "Errors by type: {'ValueError': 1}" in out  # only the NaN study
+    assert "Input files skipped by the reader: {'ValueError': 1}" in out
+
+
 def test_a_failing_stage_stops_with_its_name_and_type(tmp_path: Path, capsys) -> None:
     source = _dataset(tmp_path)
     corrections = _corrections(tmp_path / "fix.tsv", [("01", "XX")])  # class outside --classes
@@ -136,6 +149,7 @@ def test_without_key_nothing_is_created(monkeypatch, tmp_path: Path, capsys) -> 
     [
         (["--classes", "=x"], "Invalid --classes."),
         (["--classes", "+AD"], "Invalid --classes."),
+        (["--classes", "AD=first", "AD=second"], "Invalid --classes."),  # QA4-10
         (["--corrections", "fix.tsv"], "--corrections needs --classes."),
         (["--classes", "AD", "--corrections", "missing.tsv"], "Corrections file not found."),
         (["--ratios", "0.5", "0.5", "0.5"], "Invalid --ratios."),

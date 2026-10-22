@@ -50,6 +50,18 @@ salidas parciales en `--output-dir` y la corrida siguiente con el mismo director
 («Output directory already exists»): **borrar `--output-dir` antes de reintentar**. `--output-dir` dentro
 de `dataset_root` (o igual) se rechaza antes de crear nada, con código 2.
 
+## Conteos de la consola (QA4-11)
+
+Cada `on_error` se cuenta aparte y por tipo de excepción:
+
+| Línea | Qué cuenta |
+|---|---|
+| `errors: n` (tras exportar) y `Errors by type` | Estudios o series que no entraron al dataset: fallos de un paso del pipeline o de escritura (`DatasetReport.errors`; las dos cifras coinciden) |
+| `Input files skipped by the reader` | Archivos de la entrada que el lector omite (no NIfTI legibles: punteros de git-annex, archivos truncados); no son errores de exportación |
+| `Report read errors` | Archivos del dataset ya escrito que el reporte no pudo leer |
+
+`--classes` con un nombre repetido (`A=uno A=dos`) se rechaza como `Invalid --classes.` (código 2, QA4-10).
+
 ## Códigos de salida
 
 | Código | Caso |
