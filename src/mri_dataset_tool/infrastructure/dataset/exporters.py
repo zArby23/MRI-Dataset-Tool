@@ -21,6 +21,10 @@ _INVALID = "Report content is invalid."
 _INVALID_CHARS = re.compile(r"[^\x09\x0a\x0d\x20-\ud7ff\ue000-\ufffd\U00010000-\U0010ffff]")
 # Children of these dicts are named by data (modality, class), so they become name attributes.
 _XML_NAMED_CHILDREN = {"modalities": "modality", "classes": "class"}
+# Dicts keyed by run-manifest data (editable by hand): one JSON text, as in the Markdown and XLSX cells.
+_XML_JSON_TEXT = {"params", "error_types"}
+# Any other key is a tag; it comes from the summary schema, never from data.
+_XML_TAG = re.compile(r"[A-Za-z_][A-Za-z0-9_]*")
 
 
 def to_json(summary: dict[str, Any]) -> str:
@@ -53,13 +57,20 @@ def to_xml(summary: dict[str, Any]) -> str:
 
 
 def _xml_fill(element: ET.Element, key: str, value: Any) -> None:
-    if isinstance(value, dict):
+    """*key* is the schema position (the tag), never a data name, so data cannot steer the layout."""
+    if key in _XML_JSON_TEXT:
+        element.text = _checked(_text(value))
+    elif isinstance(value, dict):
         for child_key in sorted(value):
             if key in _XML_NAMED_CHILDREN:
-                child = ET.SubElement(element, _XML_NAMED_CHILDREN[key], name=_checked(child_key))
+                tag = _XML_NAMED_CHILDREN[key]
+                child = ET.SubElement(element, tag, name=_checked(child_key))
+            elif _XML_TAG.fullmatch(child_key):
+                tag = child_key
+                child = ET.SubElement(element, tag)
             else:
-                child = ET.SubElement(element, child_key)
-            _xml_fill(child, child_key, value[child_key])
+                raise ValueError(_INVALID)
+            _xml_fill(child, tag, value[child_key])
     elif isinstance(value, list) and any(isinstance(item, dict) for item in value):
         for item in value:
             _xml_fill(ET.SubElement(element, "item"), "item", item)
@@ -94,6 +105,8 @@ def _xlsx_sheets(summary: dict[str, Any]) -> dict[str, tuple[list[str], list[lis
     totals = [[key, summary[key]] for key in ("participants", "sessions", "studies", "series")]
     if labels is not None:
         totals += [[key, labels[key]] for key in ("unlabeled_sessions", "unlabeled_participants")]
+    if summary.get("pipeline") is not None:
+        totals.append(["pipeline_studies", summary["pipeline"]["studies"]])
     intensity_keys = list(next(iter(modalities.values()))["intensity"]) if modalities else []
     distributions = [
         [name, key, item["value"], item["count"]]
@@ -114,7 +127,17 @@ def _xlsx_sheets(summary: dict[str, Any]) -> dict[str, tuple[list[str], list[lis
         ),
         "Labels": (["class", "participants", "sessions", "series"], classes),
         "Warnings": (["code", "count"], [[w["code"], w["count"]] for w in summary["warnings"]]),
+        "Pipeline": (_PIPELINE_COLUMNS, _pipeline_rows(summary)),
     }
+
+
+# Optional section added by the report service from the run manifest: {"studies", "steps": [...]}.
+_PIPELINE_COLUMNS = ["name", "version", "params", "studies_ok", "studies_failed", "error_types", "series_transformed"]
+
+
+def _pipeline_rows(summary: dict[str, Any]) -> list[list[Any]]:
+    pipeline = summary.get("pipeline")
+    return [] if pipeline is None else [[step[key] for key in _PIPELINE_COLUMNS] for step in pipeline["steps"]]
 
 
 def to_markdown(summary: dict[str, Any]) -> str:
@@ -140,6 +163,13 @@ def to_markdown(summary: dict[str, Any]) -> str:
         lines += _table(["class", "participants", "sessions", "series"], rows)
         lines += ["", f"Unlabeled sessions: {labels['unlabeled_sessions']}"]
         lines += [f"Unlabeled participants: {labels['unlabeled_participants']}"]
+    if "pipeline" in summary:
+        lines += ["", "## Pipeline", ""]
+        if summary["pipeline"] is None:
+            lines.append("No run manifest.")
+        else:
+            lines += [f"Studies in the run: {summary['pipeline']['studies']}", ""]
+            lines += _table(_PIPELINE_COLUMNS, _pipeline_rows(summary))
     lines += ["", "## Warnings", ""]
     if summary["warnings"]:
         lines += _table(["code", "count"], [[w["code"], w["count"]] for w in summary["warnings"]])

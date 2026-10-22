@@ -61,7 +61,7 @@ def _from_xml(element: ET.Element, key: str = "dataset_report"):
         except ValueError:
             return element.text
     if key in ("modalities", "classes"):
-        return {child.get("name"): _from_xml(child, child.get("name")) for child in children}
+        return {child.get("name"): _from_xml(child, child.tag) for child in children}
     if all(child.tag == "item" for child in children):
         return [_from_xml(child, "item") for child in children]
     return {child.tag: _from_xml(child, child.tag) for child in children}
@@ -92,6 +92,32 @@ def test_xml_escapes_markup_in_names() -> None:
     assert {m.get("name") for m in root.iter("modality")} == {'"<T1w>&\'', "dwi"}
 
 
+HOSTILE_KEYS = ["Bad Type<x", "1starts_with_digit", "a&b\"c'd", "params", "classes"]
+
+
+def test_xml_keeps_manifest_keys_as_data() -> None:
+    summary = _summary()
+    hostile = {key: index for index, key in enumerate(HOSTILE_KEYS)}
+    summary["pipeline"] = {"studies": 1, "steps": [{
+        "name": "x", "version": "v1", "params": {**hostile, "nested": {"<k>": [1]}},
+        "studies_ok": 0, "studies_failed": 1, "error_types": hostile, "series_transformed": 0,
+    }]}
+    root = ET.fromstring(to_xml(summary))
+    assert _from_xml(root) == summary
+    assert json.loads(root.find("pipeline/steps/item/error_types").text) == hostile
+
+
+@pytest.mark.parametrize("name", ["params", "classes", "modalities", "error_types"])
+def test_xml_data_names_do_not_change_the_layout(name: str) -> None:
+    summary = _summary(classes=[name], label=name, modality=name)
+    assert _from_xml(ET.fromstring(to_xml(summary))) == summary
+
+
+def test_xml_rejects_a_key_that_is_not_a_tag() -> None:
+    with pytest.raises(ValueError, match=r"^Report content is invalid\.$"):
+        to_xml({**_summary(), "not a tag": 1})
+
+
 def test_xml_of_an_empty_dataset() -> None:
     summary = build_dataset_summary([])
     assert _from_xml(ET.fromstring(to_xml(summary))) == summary
@@ -100,7 +126,7 @@ def test_xml_of_an_empty_dataset() -> None:
 def test_xlsx_has_one_sheet_per_section_with_the_json_figures(tmp_path: Path) -> None:
     summary = _summary()
     rows = _sheet_rows(write_xlsx(summary, tmp_path / "report.xlsx"))
-    assert list(rows) == ["Totals", "Modalities", "Distributions", "Intensity", "Labels", "Warnings"]
+    assert list(rows) == ["Totals", "Modalities", "Distributions", "Intensity", "Labels", "Warnings", "Pipeline"]
     assert rows["Totals"] == [
         ("item", "count"), ("participants", 2), ("sessions", 2), ("studies", 2), ("series", 3),
         ("unlabeled_sessions", 1), ("unlabeled_participants", 1),
