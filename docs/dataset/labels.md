@@ -123,8 +123,10 @@ bitácora y los archivos no se contradicen.
 **Editar `labels.tsv` a mano no queda registrado.** `review_labels` detecta los defectos que deja una
 edición así, pero la bitácora solo registra lo que entra por `apply_label_corrections`.
 
-Mensajes de error del archivo de correcciones: son los de la lectura de `labels.tsv` («Label table
-…»), porque el formato es el mismo.
+Mensajes de error del archivo de correcciones: si no existe, `FileNotFoundError("Corrections file not
+found.")`; los demás son los de la lectura de `labels.tsv` («Label table …»), porque el formato es el
+mismo. Si la bitácora no termina en salto de línea (edición a mano), el siguiente anexo empieza con uno
+para no pegarse a la última fila.
 
 ## Privacidad e inyección de fórmulas
 

@@ -164,7 +164,11 @@ def apply_label_corrections(dataset_root: Path, corrections_path: Path) -> int:
 
     updated = dict(current)
     corrected: set[LabelKey] = set()
-    for participant_cell, session_cell, label in parse_label_rows(corrections_path):
+    try:
+        correction_rows = parse_label_rows(corrections_path)
+    except FileNotFoundError:
+        raise FileNotFoundError("Corrections file not found.") from None
+    for participant_cell, session_cell, label in correction_rows:
         key = parse_label_key(participant_cell, session_cell)
         if key not in pairs:
             raise ValueError("Correction targets a participant/session not in the dataset.")

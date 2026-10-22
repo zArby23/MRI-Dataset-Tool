@@ -236,8 +236,12 @@ def appended_label_changes(root: Path, text: str) -> Iterator[None]:
     path = root / CHANGES_TSV
     previous = path.stat().st_size if path.exists() else None
     try:
+        if not previous:
+            text = "\t".join(CHANGES_COLUMNS) + "\n" + text
+        elif _last_byte(path) != b"\n":
+            text = "\n" + text  # a hand edit dropped the final newline
         with path.open("a", encoding="utf-8", newline="\n") as handle:
-            handle.write(("" if previous else "\t".join(CHANGES_COLUMNS) + "\n") + text)
+            handle.write(text)
     except BaseException as error:
         _undo_append(path, previous)
         if isinstance(error, OSError):
@@ -276,6 +280,12 @@ def remove_final_labels(root: Path) -> None:
         raise ValueError("Labels are not finalized.") from None
     except OSError:
         raise OSError("Final labels file could not be removed.") from None
+
+
+def _last_byte(path: Path) -> bytes:
+    with path.open("rb") as handle:
+        handle.seek(-1, os.SEEK_END)
+        return handle.read(1)
 
 
 def _undo_append(path: Path, previous: int | None) -> None:

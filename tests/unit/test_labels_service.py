@@ -236,6 +236,25 @@ def test_log_only_appends_and_skips_unchanged_rows(labeled, tmp_path):
     assert (labeled / CHANGES_TSV).read_bytes() == after
 
 
+def test_log_without_final_newline_keeps_rows_apart(labeled, tmp_path):
+    apply_label_corrections(labeled, corrections(tmp_path, "sub-01\tses-01\tAD\n"))
+    log = labeled / CHANGES_TSV
+    log.write_bytes(log.read_bytes().rstrip(b"\n"))  # hand edit drops the final newline
+    apply_label_corrections(labeled, corrections(tmp_path, "sub-03\t\tCN\n"))
+    assert changes(labeled) == [
+        ["correct", "sub-01", "ses-01", "", "AD"],
+        ["correct", "sub-03", "", "", "CN"],
+    ]
+
+
+def test_missing_corrections_file_has_own_message(labeled, tmp_path):
+    before = snapshot(labeled)
+    with pytest.raises(FileNotFoundError, match=r"^Corrections file not found\.$") as info:
+        apply_label_corrections(labeled, tmp_path / "missing.tsv")
+    assert info.value.__cause__ is None
+    assert snapshot(labeled) == before
+
+
 def test_empty_correction_sets_unlabeled(labeled, tmp_path):
     apply_label_corrections(labeled, corrections(tmp_path, FULL))
     apply_label_corrections(labeled, corrections(tmp_path, "sub-01\tses-01\t\n"))
