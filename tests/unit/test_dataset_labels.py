@@ -231,6 +231,24 @@ def test_unexpected_write_error_leaves_no_files(tmp_path):
     assert list(tmp_path.iterdir()) == []
 
 
+def test_overwrite_replaces_both_files(tmp_path):
+    write_labels(make_table(), tmp_path)
+    updated = make_table(labels={("01", None): "CN"})
+    write_labels(updated, tmp_path, overwrite=True)
+    assert read_labels(tmp_path) == updated
+    assert sorted(p.name for p in tmp_path.iterdir()) == [LABELS_JSON, LABELS_TSV]
+
+
+def test_failed_overwrite_keeps_previous_table(tmp_path):
+    write_labels(make_table(), tmp_path)
+    before = {p.name: p.read_bytes() for p in tmp_path.iterdir()}
+    table = make_table()
+    object.__setattr__(table, "description", "x\ud800")  # bypasses validation
+    with pytest.raises(ValueError, match=r"^Label table could not be written\.$"):
+        write_labels(table, tmp_path, overwrite=True)
+    assert {p.name: p.read_bytes() for p in tmp_path.iterdir()} == before
+
+
 def test_write_failure_leaves_nothing(tmp_path):
     with pytest.raises(OSError, match=r"^Label table could not be written\.$"):
         write_labels(make_table(), tmp_path / "missing")

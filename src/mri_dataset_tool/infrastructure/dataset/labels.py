@@ -9,6 +9,8 @@ tab or carriage return (CSV injection). Messages are fixed: never ids, labels or
 import csv
 import json
 import os
+from collections.abc import Iterator
+from contextlib import contextmanager
 from dataclasses import dataclass, field
 from pathlib import Path
 
@@ -17,6 +19,9 @@ from mri_dataset_tool.infrastructure.dataset.bids_layout import validate_label
 LABELS_TSV = "labels.tsv"
 LABELS_JSON = "labels.json"
 COLUMNS = ("participant_id", "session_id", "label")
+CHANGES_TSV = "labels_changes.tsv"
+CHANGES_COLUMNS = ("timestamp_utc", "action", "participant_id", "session_id", "old_label", "new_label")
+FINAL_JSON = "labels_final.json"
 
 # File format (approved by the human, see docs/dataset/labels.md): ids carry the BIDS prefix
 # in the file and not in the API; an empty session cell means a dataset without sessions.
@@ -119,25 +124,48 @@ def read_labels(root: Path) -> LabelTable:
     return LabelTable(classes, labels, description)
 
 
-def write_labels(table: LabelTable, root: Path) -> tuple[Path, Path]:
-    """Write ``labels.tsv`` (rows sorted by participant, session) and ``labels.json``.
-
-    Never overwrites: if either file exists → ``FileExistsError`` and nothing is written.
-    Each file is written atomically (temporary + ``os.replace``). ``root`` must exist.
-    """
-    tsv_path, json_path = root / LABELS_TSV, root / LABELS_JSON
-    if tsv_path.exists() or json_path.exists():
-        raise FileExistsError("Label table already exists.")
+def serialize_labels(table: LabelTable) -> tuple[str, str]:
+    """Canonical text of ``labels.tsv`` (rows sorted by participant, session) and ``labels.json``."""
     lines = ["\t".join(COLUMNS)]
     for (participant, session), label in sorted(table.labels.items(), key=lambda item: (item[0][0], item[0][1] or "")):
         session_cell = "" if session is None else _SES_PREFIX + session
         lines.append("\t".join((_SUB_PREFIX + participant, session_cell, label or "")))
     sidecar = {"label": {"Description": table.description, "Levels": table.classes}}
-    _write_atomic(json_path, json.dumps(sidecar, indent=2, sort_keys=True, ensure_ascii=False) + "\n")
+    return "\n".join(lines) + "\n", json.dumps(sidecar, indent=2, sort_keys=True, ensure_ascii=False) + "\n"
+
+
+def write_labels(table: LabelTable, root: Path, overwrite: bool = False) -> tuple[Path, Path]:
+    """Write ``labels.tsv`` and ``labels.json`` (``serialize_labels``).
+
+    Without ``overwrite``, if either file exists → ``FileExistsError`` and nothing is written.
+    Both files are staged as temporaries first and then moved with ``os.replace``; a failure
+    leaves no temporaries and, without ``overwrite``, no half table. ``root`` must exist.
+    """
+    tsv_path, json_path = root / LABELS_TSV, root / LABELS_JSON
+    if not overwrite and (tsv_path.exists() or json_path.exists()):
+        raise FileExistsError("Label table already exists.")
+    tsv_text, json_text = serialize_labels(table)
+    staged: list[tuple[Path, Path]] = []
+    replaced: list[Path] = []
     try:
-        _write_atomic(tsv_path, "\n".join(lines) + "\n")
-    except BaseException:
-        json_path.unlink(missing_ok=True)  # never leave half a table
+        for path, text in ((json_path, json_text), (tsv_path, tsv_text)):
+            tmp = path.with_name(f".{path.name}.tmp")
+            staged.append((tmp, path))
+            with tmp.open("w", encoding="utf-8", newline="\n") as handle:
+                handle.write(text)
+        for tmp, path in staged:
+            os.replace(tmp, path)
+            replaced.append(path)
+    except BaseException as error:
+        for tmp, _ in staged:
+            tmp.unlink(missing_ok=True)
+        if not overwrite:
+            for path in replaced:
+                path.unlink(missing_ok=True)  # never leave half a new table
+        if isinstance(error, OSError):
+            raise OSError("Label table could not be written.") from None  # the cause quotes the path
+        if isinstance(error, UnicodeEncodeError):
+            raise ValueError("Label table could not be written.") from None  # the cause quotes the text
         raise
     return tsv_path, json_path
 
@@ -181,18 +209,78 @@ def _strip_prefix(cell: str, prefix: str) -> str | None:
     return value if cell.startswith(prefix) and _is_id(value) else None
 
 
-def _write_atomic(path: Path, text: str) -> None:
+def label_changes_text(timestamp: str, action: str, changes: list[tuple[LabelKey | None, str, str]]) -> str:
+    """Rows of ``labels_changes.tsv`` for one action: (key or None, old label, new label)."""
+    lines = []
+    for key, old, new in changes:
+        participant, session = key if key is not None else ("", None)
+        cells = (
+            timestamp,
+            action,
+            _SUB_PREFIX + participant if participant else "",
+            "" if session is None else _SES_PREFIX + session,
+            old,
+            new,
+        )
+        lines.append("\t".join(cells) + "\n")
+    return "".join(lines)
+
+
+@contextmanager
+def appended_label_changes(root: Path, text: str) -> Iterator[None]:
+    """Append *text* to ``labels_changes.tsv`` (header if new) and run the body.
+
+    The log only grows: if the append or the body fails, only the rows just appended are
+    removed (the file is truncated back to its previous size, or removed if it was new).
+    """
+    path = root / CHANGES_TSV
+    previous = path.stat().st_size if path.exists() else None
+    try:
+        with path.open("a", encoding="utf-8", newline="\n") as handle:
+            handle.write(("" if previous else "\t".join(CHANGES_COLUMNS) + "\n") + text)
+    except BaseException as error:
+        _undo_append(path, previous)
+        if isinstance(error, OSError):
+            raise OSError("Label changes could not be written.") from None  # the cause quotes the path
+        if isinstance(error, UnicodeEncodeError):
+            raise ValueError("Label changes could not be written.") from None
+        raise
+    try:
+        yield
+    except BaseException:
+        _undo_append(path, previous)
+        raise
+
+
+def write_final_labels(root: Path, data: dict) -> Path:
+    """Write ``labels_final.json`` atomically; an existing one → ``FileExistsError``."""
+    path = root / FINAL_JSON
+    if path.exists():
+        raise FileExistsError("Labels are already finalized.")
     tmp = path.with_name(f".{path.name}.tmp")
     try:
-        with tmp.open("w", encoding="utf-8", newline="\n") as handle:
-            handle.write(text)
+        tmp.write_text(json.dumps(data, indent=2, sort_keys=True) + "\n", encoding="utf-8")
         os.replace(tmp, path)
-    except OSError:
+    except BaseException as error:
         tmp.unlink(missing_ok=True)
-        raise OSError("Label table could not be written.") from None  # the cause quotes the path
-    except UnicodeEncodeError:
-        tmp.unlink(missing_ok=True)
-        raise ValueError("Label table could not be written.") from None  # the cause quotes the text
-    except BaseException:
-        tmp.unlink(missing_ok=True)
+        if isinstance(error, OSError):
+            raise OSError("Final labels file could not be written.") from None  # the cause quotes the path
         raise
+    return path
+
+
+def remove_final_labels(root: Path) -> None:
+    try:
+        (root / FINAL_JSON).unlink()
+    except FileNotFoundError:
+        raise ValueError("Labels are not finalized.") from None
+    except OSError:
+        raise OSError("Final labels file could not be removed.") from None
+
+
+def _undo_append(path: Path, previous: int | None) -> None:
+    if previous is None:
+        path.unlink(missing_ok=True)
+    elif path.exists():
+        with path.open("r+b") as handle:
+            handle.truncate(previous)

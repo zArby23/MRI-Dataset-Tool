@@ -1,7 +1,7 @@
-# Etiquetas del dataset (RF11)
+# Etiquetas del dataset (RF11, RF12, RF15)
 
-Módulo: `src/mri_dataset_tool/infrastructure/dataset/labels.py` (tarea L1). El flujo de revisión,
-correcciones y cierre (RF12, tarea L2) se documentará aquí cuando exista.
+Módulos: `src/mri_dataset_tool/infrastructure/dataset/labels.py` (L1: tabla, formatos de archivo) y
+`src/mri_dataset_tool/application/services/labels.py` (L2: plantilla, revisión, correcciones, cierre).
 
 ## Modelo
 
@@ -46,15 +46,17 @@ de línea.
 
 | Función | Qué hace |
 |---|---|
-| `write_labels(table, root)` | Escribe ambos archivos (filas ordenadas por participante y sesión, JSON con `sort_keys`). Si alguno existe → `FileExistsError("Label table already exists.")` sin escribir nada. Escritura atómica por archivo; si falla el TSV se borra el JSON recién escrito. `root` debe existir. |
+| `serialize_labels(table)` | Texto canónico `(labels.tsv, labels.json)`: filas ordenadas por participante y sesión, JSON con `sort_keys`. Base de la escritura y de la huella. |
+| `write_labels(table, root, overwrite=False)` | Escribe ambos archivos. Sin `overwrite`, si alguno existe → `FileExistsError("Label table already exists.")` sin escribir nada. Primero escribe los dos temporales y después hace los dos `os.replace`. Si algo falla, no quedan temporales; sin `overwrite` tampoco queda media tabla, y con `overwrite` una tabla previa se conserva si el fallo ocurre antes de los reemplazos. `root` debe existir. |
 | `read_labels(root)` | Lectura **estricta**: cualquier defecto → `ValueError` de mensaje fijo. |
 | `read_classes(root)` | Lee `labels.json` → `(clases, descripción)`. |
 | `parse_label_rows(path)` | Lectura **tolerante** (para `review_labels`, L2): solo valida la estructura y devuelve `(participant_id, session_id, label)` tal como están escritos, en el orden del archivo. |
 | `parse_label_key(participant_cell, session_cell)` | Celdas de id → clave de la tabla; inválidas → `ValueError`. |
 
-Límite conocido de `write_labels`: hay una ventana mínima entre la comprobación de existencia y el
-`os.replace` (proceso de un solo usuario), igual que en `NIfTIWriter`. Si la escritura falla por
-cualquier causa, no quedan temporales ni media tabla.
+Límites conocidos de `write_labels`: hay una ventana mínima entre la comprobación de existencia y el
+`os.replace` (proceso de un solo usuario), igual que en `NIfTIWriter`. Con `overwrite`, un fallo entre
+los dos `os.replace` dejaría el `labels.json` nuevo junto al `labels.tsv` anterior. En las correcciones
+el JSON no cambia de contenido, así que no tiene efecto.
 
 La lectura tolera lo que suele dejar Excel: BOM, `\r\n`, líneas en blanco y columnas extra (se ignoran,
 en cualquier orden).
@@ -74,6 +76,55 @@ en cualquier orden).
 | Archivo ausente | `FileNotFoundError("Label table not found.")` / `FileNotFoundError("Label classes file not found.")` |
 | Fallo de E/S | `OSError` de mensaje fijo, sin causa encadenada (citaría la ruta) |
 | Texto no codificable que llega a la escritura saltándose la validación | `ValueError("Label table could not be written.")` (sin causa) |
+
+## Flujo de revisión y cierre (L2; aprobado por el humano, 2026-10-22)
+
+Todo ocurre en la raíz del dataset exportado. Los pares (participante, sesión) salen del árbol: carpetas
+`sub-<id>` y, dentro, `ses-<id>` (sin carpetas `ses-` → `(sub, None)`), validadas con
+`bids_layout.validate_label`. Se ignoran las entradas ocultas, los archivos y las carpetas con nombre inválido.
+
+1. **Plantilla**: `write_label_template(root, classes, description="")` escribe `labels.json` y un
+   `labels.tsv` con todos los pares del árbol **sin etiquetar**, y devuelve la ruta de `labels.tsv`. No
+   hay archivo de plantilla aparte. No sobrescribe (`FileExistsError`); un dataset sin participantes
+   → `ValueError("Dataset has no participants.")`.
+2. **Asignación y correcciones**: `apply_label_corrections(root, corrections_path) -> int`. El archivo
+   de correcciones tiene las mismas columnas que `labels.tsv`, solo con las filas que cambian (puede ser
+   una copia rellenada de la plantilla). Una etiqueta vacía devuelve el par a «sin etiquetar».
+   - **Todo o nada**: un par fuera del árbol, un par repetido, un id inválido o una tabla resultante
+     con una clase desconocida rechazan el archivo entero; no se escribe nada.
+   - La tabla actual se lee en modo tolerante: puede tener clases desconocidas o pares que faltan, y
+     las correcciones pueden arreglarlos (la tabla resultante tiene que superar la validación estricta).
+     Las filas duplicadas, con ids inválidos o de pares que no están en el árbol se quitan **a mano**
+     (`ValueError("Label table must be fixed by hand before corrections.")`).
+   - Devuelve el número de cambios; una fila igual al valor actual no se registra.
+3. **Revisión**: `review_labels(root) -> LabelReview` no modifica nada. Campos: `dataset_pairs`,
+   `class_counts` (todas las clases, incluidas las de cero), `unlabeled`, `unknown_class`, `duplicated`,
+   `missing` (pares del árbol ausentes de la tabla; las listas tienen solo pares del árbol, ordenados),
+   `not_in_dataset` e `invalid_ids` (solo conteos: no son ids del dataset); propiedades `labeled` e
+   `is_complete`. Las filas de un par duplicado solo cuentan en `duplicated`.
+4. **Cierre**: `finalize_labels(root)` exige `review.is_complete` (ningún par sin etiquetar, ninguna clase
+   desconocida, sin duplicados, faltantes, ids inválidos ni pares ajenos); si no,
+   `ValueError("Labels are incomplete or invalid.")`. Escribe `labels_final.json`, sin fecha:
+   `{"label_count", "class_counts", "sha256"}`. Ya cerrado → `FileExistsError("Labels are already finalized.")`.
+5. **Tras el cierre**, `apply_label_corrections` lanza `ValueError("Labels are finalized.")`.
+6. **Reapertura explícita**: `reopen_labels(root)` borra `labels_final.json` y registra una fila
+   `reopen`; sin cierre previo → `ValueError("Labels are not finalized.")`.
+
+**Huella** (`label_fingerprint(table)`): SHA-256 de la serialización canónica de `labels.tsv` +
+`labels.json`. Cambiar una etiqueta, una clase o una descripción la cambia; reordenar filas o claves no.
+
+**Bitácora** `labels_changes.tsv` (solo crece): columnas `timestamp_utc` (`AAAA-MM-DDTHH:MM:SSZ`),
+`action` (`correct`, `finalize`, `reopen`), `participant_id`, `session_id`, `old_label`, `new_label`.
+Las filas `finalize`/`reopen` dejan vacías las demás columnas. Un valor anterior que no era una clase
+(edición a mano) se registra como `<invalid>`, nunca con el texto original. Si falla la escritura de
+la tabla, de `labels_final.json` o el borrado al reabrir, se quitan las filas recién anexadas: la
+bitácora y los archivos no se contradicen.
+
+**Editar `labels.tsv` a mano no queda registrado.** `review_labels` detecta los defectos que deja una
+edición así, pero la bitácora solo registra lo que entra por `apply_label_corrections`.
+
+Mensajes de error del archivo de correcciones: son los de la lectura de `labels.tsv` («Label table
+…»), porque el formato es el mismo.
 
 ## Privacidad e inyección de fórmulas
 
