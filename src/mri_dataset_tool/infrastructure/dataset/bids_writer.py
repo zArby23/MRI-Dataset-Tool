@@ -142,17 +142,11 @@ class BIDSDatasetWriter:
             files[self.root / "code" / "run_manifest.json"] = manifest_json.encode("utf-8")
         if any(path.exists() for path in files):
             raise FileExistsError("Dataset file already exists.")
-
-        written: list[Path] = []
         try:
             if manifest_json is not None:
                 (self.root / "code").mkdir(exist_ok=True)
-            for path, data in files.items():
-                _write_bytes(path, data)
-                written.append(path)
+            write_all(files)
         except BaseException:
-            for path in written:  # all or nothing: a retry must not hit FileExistsError
-                path.unlink(missing_ok=True)
             self._remove_empty_dirs(self.root / "code")
             raise
         logger.info("Finalized dataset with %d participants.", len(participants))
@@ -243,6 +237,23 @@ def _tool_version() -> str:
         return version("mri-dataset-tool")
     except PackageNotFoundError:
         return "unknown"
+
+
+def write_all(files: dict[Path, bytes]) -> list[Path]:
+    """Write every file or none: an existing one → ``FileExistsError`` before writing; on any
+    failure the files already written are removed, so the call can be retried."""
+    if any(path.exists() for path in files):
+        raise FileExistsError("Dataset file already exists.")
+    written: list[Path] = []
+    try:
+        for path, data in files.items():
+            _write_bytes(path, data)
+            written.append(path)
+    except BaseException:
+        for path in written:
+            path.unlink(missing_ok=True)
+        raise
+    return written
 
 
 def _write_bytes(path: Path, data: bytes) -> None:

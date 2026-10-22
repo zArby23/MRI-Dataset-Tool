@@ -9,6 +9,15 @@ from mri_dataset_tool.application.pipeline.manifest import RunManifest
 from mri_dataset_tool.application.pipeline.runner import Pipeline
 from mri_dataset_tool.domain.models.study import MRIStudy
 from mri_dataset_tool.infrastructure.dataset.bids_writer import BIDSDatasetWriter
+from mri_dataset_tool.infrastructure.dataset.index import scan_images, write_ml_files
+from mri_dataset_tool.infrastructure.dataset.labels import LABELS_TSV, read_labels
+from mri_dataset_tool.infrastructure.dataset.splits import (
+    DEFAULT_RATIOS,
+    DEFAULT_SEED,
+    assign_splits,
+    check_split_params,
+    participant_strata,
+)
 from mri_dataset_tool.infrastructure.logging.logger import get_logger
 
 logger = get_logger(__name__)
@@ -82,3 +91,25 @@ def export_dataset(
     result = DatasetReport(studies_written, series_written, len(writer.participants), errors)
     logger.info("Exported %d studies (%d series). Errors: %d.", studies_written, series_written, errors)
     return result
+
+
+def write_ml_exports(root: Path, ratios: Any = DEFAULT_RATIOS, seed: Any = DEFAULT_SEED) -> list[Path]:
+    """Write ``dataset_index.csv``, ``datalist.json``, ``splits.tsv`` and ``splits.json`` for the
+    BIDS dataset at *root* (RF13). Splits are by participant, stratified when ``labels.tsv`` exists.
+
+    Reads only file names and the label table, never volumes. Invalid ratios/seed, a dataset
+    without images or with files outside the layout → ``ValueError``; existing exports → ``FileExistsError``.
+    """
+    weights = check_split_params(ratios, seed)
+    if not root.is_dir():
+        raise NotADirectoryError("Dataset directory not found.")
+    entries = scan_images(root)
+    labels = read_labels(root) if (root / LABELS_TSV).exists() else None
+    strata, unlabeled = participant_strata(
+        ((entry.participant, entry.session) for entry in entries), None if labels is None else labels.labels
+    )
+    # every participant unlabeled: nothing to split, all are listed apart
+    assignment, warnings = assign_splits(strata, weights, seed) if strata else ({}, [])
+    written = write_ml_files(root, entries, labels, assignment, unlabeled, warnings, weights, seed)
+    logger.info("Wrote ML exports: %d images, %d participants split, %d unlabeled.", len(entries), len(assignment), len(unlabeled))
+    return written
