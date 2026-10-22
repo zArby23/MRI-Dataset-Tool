@@ -3,7 +3,7 @@
 Supported suffixes and their datatype folder are listed in ``SUFFIX_DATATYPES``. To support a new
 suffix, add it there with its BIDS datatype; only suffixes whose file name needs no entity other
 than ``sub``/``ses`` belong here (``bold`` needs ``task-`` and is therefore not supported). A suffix
-outside the map is rejected, never guessed from free text (Q2).
+outside the map is rejected, never guessed from free text.
 """
 
 import re

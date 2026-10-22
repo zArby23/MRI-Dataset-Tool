@@ -1,4 +1,4 @@
-"""Stage 3 closing pipeline (E1): validate -> anonymize -> reorient -> resample -> normalize.
+"""Stage 3 closing pipeline: validate -> anonymize -> reorient -> resample -> normalize.
 
 Usage, from the repository root (the key is a secret of at least 32 characters):
 

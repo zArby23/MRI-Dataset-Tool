@@ -1,13 +1,13 @@
 # Política de anonimización (RF09, RNF07)
 
 > **Versión de la política: `1`** (`POLICY_VERSION` en `infrastructure/anonymization/policy.py`).
-> Estado: **política v1 APROBADA por el humano el 2026-10-20** (Checkpoint 1 de la etapa 3).
+> Estado: **política v1 vigente desde el 2026-10-20** (etapa 3).
 > Guía de uso en la sección 7.
 
 La política es **datos**: listas blancas y una tabla etiqueta → acción. Lo que no aparece en una
 lista se **descarta**.
 
-**Versionado:** la versión `1` es la que aprobó el humano en el Checkpoint 1. Desde esa aprobación,
+**Versionado:** la versión `1` es la vigente desde el 2026-10-20. Desde entonces,
 cualquier cambio que altere un resultado anonimizado sube `POLICY_VERSION`.
 
 | Módulo | Contenido |
@@ -46,7 +46,7 @@ cualquier cambio que altere un resultado anonimizado sube `POLICY_VERSION`.
 ## 2. Paso `anonymize` (modelo de dominio)
 
 `params = {"policy_version": "1"}` (llega al manifiesto); otra versión → `ValueError`.
-Declara `redacts_sources: ClassVar[bool] = True` (contrato C1; no está en `params` ni en `repr`): en
+Declara `redacts_sources: ClassVar[bool] = True` (no está en `params` ni en `repr`): en
 un pipeline con `anonymize`, los `StudyReport` del manifiesto no guardan la ruta de origen.
 
 - `study_uid`, `series_uid` → seudónimo UID; `subject_id`, `session_id` → seudónimo de etiqueta;
@@ -112,17 +112,17 @@ las secuencias no listadas (con todo su contenido anidado). `DICOM_ACTIONS` usa 
 | `replaced` | `PatientIdentityRemoved` = `YES`, `DeidentificationMethod` = `MRI-Dataset-Tool anonymization policy <POLICY_VERSION>` | Marcas de desidentificación de PS3.15 E.1.1 (`DICOM_FIXED_VALUES`); se añaden si faltan |
 | `emptied` | `PatientName`, `PatientBirthDate`, `ReferringPhysicianName`, `StudyID`, `AccessionNumber`, `StudyTime` | Tipo 2: deben existir, pero llevan identidad, fecha de nacimiento u hora |
 | `generalized` | `StudyDate`, `SeriesDate`, `AcquisitionDate`, `ContentDate`, `AcquisitionDateTime`, `PatientAge` | Ver reglas abajo |
-| `kept` | `PatientSex` | Decisión del humano |
+| `kept` | `PatientSex` | Decisión de diseño |
 | `kept` | `SpecificCharacterSet`, `SOPClassUID`, `MediaStorageSOPClassUID`, `TransferSyntaxUID`, `Modality`, `ImageType` | Codificación y tipo de objeto |
 | `kept` | Módulo de píxel y geometría: `Rows`, `Columns`, `SamplesPerPixel`, `PhotometricInterpretation`, `BitsAllocated`, `BitsStored`, `HighBit`, `PixelRepresentation`, `PixelData`, `RescaleSlope`, `RescaleIntercept`, `RescaleType`, `WindowCenter`, `WindowWidth`, `PixelSpacing`, `SliceThickness`, `SpacingBetweenSlices`, `ImageOrientationPatient`, `ImagePositionPatient`, `SliceLocation`, `PatientPosition`, `SeriesNumber`, `InstanceNumber`, `AcquisitionNumber`, `TemporalPositionIdentifier`, `NumberOfTemporalPositions` | Los necesita `build_series_volume` para reconstruir el volumen; no describen a la persona |
 | `kept` | Técnicos: `Manufacturer`, `ManufacturerModelName`, `MagneticFieldStrength`, `MRAcquisitionType`, `ScanningSequence`, `SequenceVariant`, `ScanOptions`, `SequenceName`, `RepetitionTime`, `EchoTime`, `InversionTime`, `EchoTrainLength`, `FlipAngle`, `PixelBandwidth` | Mismos grupos que el sidecar |
 | `removed` | Todo lo demás: dirección, otros IDs, peso y talla, institución, estación, número de serie, médicos y operadores, descripciones y comentarios, horas, secuencias de referencia, privados | Perfil básico de PS3.15 más la lista blanca |
 
-**Fechas** (decisión del humano): DA → `AAAA0101`; DT → `AAAA` (DT admite solo el año); TM eliminado
+**Fechas** (decisión de diseño): DA → `AAAA0101`; DT → `AAAA` (DT admite solo el año); TM eliminado
 (o vacío si es tipo 2, como `StudyTime`). **Excepción:** `PatientBirthDate` se vacía (no conserva
 el año). La edad solo se conserva a través del rango de `PatientAge`.
 
-**Edad** (decisión del humano): `PatientAge` (AS, `nnnD/W/M/Y`) → límite inferior de su rango de 10
+**Edad** (decisión de diseño): `PatientAge` (AS, `nnnD/W/M/Y`) → límite inferior de su rango de 10
 años, p. ej. `047Y` → `040Y`. 90 años o más → `090Y`. D/W/M se pasan a años antes; menos de 1 año → `000Y`.
 El VR AS no admite `90+` ni rangos, por eso se escribe el límite inferior.
 
@@ -173,7 +173,7 @@ escritos se reportan entonces como `FileExistsError`.
 ## 6. Riesgo residual
 
 - **La imagen** puede reidentificar: reconstrucción de la cara en volúmenes 3D (*defacing* fuera de
-  alcance) y texto quemado en los píxeles (fuera de alcance, Q11).
+  alcance) y texto quemado en los píxeles (fuera de alcance).
 - **Cuasi-identificadores conservados**: año de las fechas del estudio, rango de edad, sexo y modelo de escáner.
   En conjunto, y en cohortes pequeñas, pueden reducir mucho el número de candidatos.
 - **Valores de claves permitidas**: una clave técnica permitida (p. ej. `Manufacturer`) que un equipo
@@ -186,11 +186,11 @@ escritos se reportan entonces como `FileExistsError`.
   con 10⁴ sujetos); dos cortes con el mismo nombre de salida dan `FileExistsError` reportado (sección 5).
 - **Valores de entidades BIDS** permitidas (`acq-`, `task-`, …): texto libre del autor del dataset, sin filtrar.
 - **Manifiesto**: `StudyReport.source_path` guarda la ruta del archivo de **entrada** (en BIDS contiene
-  `sub-<ID>`). El paso declara `redacts_sources = True` y, con el contrato C1, el runner deja
-  `source_path = None` en las corridas con `anonymize` (C1, integrado). `on_error` sigue recibiendo
+  `sub-<ID>`). El paso declara `redacts_sources = True` y el runner deja
+  `source_path = None` en las corridas con `anonymize`. `on_error` sigue recibiendo
   la ruta: quien lo implemente no debe volcarla en salidas compartidas.
 - **Validación con datos sintéticos**: las pruebas usan solo DICOM sintéticos. La revisión de un
-  informe y de una salida reales queda pendiente del humano, fuera del repositorio (sección 7).
+  informe y de una salida reales es una verificación manual pendiente, fuera del repositorio (sección 7).
 
 ## 7. Guía de uso
 
@@ -227,7 +227,7 @@ escritos se reportan entonces como `FileExistsError`.
    cuadran con `files_written` y que no aparece ninguna etiqueta `kept` inesperada. Los errores de
    `on_error` llevan la ruta de entrada: no los compartas con la salida.
 
-4. **Verificación manual (humano, fuera del repositorio):** correr el servicio sobre un DICOM real,
+4. **Verificación manual (pendiente, fuera del repositorio):** correr el servicio sobre un DICOM real,
    revisar el informe y buscar en la salida (abriéndola con un visor DICOM o volcando las cabeceras)
    cualquier identificador: nombres, IDs, fechas completas, institución, texto libre. Nunca versionar
    datos reales ni sus salidas.

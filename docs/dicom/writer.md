@@ -13,7 +13,7 @@ Escribe un archivo `slice-NNNN.dcm` por corte de un volumen **3D** (`MRISeries.v
 - Directorio de salida no vacío → `FileExistsError` salvo `overwrite=True`. Con `overwrite=True` nunca se borran archivos previos (solo se reemplazan los `slice-NNNN.dcm` con el mismo nombre); si hay `slice-*.dcm` de más (serie anterior más larga) → `ValueError` sin escribir. Si la validación falla no se escribe nada.
 - Affine con eje de corte opuesto a `cross(fila, columna)` (determinante < 0): al releer con `build_series_volume` el volumen es el mismo con el eje de corte invertido (affine equivalente, no idéntico).
 - 4D → DICOM queda fuera de v1 por decisión explícita: un volumen 4D lanza `ValueError("Only 3D volumes are supported.")`. Si se necesita, será un cambio posterior.
-- Conformidad: no se escriben `ScanningSequence` ni `SequenceVariant` (tipo 1 del IOD MR) por decisión del humano. El archivo **no pasa un validador estricto del IOD MR** (p. ej. `dciodvfy`) por esos dos atributos, aunque pydicom lo abre. Apertura en 3D Slicer / ITK-SNAP: verificación pendiente del humano.
+- Conformidad: no se escriben `ScanningSequence` ni `SequenceVariant` (tipo 1 del IOD MR) por decisión de diseño. El archivo **no pasa un validador estricto del IOD MR** (p. ej. `dciodvfy`) por esos dos atributos, aunque pydicom lo abre. Apertura en 3D Slicer / ITK-SNAP: verificación manual pendiente.
 
 ## Límites
 

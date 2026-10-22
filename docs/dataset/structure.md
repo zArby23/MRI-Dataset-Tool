@@ -1,8 +1,8 @@
 # Estructura del dataset BIDS (RF10, RF13, RF15)
 
-Módulos: `infrastructure/dataset/bids_layout.py` (D0, reglas de nombres),
-`infrastructure/dataset/bids_writer.py` (D1, `BIDSDatasetWriter`) y `application/services/dataset.py`
-(D1, `export_dataset`).
+Módulos: `infrastructure/dataset/bids_layout.py` (reglas de nombres),
+`infrastructure/dataset/bids_writer.py` (`BIDSDatasetWriter`) y `application/services/dataset.py`
+(`export_dataset`).
 
 ## Árbol escrito
 
@@ -21,10 +21,10 @@ Módulos: `infrastructure/dataset/bids_layout.py` (D0, reglas de nombres),
   Un estudio sin `session_id` se escribe sin el nivel `ses-`.
 - **Sufijos soportados** (`SUFFIX_DATATYPES`): `T1w`, `T2w`, `PDw`, `T2starw`, `FLAIR` → `anat`;
   `dwi` → `dwi`; `magnitude1`, `magnitude2`, `phasediff` → `fmap`. El sufijo es `series.modality`.
-  Otro valor (`MR` de DICOM, `bold`, `None`) no se escribe y se reporta (Q2): nunca se adivina.
+  Otro valor (`MR` de DICOM, `bold`, `None`) no se escribe y se reporta: nunca se adivina.
   `bold` queda fuera porque BIDS le exige la entidad `task-`. Para ampliar la lista se añade el sufijo
   con su carpeta en `SUFFIX_DATATYPES` (solo sufijos que no exijan más entidades que `sub`/`ses`/`run`).
-- **`run-<n>`** (decisión del humano): si un sufijo aparece más de una vez en un mismo estudio
+- **`run-<n>`** (decisión de diseño): si un sufijo aparece más de una vez en un mismo estudio
   (sujeto/sesión), **todas** sus series llevan `run-1..n` en el orden de `study.series`; un sufijo que
   aparece una sola vez no lleva `run`. Si una de esas series falla, sus números no se reasignan (puede
   quedar `run-2` sin `run-1`). Las demás entidades de origen (`acq`, `dir`, `echo`, ...) no se conservan.
@@ -34,9 +34,9 @@ Módulos: `infrastructure/dataset/bids_layout.py` (D0, reglas de nombres),
 - **Sidecar** `.json` (siempre, aunque quede `{}`): solo claves de `SIDECAR_WHITELIST`
   (`infrastructure/anonymization/policy.py`) con valores escalares o listas de escalares finitos.
   Sin `AcquisitionTime`, fechas, rutas ni UIDs.
-- **`participants.tsv`**: solo la columna `participant_id` (Q7), ordenada; un sujeto aparece si se
+- **`participants.tsv`**: solo la columna `participant_id` (sexo y edad son cuasi-identificadores), ordenada; un sujeto aparece si se
   escribió al menos una serie suya. `participants.json` describe esa columna.
-- **`dataset_description.json`**: `Name`, `BIDSVersion` (`1.9.0`), `DatasetType: raw` (Q8) y
+- **`dataset_description.json`**: `Name`, `BIDSVersion` (`1.9.0`), `DatasetType: raw` y
   `GeneratedBy` (`MRI-Dataset-Tool` y su versión). La política de anonimización (`POLICY_VERSION`) se
   declara en `GeneratedBy.Description` y en el `README` **solo** si el manifiesto registra el paso
   `anonymize`; sin él, el `README` dice que no se registró anonimización.
@@ -84,7 +84,7 @@ sidecar se borra la imagen recién escrita, y las carpetas que queden vacías se
 todo o nada: si falla un archivo, borra los de nivel superior que ya había escrito y puede reintentarse. Un callback
 `on_error` que lanza se captura y solo se registra su tipo. Los logs contienen solo tipos y conteos.
 
-## Límites conocidos (decisiones del humano)
+## Límites conocidos (decisiones de diseño)
 
 - **`dwi` sin `.bval`/`.bvec`**: el pipeline no los conserva; el `bids-validator` reportará error en
   esas series.
@@ -94,5 +94,5 @@ todo o nada: si falla un archivo, borra los de nivel superior que ya había escr
   distinción de mayúsculas) comparten carpeta y el dataset queda incoherente (`write_ml_exports` falla con
   "outside the BIDS layout"). Solo puede pasar sin el paso `anonymize`: los seudónimos son hex en minúsculas
   y el lanzador de la etapa 4 exige `anonymize`. No se detecta al escribir.
-- La validación con el `bids-validator` oficial es una verificación manual del humano (requiere Node).
+- La validación con el `bids-validator` oficial es una verificación manual pendiente (requiere Node).
 - Riesgo residual heredado de la etapa 3: cuasi-identificadores en la imagen (rostro, texto quemado).

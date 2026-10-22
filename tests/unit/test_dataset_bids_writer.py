@@ -152,7 +152,6 @@ def test_bad_series_are_reported_and_the_rest_is_written(tmp_path: Path) -> None
 
 @pytest.mark.parametrize("shape", [(4, 4), (3, 3, 3, 2, 2)])
 def test_volumes_that_are_not_3d_or_4d_are_reported(tmp_path: Path, shape) -> None:
-    """QA4-05."""
     errors: list[Exception] = []
     root = tmp_path / "ds"
     assert BIDSDatasetWriter(root).add_study(_study("a1", "01", _series(shape=shape)), lambda _p, e: errors.append(e)) == []
@@ -160,7 +159,7 @@ def test_volumes_that_are_not_3d_or_4d_are_reported(tmp_path: Path, shape) -> No
 
 
 def test_values_beyond_float32_are_reported_not_written_as_inf(tmp_path: Path) -> None:
-    """QA4-06: finite float64 values that overflow float32 are rejected; existing inf is kept as is."""
+    """Finite float64 values that overflow float32 are rejected; existing inf is kept as is."""
     errors: list[Exception] = []
     root = tmp_path / "ds"
     huge = _series(volume=np.full((3, 4, 5), 1e300))

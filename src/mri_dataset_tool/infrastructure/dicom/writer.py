@@ -83,7 +83,7 @@ def _validate(series: MRISeries) -> tuple[np.ndarray, np.ndarray]:
         raise ValueError("The series has no valid 4x4 affine.")
     volume = np.asarray(series.volume, dtype=np.float64)
     if volume.ndim != 3:
-        # Pending DUDA T7: 4D handling is not decided yet.
+        # 3D only by design (docs/dicom/writer.md).
         raise ValueError("Only 3D volumes are supported.")
     if not np.isfinite(volume).all() or not np.isfinite(affine).all():
         raise ValueError("The volume or affine contains non-finite values.")

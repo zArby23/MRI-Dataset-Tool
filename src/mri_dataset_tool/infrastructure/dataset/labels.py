@@ -24,16 +24,16 @@ CHANGES_TSV = "labels_changes.tsv"
 CHANGES_COLUMNS = ("timestamp_utc", "action", "participant_id", "session_id", "old_label", "new_label")
 FINAL_JSON = "labels_final.json"
 
-# File format (approved by the human, see docs/dataset/labels.md): ids carry the BIDS prefix
+# File format (see docs/dataset/labels.md): ids carry the BIDS prefix
 # in the file and not in the API; an empty session cell means a dataset without sessions.
 _SUB_PREFIX = "sub-"
 _SES_PREFIX = "ses-"
 _FORBIDDEN_IN_CLASS = ("\t", "\r", "\n")
 # A class name ends up in every labelled row, so it may not look like a spreadsheet formula
-# (CSV injection; decision of the human).
+# (CSV injection).
 _FORMULA_PREFIXES = ("=", "+", "-", "@", "\t", "\r")
 # Same rule as exporters.py (XML 1.0 characters; also excludes lone surrogates): a class must be
-# reportable, otherwise every report of the dataset fails (QA4-04).
+# reportable, otherwise every report of the dataset fails.
 _INVALID_CHARS = re.compile(r"[^\x09\x0a\x0d\x20-\ud7ff\ue000-\ufffd\U00010000-\U0010ffff]")
 
 LabelKey = tuple[str, str | None]

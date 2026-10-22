@@ -105,7 +105,7 @@ def write_ml_exports(
     without images or with files outside the layout → ``ValueError``; existing exports → ``FileExistsError``.
     With any label file (``labels.tsv``, ``labels.json``, ``labels_final.json``) the table is read
     (a missing file → ``FileNotFoundError``) and the labels must be closed (``labels_final.json`` whose ``sha256`` matches the
-    current table) unless *allow_unfinalized* is true (decision of the human); otherwise
+    current table) unless *allow_unfinalized* is true; otherwise
     ``ValueError("Labels are not finalized.")`` before writing anything. ``splits.json`` records it.
     """
     weights = check_split_params(ratios, seed)
@@ -114,7 +114,7 @@ def write_ml_exports(
     if not root.is_dir():
         raise NotADirectoryError("Dataset path is not a directory.")
     labels, finalized = None, None
-    # any label file present means a labelled dataset: a lost labels.tsv must not export unlabelled (QA4-09)
+    # any label file present means a labelled dataset: a lost labels.tsv must not export unlabelled
     if any((root / name).exists() for name in (LABELS_TSV, LABELS_JSON, FINAL_JSON)):
         labels = read_labels(root)  # a missing file → FileNotFoundError with a fixed message
         finalized = _labels_finalized(root, labels)

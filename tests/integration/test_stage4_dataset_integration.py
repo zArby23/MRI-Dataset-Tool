@@ -1,4 +1,4 @@
-"""E2 integration: synthetic BIDS batch → stage 3 pipeline → BIDS dataset → labels → ML exports → report."""
+"""Integration: synthetic BIDS batch → stage 3 pipeline → BIDS dataset → labels → ML exports → report."""
 
 import csv
 import getpass

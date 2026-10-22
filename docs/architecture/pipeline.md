@@ -182,7 +182,7 @@ ignora. Después reconstruye el pipeline desde ese manifiesto y lo vuelve a corr
 `reproduced from manifest: True` si ambas corridas coinciden. Revisa que el JSON solo contenga rutas,
 pasos, parámetros, versiones y tipos de excepción, nunca mensajes ni valores de cabecera.
 
-## Ejemplo de la etapa 3 (E1)
+## Ejemplo de la etapa 3
 
 `config/stage3_example.yaml` define el pipeline completo solo con claves admitidas por el loader
 (`pipeline.steps`, `report.path`):
@@ -216,14 +216,14 @@ report:
    cualquier otro error.
 4. `on_error` imprime solo el tipo de excepción y un contador; al final, conteos de estudios ok y
    fallidos y errores por tipo.
-5. Escribe el manifiesto, comprueba que no contiene la ruta de entrada ni `sub-` (C1: `anonymize`
+5. Escribe el manifiesto, comprueba que no contiene la ruta de entrada ni `sub-` (`anonymize`
    declara `redacts_sources`), lo reconstruye con `pipeline_from_manifest`, vuelve a correr sin
    escribir y compara.
 
 La versión ejecutable con un lote sintético (NaN, otra orientación y otro espaciado) está en
 `tests/unit/test_pipeline_stage3_example.py`.
 
-Verificación manual (humano), desde la raíz del repositorio:
+Verificación manual, desde la raíz del repositorio:
 
 ```powershell
 $env:MRI_ANON_KEY = "<secreto de al menos 32 caracteres>"

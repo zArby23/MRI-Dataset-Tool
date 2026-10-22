@@ -1,11 +1,11 @@
 # Etiquetas del dataset (RF11, RF12, RF15)
 
-Módulos: `src/mri_dataset_tool/infrastructure/dataset/labels.py` (L1: tabla, formatos de archivo) y
-`src/mri_dataset_tool/application/services/labels.py` (L2: plantilla, revisión, correcciones, cierre).
+Módulos: `src/mri_dataset_tool/infrastructure/dataset/labels.py` (tabla, formatos de archivo) y
+`src/mri_dataset_tool/application/services/labels.py` (plantilla, revisión, correcciones, cierre).
 
 ## Modelo
 
-Una etiqueta categórica por (participante, sesión), tomada de una lista cerrada de clases (Q3). Una
+Una etiqueta categórica por (participante, sesión), tomada de una lista cerrada de clases. Una
 etiqueta vacía significa **sin etiquetar**; una clase fuera de la lista es **inválida** (error).
 
 `LabelTable(classes, labels, description="")`:
@@ -15,7 +15,7 @@ etiqueta vacía significa **sin etiquetar**; una clase fuera de la lista es **in
   (como `MRIStudy.subject_id`/`session_id`); `None` = sin etiquetar.
 - Valida al construirse; copia los dicts de entrada (no los comparte).
 
-## Archivos (formato aprobado por el humano, 2026-10-22)
+## Archivos (formato vigente desde el 2026-10-22)
 
 Ambos en la raíz del dataset.
 
@@ -38,7 +38,7 @@ sub-02	ses-01	CN
 
 Ids: `sub-`/`ses-` seguido de una etiqueta válida para `bids_layout.validate_label` (alfanumérica ASCII). Nombres de clase:
 no vacíos, sin espacios al inicio o al final, sin tabuladores ni saltos de línea, sin empezar por `=`,
-`+`, `-` o `@` (inyección de fórmulas; decisión del humano, 2026-10-22) y solo con caracteres que el
+`+`, `-` o `@` (inyección de fórmulas) y solo con caracteres que el
 reporte puede guardar: ni caracteres de control que XML 1.0/XLSX rechazan (`\x00`–`\x1f` salvo
 tabulador y saltos, `￾`, `￿`) ni sustitutos sueltos. Es la misma regla que aplica
 `exporters.py`, así que una clase aceptada siempre se puede reportar (QA4-04). Las descripciones (de
@@ -52,7 +52,7 @@ clase y de la tabla) siguen la misma regla de caracteres y tampoco admiten tabul
 | `write_labels(table, root, overwrite=False)` | Escribe ambos archivos. Sin `overwrite`, si alguno existe → `FileExistsError("Label table already exists.")` sin escribir nada. Primero escribe los dos temporales y después hace los dos `os.replace`. Si algo falla, no quedan temporales; sin `overwrite` tampoco queda media tabla, y con `overwrite` una tabla previa se conserva si el fallo ocurre antes de los reemplazos. `root` debe existir. |
 | `read_labels(root)` | Lectura **estricta**: cualquier defecto → `ValueError` de mensaje fijo. |
 | `read_classes(root)` | Lee `labels.json` → `(clases, descripción)`. |
-| `parse_label_rows(path)` | Lectura **tolerante** (para `review_labels`, L2): solo valida la estructura y devuelve `(participant_id, session_id, label)` tal como están escritos, en el orden del archivo. |
+| `parse_label_rows(path)` | Lectura **tolerante** (para `review_labels`): solo valida la estructura y devuelve `(participant_id, session_id, label)` tal como están escritos, en el orden del archivo. |
 | `parse_label_key(participant_cell, session_cell)` | Celdas de id → clave de la tabla; inválidas → `ValueError`. |
 
 Límites conocidos de `write_labels`: hay una ventana mínima entre la comprobación de existencia y el
@@ -79,7 +79,7 @@ en cualquier orden).
 | Fallo de E/S | `OSError` de mensaje fijo, sin causa encadenada (citaría la ruta) |
 | Texto no codificable que llega a la escritura saltándose la validación | `ValueError("Label table could not be written.")` (sin causa) |
 
-## Flujo de revisión y cierre (L2; aprobado por el humano, 2026-10-22)
+## Flujo de revisión y cierre
 
 Todo ocurre en la raíz del dataset exportado. Los pares (participante, sesión) salen del árbol: carpetas
 `sub-<id>` y, dentro, `ses-<id>` (sin carpetas `ses-` → `(sub, None)`), validadas con

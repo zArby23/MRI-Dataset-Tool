@@ -1,8 +1,8 @@
 # Reporte estadístico del dataset (RF14, RF15, RF16)
 
-Módulos: `infrastructure/dataset/report.py` (R1, `build_dataset_summary`),
-`infrastructure/dataset/exporters.py` (R1/R2, formatos) y `application/services/dataset_report.py`
-(R3, `report_dataset`).
+Módulos: `infrastructure/dataset/report.py` (`build_dataset_summary`),
+`infrastructure/dataset/exporters.py` (formatos) y `application/services/dataset_report.py`
+(`report_dataset`).
 
 ## Uso
 
@@ -15,9 +15,9 @@ paths = report_dataset(Path("E:/salida/dataset"), Path("E:/salida/reporte"), on_
 Escribe en `output_dir` (se crea si no existe) cuatro archivos con el mismo contenido:
 `dataset_report.json`, `dataset_report.md`, `dataset_report.xml` y `dataset_report.xlsx`.
 
-- Lee el dataset **ya escrito** (D1) con `BIDSBatchReader(lazy=True)`: el reporte describe lo que
+- Lee el dataset **ya escrito** (por `export_dataset`) con `BIDSBatchReader(lazy=True)`: el reporte describe lo que
   realmente se exportó. Un estudio vivo a la vez (RNF02); las intensidades se calculan volumen a volumen.
-- Etiquetas: si existe `labels.tsv` o `labels.json` en la raíz, se leen con `read_labels` (L1).
+- Etiquetas: si existe `labels.tsv` o `labels.json` en la raíz, se leen con `read_labels`.
 - Pasos aplicados: si existe `code/run_manifest.json`, se resume por paso.
 - `output_dir` **debe estar fuera del dataset** (también fuera de `derivatives/`): si quedara dentro,
   el reporte pasaría a formar parte del dataset. Se rechaza antes de crear nada.

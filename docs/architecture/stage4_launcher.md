@@ -33,7 +33,7 @@ hecha con la misma clave.
    → `<output-dir>/dataset` (con `code/run_manifest.json`).
 2. Con `--classes`: `write_label_template`; con `--corrections`: `apply_label_corrections`. Sin ellos
    la consola dice qué se omitió. Después, `review_labels`: si está completa se cierran con
-   `finalize_labels` (decisión del humano: `write_ml_exports` exige etiquetas cerradas); si no, se
+   `finalize_labels` (`write_ml_exports` exige etiquetas cerradas); si no, se
    imprime `WARNING LABELS_INCOMPLETE: {código: conteo}` (`UNLABELED`, `UNKNOWN_CLASS`, `DUPLICATED`,
    `MISSING`, `NOT_IN_DATASET`, `INVALID_IDS`) y las etiquetas quedan abiertas.
 3. `write_ml_exports(dataset, ratios, seed, allow_unfinalized=...)` (`dataset_index.csv`,

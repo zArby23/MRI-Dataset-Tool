@@ -268,7 +268,7 @@ def test_dataset_without_labels_needs_no_closure(tmp_path: Path) -> None:
 
 @pytest.mark.parametrize(("lost", "message"), [("labels.tsv", "Label table not found."), ("labels.json", "Label classes file not found.")])
 def test_label_files_without_their_pair_block_the_exports(tmp_path: Path, lost, message) -> None:
-    """QA4-09: a renamed labels.tsv must not turn a labelled dataset into an unlabelled export."""
+    """A renamed labels.tsv must not turn a labelled dataset into an unlabelled export."""
     root = _labelled_dataset(tmp_path)
     finalize_labels(root)
     (root / lost).rename(root / f"{lost}.bak")

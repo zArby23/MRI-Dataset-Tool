@@ -39,7 +39,7 @@ Errores al aplicar (el runner marca el estudio `failed` y el lote sigue): los de
 | `replace_volume(series, volume, affine)` | Serie nueva con `volume` y la geometría canónica recalculada: `shape` (tupla de `int`), `voxel_size` (norma de las columnas 3×3 del affine; solo espacial en 4D), `affine` (copia `float`) y `orientation` (`nib.aff2axcodes`). El resto de `metadata` se copia en profundidad (`bids`, `sidecar`, `provenance` no se comparten con la entrada); `files` se copia. **Único punto** del procesamiento que escribe esos cuatro campos. |
 | `validate_geometry(series)` | `ValueError` de mensaje fijo, sin causa ni valores, si falta `volume` o `affine`, si el affine no es 4×4 numérico, finito, con última fila `[0, 0, 0, 1]` e invertible, o si `metadata["shape"]` no coincide con `volume.shape` (también si no es iterable). Solo lee `volume.shape`: no materializa un volumen perezoso. |
 | `check_modalities(modalities)` | `None` o lista/tupla de `str`; si no, `ValueError("Modalities must be a list of strings.")`. Los pasos lo llaman al construirse. |
-| `apply_to_series(study, transform, modalities=None)` | Devuelve `(estudio_nuevo, outputs)`. Aplica `transform(series) -> (serie, valores)` a las series con `volume` y, si hay filtro (Q12), `modality` en `modalities` (`modality=None` queda fuera; `[]` no selecciona ninguna). Las demás series se devuelven como el mismo objeto, sin mutar. `outputs = {"series": [{"index": i, **valores}]}`, con `i` la posición en `study.series`, solo para las transformadas (convención de `StepRecord.outputs`). |
+| `apply_to_series(study, transform, modalities=None)` | Devuelve `(estudio_nuevo, outputs)`. Aplica `transform(series) -> (serie, valores)` a las series con `volume` y, si hay filtro, `modality` en `modalities` (`modality=None` queda fuera; `[]` no selecciona ninguna). Las demás series se devuelven como el mismo objeto, sin mutar. `outputs = {"series": [{"index": i, **valores}]}`, con `i` la posición en `study.series`, solo para las transformadas (convención de `StepRecord.outputs`). |
 
 ## Paso `reorient` (RF07)
 
@@ -77,7 +77,7 @@ como `float`), `interpolation` (`"linear"` por defecto, `"nearest"`, `"cubic"`) 
 Parámetros inválidos lanzan `ValueError` de mensaje fijo al construir el paso
 (`"Spacing must be three finite positive numbers."`, `"Unknown interpolation."`).
 
-Algoritmo (`resample.py`), decisiones Q5:
+Algoritmo (`resample.py`), decisiones de diseño:
 
 - **Malla de salida alineada con los ejes RAS:** `affine` de salida = `diag(spacing)` con origen
   propio; la oblicuidad desaparece y `orientation` pasa a `RAS`.
@@ -124,7 +124,7 @@ Algoritmo (`resample.py`), decisiones Q5:
 | Unidades | mm (las del affine); intensidades sin reescalar. |
 
 - **Affine oblicuo:** la caja de salida tiene la extensión de los ejes más cercanos (fórmula de
-  Q5), no la caja envolvente del volumen rotado. Las esquinas del FOV rotado que caen fuera de
+  la malla de salida), no la caja envolvente del volumen rotado. Las esquinas del FOV rotado que caen fuera de
   esa caja se pierden, y las zonas de la caja sin datos de entrada valen `0`.
 - **`cubic`:** puede producir sobreoscilación (valores fuera del rango de entrada) cerca de bordes
   marcados.
@@ -152,7 +152,7 @@ Algoritmo (`resample.py`), decisiones Q5:
 - **`reorient` con proxy escalado:** un NIfTI perezoso con `scl_slope`/`scl_inter` sale en `float64`
   (no en el dtype de disco), el doble de memoria que `float32`.
 - **`resample` con affine oblicuo:** la caja de salida usa la extensión de los ejes más cercanos
-  (Q5), no la caja envolvente del volumen rotado: se pierden las esquinas del FOV rotado y las zonas
+  (como en la malla de salida), no la caja envolvente del volumen rotado: se pierden las esquinas del FOV rotado y las zonas
   sin datos valen `0`.
 - **`resample` con `cubic`:** sobreoscilación (*ringing*) cerca de bordes marcados; puede dar valores
   fuera del rango de entrada.

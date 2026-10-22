@@ -1,4 +1,4 @@
-"""ML/DL export files of a written BIDS dataset (RF13, Q6): ``dataset_index.csv``, ``datalist.json``
+"""ML/DL export files of a written BIDS dataset (RF13; no tensors, see docs/dataset/export.md): ``dataset_index.csv``, ``datalist.json``
 (MONAI style), ``splits.tsv`` and ``splits.json``, all at the dataset root.
 
 Paths are POSIX and relative to the dataset root. Ids carry the BIDS prefix in the files. Cells are

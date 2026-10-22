@@ -1,4 +1,4 @@
-"""Stage 4 end to end (E2): BIDS input → stage 3 pipeline → BIDS dataset, labels, ML exports, report.
+"""Stage 4 end to end: BIDS input → stage 3 pipeline → BIDS dataset, labels, ML exports, report.
 
 Usage, from the repository root (the key is a secret of at least 32 characters):
 
@@ -54,7 +54,7 @@ def is_discouraged_location(path: Path) -> bool:
 
 
 def parse_classes(items: Sequence[str]) -> dict[str, str]:
-    """``NAME`` or ``NAME=description`` → class → description; a repeated name → ``ValueError`` (QA4-10)."""
+    """``NAME`` or ``NAME=description`` → class → description; a repeated name → ``ValueError``."""
     pairs = [item.partition("=")[::2] for item in items]
     classes = dict(pairs)
     if len(classes) != len(pairs):
@@ -137,12 +137,12 @@ def main(argv: Sequence[str] | None = None) -> int:
     except Exception as error:
         print(f"Invalid config: {type(error).__name__}")
         return 2
-    if not any(step.name == "anonymize" for step in pipeline.steps):  # ids would be the source ones (QA4-01)
+    if not any(step.name == "anonymize" for step in pipeline.steps):  # without it the dataset ids would be the source ones
         print("The pipeline must include the anonymize step.")
         return 2
     logging.basicConfig(level=config["logging"]["level"])
     dataset, report_dir = output_dir / "dataset", output_dir / "report"
-    # Separate counts (QA4-11): files the reader skips (e.g. git-annex pointers) are not export errors.
+    # Separate counts: files the reader skips (e.g. git-annex pointers) are not export errors.
     skipped, on_skipped = _counter("input file skipped")
     errors, on_error = _counter("error")  # the same events as DatasetReport.errors
     report_errors, on_report_error = _counter("report read error")

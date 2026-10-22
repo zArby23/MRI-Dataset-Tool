@@ -116,7 +116,7 @@ def test_allow_unfinalized_writes_the_ml_exports(tmp_path: Path, capsys) -> None
 
 
 def test_reader_skips_are_counted_apart_from_export_errors(tmp_path: Path, capsys) -> None:
-    """QA4-11: a file the reader skips (e.g. a git-annex pointer) is not an export error."""
+    """A file the reader skips (e.g. a git-annex pointer) is not an export error."""
     source = _dataset(tmp_path)
     (source / "sub-04" / "anat").mkdir(parents=True)
     (source / "sub-04" / "anat" / "sub-04_T1w.nii.gz").write_bytes(b"annex pointer")
@@ -149,7 +149,7 @@ def test_without_key_nothing_is_created(monkeypatch, tmp_path: Path, capsys) -> 
     [
         (["--classes", "=x"], "Invalid --classes."),
         (["--classes", "+AD"], "Invalid --classes."),
-        (["--classes", "AD=first", "AD=second"], "Invalid --classes."),  # QA4-10
+        (["--classes", "AD=first", "AD=second"], "Invalid --classes."),  # repeated class name
         (["--corrections", "fix.tsv"], "--corrections needs --classes."),
         (["--classes", "AD", "--corrections", "missing.tsv"], "Corrections file not found."),
         (["--ratios", "0.5", "0.5", "0.5"], "Invalid --ratios."),

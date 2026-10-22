@@ -9,7 +9,7 @@ from mri_dataset_tool.domain.models.serie import MRISeries
 from mri_dataset_tool.infrastructure.processing.arrays import iter_volumes_3d
 from mri_dataset_tool.infrastructure.processing.geometry import validate_geometry
 
-# Non-serious finding codes (Q6): the study passes and they are recorded.
+# Non-serious finding codes: the study passes and they are recorded.
 CONSTANT_VOLUME = "CONSTANT_VOLUME"
 SINGLE_VOLUME_4D = "SINGLE_VOLUME_4D"
 

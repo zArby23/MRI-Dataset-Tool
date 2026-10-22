@@ -2,7 +2,7 @@
 
 Módulos: `infrastructure/dataset/splits.py` (particiones, funciones puras),
 `infrastructure/dataset/index.py` (archivos de exportación) y `write_ml_exports` en
-`application/services/dataset.py` (tarea D2). Sin tensores (`.pt`/`.npy`): decisión Q6.
+`application/services/dataset.py`. Sin tensores (`.pt`/`.npy`): el formato de exportación es NIfTI más índices CSV/JSON.
 
 ## Uso
 
@@ -12,7 +12,7 @@ from mri_dataset_tool.application.services.dataset import write_ml_exports
 write_ml_exports(Path("E:/salida/dataset"), ratios=(0.7, 0.15, 0.15), seed=0, allow_unfinalized=False)
 ```
 
-**Etiquetas cerradas** (decisión del humano): si el dataset tiene algún archivo de etiquetas (`labels.tsv`, `labels.json` o `labels_final.json`), por defecto se exige
+**Etiquetas cerradas** (decisión de diseño): si el dataset tiene algún archivo de etiquetas (`labels.tsv`, `labels.json` o `labels_final.json`), por defecto se exige
 `labels_final.json` (escrito por `finalize_labels`) con una huella `sha256` igual a `label_fingerprint`
 de la tabla actual. Si falta, es ilegible o la tabla cambió después del cierre →
 `ValueError("Labels are not finalized.")` antes de escribir nada. `allow_unfinalized=True` exporta
@@ -38,7 +38,7 @@ volúmenes. Escribe en la raíz del dataset:
   entero de una clase es su posición en esa lista. Sin `labels.tsv` las entradas no tienen `label`.
   Índice numérico para entrenar: `datalist["classes"].index(item["label"])`.
 
-## Particiones (Q5)
+## Particiones
 
 - **Por participante**: todas las sesiones y series de un participante caen en la misma partición
   (sin fuga). Por defecto 70/15/15 con semilla 0; ambos quedan en `splits.json`.
@@ -80,6 +80,6 @@ borran los ya escritos y se puede reintentar). Los parámetros se validan antes 
 - Los archivos de exportación y las etiquetas están en la raíz del dataset; el `bids-validator` puede
   reportarlos como archivos desconocidos: el exportador no escribe `.bidsignore`. Si molesta, crear en la
   raíz un `.bidsignore` con `dataset_index.csv`, `datalist.json`, `splits.*` y `labels*` (una línea cada
-  uno). Verificación manual del humano con el `bids-validator`.
+  uno). Verificación manual (pendiente) con el `bids-validator`.
 - Las particiones dependen del algoritmo de `random.Random(seed).shuffle` de Python; una versión de
   Python que lo cambiara daría otras particiones con la misma semilla (por eso se guarda `splits.tsv`).

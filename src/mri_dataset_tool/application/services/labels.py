@@ -71,7 +71,7 @@ def dataset_pairs(dataset_root: Path) -> list[LabelKey]:
 
     A pair counts only if its folder holds at least one visible ``.nii.gz`` file directly in a
     datatype folder of the layout (``anat``, ``dwi``, ``fmap``): empty ``sub-``/``ses-`` folders
-    are not pairs (QA4-07). Hidden entries and folders whose name is not ``sub-``/``ses-`` + a
+    are not pairs. Hidden entries and folders whose name is not ``sub-``/``ses-`` + a
     valid BIDS label are ignored.
     """
     _check_root(dataset_root)

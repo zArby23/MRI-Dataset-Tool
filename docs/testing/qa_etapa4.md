@@ -10,21 +10,21 @@ contiene datos reales; los valores plantados son sintéticos y todos contienen `
 | Id | Severidad | Qué pasa | Reproducción mínima (sin PHI) | Esperado | Archivo / dueño | Estado |
 |---|---|---|---|---|---|---|
 | QA4-01 | **bloqueante** | El lanzador aceptaba un `--config` sin `anonymize` y escribía el dataset con los ids de origen (nombres de carpeta y archivo, `participants.tsv`, `labels.tsv`, índice), con código 0 | Config con solo `validate`; BIDS `sub-JohnDoe` | Rechazo antes de crear nada (el plan dice "el lanzador lo exige") | `scripts/run_stage4_dataset.py` (E2) | **Corregido** en `23b7490`; se volvió a probar: código 2 y nada creado (`test_launcher_refuses_a_pipeline_without_anonymize`) |
-| QA4-09 | mayor | Con `labels.json` y `labels_final.json` presentes pero sin `labels.tsv` (renombrado, o "guardar como" en Excel), `write_ml_exports` escribe las exportaciones sin etiquetas y sin estratificar (`stratified: false`, `labels_finalized: null`), sin aviso | Dataset con etiquetas cerradas; renombrar `labels.tsv` → `labels.txt`; llamar a `write_ml_exports` | Error fijo: hay etiquetas declaradas o cerradas sin su tabla | `application/services/dataset.py` (@dataset) | Abierto |
+| QA4-09 | mayor | Con `labels.json` y `labels_final.json` presentes pero sin `labels.tsv` (renombrado, o "guardar como" en Excel), `write_ml_exports` escribe las exportaciones sin etiquetas y sin estratificar (`stratified: false`, `labels_finalized: null`), sin aviso | Dataset con etiquetas cerradas; renombrar `labels.tsv` → `labels.txt`; llamar a `write_ml_exports` | Error fijo: hay etiquetas declaradas o cerradas sin su tabla | `application/services/dataset.py` | Abierto |
 | QA4-03 | menor (deuda conocida) | `find_nifti_files` ordena objetos `Path`, y en Windows esa comparación ignora mayúsculas. Con `acq-B` y `acq-a` en un mismo estudio, `run-1` es `acq-a` en Windows y `acq-B` en Linux: el mismo input da datasets distintos según el SO | Dos T1w de un sujeto con `acq-B` y `acq-a` | El mismo orden en todo SO (p. ej. por `as_posix()`) | `infrastructure/bids/reader.py` (congelado) | Abierto, requiere `PROPUESTA DE CONTRATO` |
-| QA4-04 | menor | Una clase con un carácter de control (p. ej. `\x01`) pasa `LabelTable` (y la validación de `--classes`); después `report_dataset` falla siempre con `"Report content is invalid."` | `write_label_template(ds, {"A\x01": "x", "B": "y"})`; `report_dataset` | Rechazar la clase en `LabelTable` | `infrastructure/dataset/labels.py` (@etiquetas) | Abierto |
-| QA4-05 | menor | `BIDSDatasetWriter` escribe volúmenes 2D y 5D en `anat/` (el pipeline los rechazaría en `validate`; solo con `export_dataset(pipeline=None)`) | `add_study` con un volumen `(4, 4)` | `on_error` con mensaje fijo | `bids_writer.py` (@dataset) | Abierto |
-| QA4-06 | menor | float64 fuera del rango de float32 se escribe como `inf`, con solo un `RuntimeWarning` | Volumen lleno de `1e300` | Error por serie, o documentarlo | `bids_writer.py` (@dataset) | Abierto |
-| QA4-07 | menor | Una carpeta `sub-x` sin imágenes cuenta como par del dataset: entra en la plantilla y `finalize_labels` exige etiquetarla | `mkdir sub-ghost` en el dataset | Pares a partir de las imágenes | `application/services/labels.py` (@etiquetas) | Abierto |
-| QA4-08 | menor (solo Windows, solo sin `anonymize`) | Dos ids que solo difieren en mayúsculas (`AB`/`ab`) comparten carpeta: `dataset_pairs` pierde uno y `write_ml_exports` falla con "outside the BIDS layout". Con QA4-01 corregido, los seudónimos son hex en minúsculas y no pueden chocar así | `export_dataset([sub AB ses 01, sub ab])` | Detectar el choque al escribir | `bids_writer.py` (@dataset) | Abierto, bajo riesgo |
+| QA4-04 | menor | Una clase con un carácter de control (p. ej. `\x01`) pasa `LabelTable` (y la validación de `--classes`); después `report_dataset` falla siempre con `"Report content is invalid."` | `write_label_template(ds, {"A\x01": "x", "B": "y"})`; `report_dataset` | Rechazar la clase en `LabelTable` | `infrastructure/dataset/labels.py` | Abierto |
+| QA4-05 | menor | `BIDSDatasetWriter` escribe volúmenes 2D y 5D en `anat/` (el pipeline los rechazaría en `validate`; solo con `export_dataset(pipeline=None)`) | `add_study` con un volumen `(4, 4)` | `on_error` con mensaje fijo | `bids_writer.py` | Abierto |
+| QA4-06 | menor | float64 fuera del rango de float32 se escribe como `inf`, con solo un `RuntimeWarning` | Volumen lleno de `1e300` | Error por serie, o documentarlo | `bids_writer.py` | Abierto |
+| QA4-07 | menor | Una carpeta `sub-x` sin imágenes cuenta como par del dataset: entra en la plantilla y `finalize_labels` exige etiquetarla | `mkdir sub-ghost` en el dataset | Pares a partir de las imágenes | `application/services/labels.py` | Abierto |
+| QA4-08 | menor (solo Windows, solo sin `anonymize`) | Dos ids que solo difieren en mayúsculas (`AB`/`ab`) comparten carpeta: `dataset_pairs` pierde uno y `write_ml_exports` falla con "outside the BIDS layout". Con QA4-01 corregido, los seudónimos son hex en minúsculas y no pueden chocar así | `export_dataset([sub AB ses 01, sub ab])` | Detectar el choque al escribir | `bids_writer.py` | Abierto, bajo riesgo |
 | QA4-10 | menor | `--classes A=uno A=dos` se queda en silencio con la última descripción | `parse_classes(["A=first", "A=second"])` | `Invalid --classes.` | `scripts/run_stage4_dataset.py` | Abierto |
 | QA4-11 | observación (RNF03) | La consola imprime `errors: 0` al exportar y después `Errors by type: {'ValueError': 86}`: `DatasetReport.errors` no cuenta los errores del lector, que llegan directo al `on_error` | Corrida real (§3) | Una sola cifra, o etiquetarlas | `dataset.py` / lanzador | Abierto, sin prueba |
 
-**Estado tras las correcciones (verificado por @qa el 2026-10-22):** QA4-04, 05, 06, 07, 09, 10 y 11 están
-corregidos. Sus pruebas pasan sin `xfail`. La de QA4-04 la reescribió @etiquetas (ahora exige el rechazo en
-`LabelTable` y en `write_label_template`, y suma un caso positivo con una clase Unicode) y @qa la revisó y aprobó.
+**Estado tras las correcciones (verificado el 2026-10-22):** QA4-04, 05, 06, 07, 09, 10 y 11 están
+corregidos. Sus pruebas pasan sin `xfail`. La de QA4-04 la reescribió el responsable del módulo (ahora exige el rechazo en
+`LabelTable` y en `write_label_template`, y suma un caso positivo con una clase Unicode) y se revisó y aprobó en la auditoría.
 La prueba de QA4-11 está en `tests/unit/test_run_stage4_dataset.py`. `tests/qa/` da 242 pruebas que pasan y 2
-`xfail`, que son los que siguen abiertos: QA4-03 (código congelado) y QA4-08 (solo Windows, sin `anonymize`; @dataset lo documentó en `docs/dataset/structure.md`).
+`xfail`, que son los que siguen abiertos: QA4-03 (código congelado) y QA4-08 (solo Windows, sin `anonymize`; documentado en `docs/dataset/structure.md`).
 
 **Sospechas no confirmadas como defecto:**
 - Un NIfTI ajeno dentro del dataset bloquea las exportaciones para ML (documentado), pero el reporte lo cuenta y usa
@@ -77,7 +77,7 @@ La prueba de QA4-11 está en `tests/unit/test_run_stage4_dataset.py`. `tests/qa/
 ## 3. Corrida real (solo lectura de `data/raw`, salida en `E:/mri_qa4/`)
 
 `run_stage4_dataset.py data/raw/bids_test_studies/ds005299 --output-dir E:/mri_qa4/real1 --classes A B --seed 5`,
-con la clave desechable que el humano dejó en la variable de usuario (no se imprimió). Después, con los servicios:
+con la clave desechable de la sesión (no se imprimió). Después, con los servicios:
 correcciones para los 27 pares, cierre, exportaciones para ML y un segundo reporte. `git status data/` quedó limpio.
 
 | Medida | Resultado |
@@ -89,7 +89,7 @@ correcciones para los 27 pares, cierre, exportaciones para ML y un segundo repor
 | Barrido | Valores de entidad de la entrada (de 3 o más caracteres), rutas, usuario: 173 archivos revisados. Las únicas coincidencias son falsos positivos: el valor `acq-dwi` coincide con la carpeta `dwi/` y con la clave `PixelBandwidth` |
 | Consola y logs | Cero `sub-`/`ses-` y cero rutas |
 
-## 4. Verificaciones manuales pendientes (humano)
+## 4. Verificaciones manuales pendientes
 
 1. Correr el `bids-validator` oficial sobre `E:/mri_qa4/real1/dataset`. Se esperan errores ya documentados:
    dwi sin `.bval`/`.bvec`, phasediff sin `EchoTime1/2` y archivos de etiquetas y exportación sin `.bidsignore`.

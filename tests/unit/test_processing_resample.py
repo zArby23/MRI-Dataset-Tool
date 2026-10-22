@@ -221,7 +221,7 @@ class _PassedSizeCheck(Exception):
 
 
 def test_real_4d_diffusion_size_passes_the_default_limit(monkeypatch) -> None:
-    # QA1-07: 144x144x78x140 at 1.8 mm resampled to 1 mm gives 260x260x141x140 ~ 1.33e9 voxels > 2**28.
+    # 144x144x78x140 at 1.8 mm resampled to 1 mm gives 260x260x141x140 ~ 1.33e9 voxels > 2**28.
     # Stop right after the size check so CI never allocates the output.
     def stop(volume, dtype):
         raise _PassedSizeCheck

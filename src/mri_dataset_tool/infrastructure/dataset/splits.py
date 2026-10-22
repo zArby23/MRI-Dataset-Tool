@@ -1,4 +1,4 @@
-"""Train/validation/test partitions by participant (RF13, Q5). Pure functions, no I/O.
+"""Train/validation/test partitions by participant (RF13). Pure functions, no I/O.
 
 All sessions of a participant land in the same split (no leakage). With labels, participants are
 stratified by their *stratum*: the sorted tuple of distinct classes over their labelled sessions

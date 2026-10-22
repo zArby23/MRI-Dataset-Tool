@@ -97,7 +97,7 @@ DICOM_ACTIONS: dict[str, Action] = {
     "PatientIdentityRemoved": Action.REPLACED,
     "DeidentificationMethod": Action.REPLACED,
     # Type 2 attributes that must exist but carry identity or clock time. The birth date is
-    # emptied (decision of the human): age survives only as the PatientAge range.
+    # emptied: age survives only as the PatientAge range.
     "PatientName": Action.EMPTIED,
     "PatientBirthDate": Action.EMPTIED,
     "ReferringPhysicianName": Action.EMPTIED,
@@ -111,7 +111,7 @@ DICOM_ACTIONS: dict[str, Action] = {
     "ContentDate": Action.GENERALIZED,
     "AcquisitionDateTime": Action.GENERALIZED,
     "PatientAge": Action.GENERALIZED,
-    # Kept by decision of the human.
+    # Kept: a policy choice (docs/anonymization/policy.md).
     "PatientSex": Action.KEPT,
     # Encoding and object type.
     "SpecificCharacterSet": Action.KEPT,
