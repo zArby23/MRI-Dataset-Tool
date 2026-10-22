@@ -6,6 +6,7 @@ import numpy as np
 import pytest
 
 from mri_dataset_tool.application.services.dataset import write_ml_exports
+from mri_dataset_tool.application.services.labels import finalize_labels
 from mri_dataset_tool.domain.models.serie import MRISeries
 from mri_dataset_tool.domain.models.study import MRIStudy
 from mri_dataset_tool.infrastructure.dataset import bids_writer
@@ -70,8 +71,10 @@ def test_files_outside_the_layout_are_rejected(tmp_path: Path, relative) -> None
 def test_dataset_without_images(tmp_path: Path) -> None:
     with pytest.raises(ValueError, match=r"^No dataset images were found\.$"):
         write_ml_exports(_touch(tmp_path, "README"))
-    with pytest.raises(NotADirectoryError):
+    with pytest.raises(FileNotFoundError, match=r"^Dataset directory not found\.$"):
         write_ml_exports(tmp_path / "missing")
+    with pytest.raises(NotADirectoryError, match=r"^Dataset path is not a directory\.$"):
+        write_ml_exports(tmp_path / "README")
 
 
 def test_exports_without_labels(tmp_path: Path) -> None:
@@ -91,6 +94,7 @@ def test_exports_without_labels(tmp_path: Path) -> None:
     summary = json.loads((root / "splits.json").read_text(encoding="utf-8"))
     assert summary["seed"] == 0 and summary["ratios"] == {"training": 0.7, "validation": 0.15, "testing": 0.15}
     assert summary["participants"] == {"training": 6, "validation": 1, "testing": 1} and not summary["stratified"]
+    assert summary["labels_finalized"] is None
     splits = _rows(root / "splits.tsv", "\t")
     assert [r["participant_id"] for r in splits] == [f"sub-p{i:02d}" for i in range(8)]
 
@@ -113,9 +117,10 @@ def test_stratified_exports_with_unlabeled(tmp_path: Path) -> None:
     labels = {(f"p{i:02d}", s): ("AD" if i < 4 else "CN") for i in range(7) for s in ("1", "2")}
     labels[("p03", "2")] = None  # an unlabeled session of a labelled participant
     write_labels(LabelTable(CLASSES, labels), root)  # p07 is not in the table at all
-    write_ml_exports(root)
+    write_ml_exports(root, allow_unfinalized=True)
     summary = json.loads((root / "splits.json").read_text(encoding="utf-8"))
     assert summary["stratified"] and summary["unlabeled_participants"] == ["sub-p07"]
+    assert summary["labels_finalized"] is False
     assert summary["warnings"] == []
     splits = {r["participant_id"]: r["split"] for r in _rows(root / "splits.tsv", "\t")}
     assert "sub-p07" not in splits
@@ -137,7 +142,7 @@ def test_stratified_exports_with_unlabeled(tmp_path: Path) -> None:
 def test_few_participants_warning_is_recorded(tmp_path: Path) -> None:
     root = _dataset(tmp_path, 5)
     write_labels(LabelTable(CLASSES, {("p00", "1"): "AD"} | {(f"p{i:02d}", "1"): "CN" for i in range(1, 5)}), root)
-    write_ml_exports(root)
+    write_ml_exports(root, allow_unfinalized=True)
     warnings = json.loads((root / "splits.json").read_text(encoding="utf-8"))["warnings"]
     assert warnings == [{"code": "FEW_PARTICIPANTS", "participants": 1, "stratum": ["AD"]}]
 
@@ -145,7 +150,7 @@ def test_few_participants_warning_is_recorded(tmp_path: Path) -> None:
 def test_all_participants_unlabeled(tmp_path: Path) -> None:
     root = _dataset(tmp_path, 2)
     write_labels(LabelTable(CLASSES, {("p00", "1"): None, ("p01", "1"): None}), root)
-    write_ml_exports(root)
+    write_ml_exports(root, allow_unfinalized=True)
     datalist = json.loads((root / "datalist.json").read_text(encoding="utf-8"))
     assert [len(datalist[s]) for s in ("training", "validation", "testing", "unlabeled")] == [0, 0, 0, 8]
     assert (root / "splits.tsv").read_text(encoding="utf-8") == "participant_id\tsplit\n"
@@ -187,7 +192,7 @@ def test_deterministic(tmp_path: Path) -> None:
     def run(root: Path) -> dict[str, bytes]:
         _dataset(root)
         write_labels(LabelTable(CLASSES, {(f"p{i:02d}", "1"): "AD" if i % 2 else "CN" for i in range(8)}), root)
-        write_ml_exports(root)
+        write_ml_exports(root, allow_unfinalized=True)
         return {name: (root / name).read_bytes() for name in EXPORTS}
 
     assert run(tmp_path / "one") == run(tmp_path / "two")
@@ -207,3 +212,55 @@ def test_on_a_dataset_written_by_the_writer_without_private_data(tmp_path: Path)
     for name in EXPORTS:
         text = (root / name).read_text(encoding="utf-8")
         assert str(tmp_path) not in text and str(tmp_path.as_posix()) not in text and "Users" not in text
+
+
+def _labelled_dataset(root: Path) -> Path:
+    _dataset(root, 6)
+    write_labels(LabelTable(CLASSES, {(f"p{i:02d}", s): "AD" if i < 3 else "CN" for i in range(6) for s in ("1", "2")}), root)
+    return root
+
+
+def _assert_rejected(root: Path) -> None:
+    with pytest.raises(ValueError) as info:
+        write_ml_exports(root)
+    assert str(info.value) == "Labels are not finalized."
+    assert not any((root / name).exists() for name in EXPORTS)
+
+
+def test_unfinalized_labels_are_rejected_by_default(tmp_path: Path) -> None:
+    _assert_rejected(_labelled_dataset(tmp_path))
+
+
+@pytest.mark.parametrize("closure", ["not json", "[]", '{"other": 1}', '{"sha256": "0"}'])
+def test_invalid_closure_is_not_finalized(tmp_path: Path, closure) -> None:
+    root = _labelled_dataset(tmp_path)
+    (root / "labels_final.json").write_text(closure, encoding="utf-8")
+    _assert_rejected(root)
+
+
+def test_closure_is_stale_after_editing_the_labels(tmp_path: Path) -> None:
+    root = _labelled_dataset(tmp_path)
+    finalize_labels(root)
+    tsv = root / "labels.tsv"
+    tsv.write_text(tsv.read_text(encoding="utf-8").replace("sub-p00	ses-1	AD", "sub-p00	ses-1	CN"), encoding="utf-8")
+    _assert_rejected(root)
+
+
+def test_valid_closure_is_exported_and_recorded(tmp_path: Path) -> None:
+    root = _labelled_dataset(tmp_path)
+    finalize_labels(root)
+    write_ml_exports(root)
+    summary = json.loads((root / "splits.json").read_text(encoding="utf-8"))
+    assert summary["labels_finalized"] is True and summary["stratified"]
+
+
+def test_allow_unfinalized_exports_and_records_it(tmp_path: Path) -> None:
+    root = _labelled_dataset(tmp_path)
+    write_ml_exports(root, allow_unfinalized=True)
+    assert json.loads((root / "splits.json").read_text(encoding="utf-8"))["labels_finalized"] is False
+
+
+def test_dataset_without_labels_needs_no_closure(tmp_path: Path) -> None:
+    root = _dataset(tmp_path, 3)
+    write_ml_exports(root)
+    assert json.loads((root / "splits.json").read_text(encoding="utf-8"))["labels_finalized"] is None

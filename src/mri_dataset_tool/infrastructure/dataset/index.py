@@ -70,8 +70,12 @@ def write_ml_files(
     warnings: list[dict[str, object]],
     ratios: tuple[float, ...],
     seed: int,
+    labels_finalized: bool | None = None,
 ) -> list[Path]:
-    """Write the four export files (all or none; existing → ``FileExistsError``)."""
+    """Write the four export files (all or none; existing → ``FileExistsError``).
+
+    *labels_finalized* goes to ``splits.json`` (``None`` = dataset without labels).
+    """
     rows = []
     datalist: dict[str, list[dict[str, str]]] = {name: [] for name in SPLITS}
     datalist_unlabeled: list[dict[str, str]] = []
@@ -102,6 +106,7 @@ def write_ml_files(
         "seed": seed,
         "ratios": dict(zip(SPLITS, ratios)),
         "stratified": labels is not None,
+        "labels_finalized": labels_finalized,
         "participants": counts,
         "unlabeled_participants": [f"sub-{p}" for p in unlabeled],
         "warnings": warnings,

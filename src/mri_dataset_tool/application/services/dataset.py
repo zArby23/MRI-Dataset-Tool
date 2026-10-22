@@ -1,5 +1,6 @@
 """Export processed studies as a BIDS dataset (RF10, RF13, RF15, RF16)."""
 
+import json
 from collections.abc import Callable, Iterable
 from dataclasses import dataclass, replace
 from pathlib import Path
@@ -7,10 +8,11 @@ from typing import Any
 
 from mri_dataset_tool.application.pipeline.manifest import RunManifest
 from mri_dataset_tool.application.pipeline.runner import Pipeline
+from mri_dataset_tool.application.services.labels import label_fingerprint
 from mri_dataset_tool.domain.models.study import MRIStudy
 from mri_dataset_tool.infrastructure.dataset.bids_writer import BIDSDatasetWriter
 from mri_dataset_tool.infrastructure.dataset.index import scan_images, write_ml_files
-from mri_dataset_tool.infrastructure.dataset.labels import LABELS_TSV, read_labels
+from mri_dataset_tool.infrastructure.dataset.labels import FINAL_JSON, LABELS_TSV, LabelTable, read_labels
 from mri_dataset_tool.infrastructure.dataset.splits import (
     DEFAULT_RATIOS,
     DEFAULT_SEED,
@@ -93,23 +95,44 @@ def export_dataset(
     return result
 
 
-def write_ml_exports(root: Path, ratios: Any = DEFAULT_RATIOS, seed: Any = DEFAULT_SEED) -> list[Path]:
+def write_ml_exports(
+    root: Path, ratios: Any = DEFAULT_RATIOS, seed: Any = DEFAULT_SEED, *, allow_unfinalized: bool = False
+) -> list[Path]:
     """Write ``dataset_index.csv``, ``datalist.json``, ``splits.tsv`` and ``splits.json`` for the
     BIDS dataset at *root* (RF13). Splits are by participant, stratified when ``labels.tsv`` exists.
 
     Reads only file names and the label table, never volumes. Invalid ratios/seed, a dataset
     without images or with files outside the layout → ``ValueError``; existing exports → ``FileExistsError``.
+    With ``labels.tsv``, the labels must be closed (``labels_final.json`` whose ``sha256`` matches the
+    current table) unless *allow_unfinalized* is true (decision of the human); otherwise
+    ``ValueError("Labels are not finalized.")`` before writing anything. ``splits.json`` records it.
     """
     weights = check_split_params(ratios, seed)
+    if not root.exists():
+        raise FileNotFoundError("Dataset directory not found.")
     if not root.is_dir():
-        raise NotADirectoryError("Dataset directory not found.")
+        raise NotADirectoryError("Dataset path is not a directory.")
+    labels, finalized = None, None
+    if (root / LABELS_TSV).exists():
+        labels = read_labels(root)
+        finalized = _labels_finalized(root, labels)
+        if not finalized and not allow_unfinalized:
+            raise ValueError("Labels are not finalized.")
     entries = scan_images(root)
-    labels = read_labels(root) if (root / LABELS_TSV).exists() else None
     strata, unlabeled = participant_strata(
         ((entry.participant, entry.session) for entry in entries), None if labels is None else labels.labels
     )
     # every participant unlabeled: nothing to split, all are listed apart
     assignment, warnings = assign_splits(strata, weights, seed) if strata else ({}, [])
-    written = write_ml_files(root, entries, labels, assignment, unlabeled, warnings, weights, seed)
+    written = write_ml_files(root, entries, labels, assignment, unlabeled, warnings, weights, seed, finalized)
     logger.info("Wrote ML exports: %d images, %d participants split, %d unlabeled.", len(entries), len(assignment), len(unlabeled))
     return written
+
+
+def _labels_finalized(root: Path, labels: LabelTable) -> bool:
+    """True if ``labels_final.json`` exists and its fingerprint matches *labels*."""
+    try:
+        recorded = json.loads((root / FINAL_JSON).read_text(encoding="utf-8"))["sha256"]
+    except (OSError, ValueError, KeyError, TypeError):
+        return False  # missing or unreadable closure: not finalized
+    return recorded == label_fingerprint(labels)
