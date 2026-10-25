@@ -101,6 +101,17 @@ inspect → (DICOM) convert dicom-to-nifti → (opcional) anonymize → process 
   `convert dicom-to-nifti`.
 - **Camino corto con un BIDS:** `dataset build` hace en un solo paso pipeline + dataset + etiquetas + exportes +
   reporte. Los subcomandos `labels`, `dataset export-ml` y `dataset report` permiten rehacer cada parte por separado.
+- **Etiquetar después del build:** pase `--classes` a `dataset build` (sin `--corrections`). Así se escribe la
+  plantilla y, como las etiquetas quedan incompletas, se omiten los exportes para ML. Luego haga `labels apply`,
+  `labels finalize` y por último `dataset export-ml`. **Sin `--classes`, `build` escribe los exportes para ML sin
+  etiquetas** y un `export-ml` posterior falla con código 1 porque los archivos ya existen.
+
+```text
+mri-dataset dataset build E:/mri/bids --output-dir E:/mri/out --config config/stage3_bids.yaml --classes AD CN
+mri-dataset labels apply E:/mri/out/dataset --corrections E:/mri/fix.tsv
+mri-dataset labels finalize E:/mri/out/dataset
+mri-dataset dataset export-ml E:/mri/out/dataset
+```
 
 ## 5. Comandos
 
@@ -276,7 +287,8 @@ Input files skipped by the reader: none
 Report read errors: none
 ```
 
-Después: `labels apply`, `labels finalize` y `dataset export-ml` sobre `E:/mri/out/dataset`.
+Después: `labels apply`, `labels finalize` y `dataset export-ml` sobre `E:/mri/out/dataset` (sección 4). Sin
+`--classes`, `build` escribe los exportes para ML sin etiquetas y ese camino ya no está disponible en esa salida.
 
 ## 6. Uso de memoria
 
@@ -323,6 +335,7 @@ pipeline:
 | `Errors by type: {'ValueError': n}` con código 0 | Algunos estudios fallaron (p. ej. valores NaN, memoria insuficiente); el resto se procesó. |
 | `Labels finalize failed: ValueError` | Las etiquetas no están completas: revise con `labels review`. |
 | `ML exports failed: ValueError` | Etiquetas sin cerrar: `labels finalize` o `--allow-unfinalized`. |
+| `ML export files already exist.` tras `dataset build` | `build` sin `--classes` ya escribió los exportes (sin etiquetas). Para etiquetar después, repita `build` en una carpeta nueva con `--classes` (sección 4). |
 
 ## 8. Límites conocidos
 

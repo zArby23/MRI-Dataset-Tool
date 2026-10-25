@@ -112,4 +112,6 @@ Los comandos conservan el streaming de los servicios (un estudio vivo a la vez; 
    `report.path`) desde el directorio actual; sin paso que redacte fuentes, que el manifiesto tenga rutas es lo
    esperado (aviso fijo, código 0); `--format dicom` → mensaje fijo que remite a `convert` y código 2.
 8. `labels`: revisión solo por archivos; `review` muestra conteos, no ids; errores del servicio solo con el tipo.
-9. `dataset build`: `IN` y `--config` obligatorios (sin los defectos del lanzador de la etapa 4).
+9. `dataset build`: `IN` y `--config` obligatorios (sin los defectos del lanzador de la etapa 4). Sin `--classes`
+   escribe los exportes para ML sin etiquetas (comportamiento de `build_dataset`), así que etiquetar después exige
+   `build --classes` (etiquetas incompletas, exportes omitidos) → `labels apply`/`finalize` → `dataset export-ml`.
