@@ -79,3 +79,46 @@ def test_oserror_reports_nothing_and_logs_only_the_type(tmp_path, monkeypatch, c
 def test_real_disk_usage_is_read(tmp_path):
     check = check_free_space(tmp_path, 1)
     assert check.free is not None and check.free <= shutil.disk_usage(tmp_path).total
+
+
+def _symlink_or_skip(link: Path, target: Path, directory: bool = False) -> None:
+    try:
+        link.symlink_to(target, target_is_directory=directory)
+    except OSError:  # Windows without the symlink privilege (Developer Mode off)
+        pytest.skip("symlinks cannot be created here")
+
+
+def test_symlinks_to_files_count_their_target(tmp_path):
+    store = tmp_path / ".git" / "annex"  # hidden: never walked, but reached through the links
+    store.mkdir(parents=True)
+    (store / "blob").write_bytes(b"x" * 300)
+    (tmp_path / "data").mkdir()
+    (tmp_path / "data" / "outside").write_bytes(b"y" * 40)
+    root = tmp_path / "ds"
+    root.mkdir()
+    _symlink_or_skip(root / "sub-01_T1w.nii.gz", store / "blob")
+    _symlink_or_skip(root / "broken.nii.gz", store / "missing")
+    _symlink_or_skip(root / "linked_dir", tmp_path / "data", directory=True)
+    _symlink_or_skip(root / "loop", root, directory=True)
+    assert estimate_input_bytes(root) == 300  # file link only: not the broken one, not linked directories
+
+
+def test_symlinks_logic_with_patched_stat(tmp_path, monkeypatch):
+    """Same rules without real symlinks (runs on Windows too)."""
+    root = tmp_path / "ds"
+    root.mkdir()
+    Info = namedtuple("Info", "st_mode st_size")
+    infos = {"annexed.nii.gz": Info(0o100644, 300), "fifo": Info(0o010644, 999)}
+
+    def fake_walk(path):
+        yield str(root), ["linked_dir", ".datalad"], ["annexed.nii.gz", "broken.nii.gz", "fifo", ".hidden"]
+
+    def fake_stat(path):
+        name = Path(path).name
+        if name not in infos:
+            raise FileNotFoundError(name)  # broken link
+        return infos[name]
+
+    monkeypatch.setattr(disk_space.os, "walk", fake_walk)
+    monkeypatch.setattr(disk_space.os, "stat", fake_stat)
+    assert estimate_input_bytes(root) == 300

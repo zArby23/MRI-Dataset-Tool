@@ -27,7 +27,9 @@ class DiskSpaceCheck:
 
 def estimate_input_bytes(path: Path) -> int:
     """Total size of the regular files of *path* (a file or a tree); hidden entries are skipped as
-    the batch readers do (``.git``, ``.datalad``...); unreadable files count as 0."""
+    the batch readers do (``.git``, ``.datalad``...). A symlink to a file counts its target (git-annex
+    and DataLad store each image as one); broken or unreadable links count as 0. Symlinked
+    directories are not followed (``os.walk`` default), so a link cycle cannot loop."""
     if path.is_file():
         return path.stat().st_size
     total = 0
@@ -37,10 +39,10 @@ def estimate_input_bytes(path: Path) -> int:
             if name.startswith("."):
                 continue
             try:
-                info = os.lstat(os.path.join(directory, name))
-            except OSError:
+                info = os.stat(os.path.join(directory, name))  # follows git-annex/DataLad file symlinks
+            except OSError:  # broken or unreadable link
                 continue
-            if stat.S_ISREG(info.st_mode):  # symlinks are not followed
+            if stat.S_ISREG(info.st_mode):
                 total += info.st_size
     return total
 

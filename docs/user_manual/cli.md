@@ -74,7 +74,9 @@ alcanza el 90 % del espacio libre (margen del 10 %), imprimen, también con `--q
 WARNING INSUFFICIENT_DISK_SPACE: estimated output 12.3 GiB, 11.0 GiB free on the output drive; consider another drive.
 ```
 
-Es solo un aviso: la ejecución sigue y el código de salida no cambia. La estimación es aproximada; el
+Es solo un aviso: la ejecución sigue y el código de salida no cambia. En datasets git-annex/DataLad, donde cada
+imagen es un enlace simbólico, se cuenta el tamaño del archivo enlazado (un enlace roto cuenta 0; no se siguen
+enlaces a carpetas ni carpetas ocultas como `.git`). La estimación es aproximada; el
 remuestreo a un espaciado menor o la salida en `float32` de entradas `int16` pueden ocupar bastante más que la
 entrada. Si el espacio libre no se puede leer, no hay aviso. `dataset report` y `dataset export-ml` escriben
 archivos pequeños y no avisan.
