@@ -106,7 +106,7 @@ Los comandos conservan el streaming de los servicios (un estudio vivo a la vez; 
 `allow_insufficient_memory` y `max_output_voxels` solo se cambian en la configuración: no hay opción de CLI.
 `test_service_pipeline_run.py` comprueba con `weakref` que cada estudio se libera antes de leer el siguiente.
 
-## Decisiones de C0–C6
+## Decisiones de diseño
 
 1. `argparse` (stdlib), ayuda en español, mensajes fijos en inglés; los errores de `argparse` se reemplazan por un
    mensaje fijo sin el valor tecleado.

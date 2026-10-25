@@ -4,7 +4,7 @@ La CLI prepara datasets de resonancia magnética (DICOM, NIfTI, BIDS) para ML/DL
 anonimiza, procesa con un pipeline configurable, etiqueta, exporta y genera reportes. Todo lo que imprime son
 conteos y tipos de error: **nunca** rutas, identificadores de pacientes, UIDs ni valores de cabecera.
 
-> Estado: en desarrollo (etapa 5A). Las pruebas automáticas usan datos sintéticos. **Pendiente de verificación
+> Estado: en desarrollo. Las pruebas automáticas usan datos sintéticos. **Pendiente de verificación
 > manual:** instalación en un entorno limpio, un recorrido real con una carpeta de datos y la ejecución en Linux.
 
 ## 1. Instalación
@@ -366,7 +366,7 @@ pipeline:
 
 ## 8. Límites conocidos
 
-- No hay interfaz gráfica (etapa 5B) ni revisión interactiva de etiquetas: la revisión es por archivos.
+- No hay interfaz gráfica ni revisión interactiva de etiquetas: la revisión es por archivos.
 - `inspect --format dicom` solo lee cabeceras (sin intensidades).
 - `nifti-to-dicom` rechaza volúmenes 4D; el DICOM escrito no es conforme estricto al IOD MR (`docs/dicom/writer.md`).
 - La anonimización no borra caras ni texto quemado en los píxeles y conserva cuasi-identificadores

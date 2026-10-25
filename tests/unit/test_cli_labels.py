@@ -1,4 +1,4 @@
-"""C5: ``labels template|review|apply|finalize|reopen`` over a dataset built by the CLI; no ids printed."""
+"""``labels template|review|apply|finalize|reopen`` over a dataset built by the CLI; no ids printed."""
 
 import json
 

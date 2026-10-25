@@ -1,4 +1,4 @@
-"""E5a: pipeline_run service (reading, float32 outputs, manifest checks, replay, typed failures)."""
+"""``pipeline_run`` service (reading, float32 outputs, manifest checks, replay, typed failures)."""
 
 import gc
 import weakref

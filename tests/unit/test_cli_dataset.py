@@ -1,4 +1,4 @@
-"""C6: ``dataset export-ml|report|build`` over a synthetic BIDS input; counts only on the console."""
+"""``dataset export-ml|report|build`` over a synthetic BIDS input; counts only on the console."""
 
 import json
 import logging

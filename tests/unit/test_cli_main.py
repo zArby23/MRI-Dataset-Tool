@@ -1,4 +1,4 @@
-"""C0: root parser, global options, exit codes and the shared CLI helpers."""
+"""Root parser, global options, exit codes and the shared CLI helpers."""
 
 import argparse
 import logging

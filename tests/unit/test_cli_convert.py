@@ -1,4 +1,4 @@
-"""C2: ``convert`` in both directions; validation before creating anything; counts only."""
+"""``convert`` in both directions; validation before creating anything; counts only."""
 
 import logging
 from collections import namedtuple

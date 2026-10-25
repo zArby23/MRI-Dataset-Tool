@@ -1,4 +1,4 @@
-"""Integration (E5): the whole flow through the CLI over a synthetic BIDS batch with planted PHI.
+"""Integration: the whole flow through the CLI over a synthetic BIDS batch with planted PHI.
 
 ``process`` → ``dataset build`` (labels in one go, and labels step by step) → ``dataset export-ml`` →
 ``dataset report``; exit codes per stage, PHI sweep over console, DEBUG logs, ``--json``, output tree and

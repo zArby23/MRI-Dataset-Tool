@@ -1,4 +1,4 @@
-"""C1: ``inspect`` shows allow-listed metadata only; never ids, UIDs, header values or paths."""
+"""``inspect`` shows allow-listed metadata only; never ids, UIDs, header values or paths."""
 
 import json
 import logging

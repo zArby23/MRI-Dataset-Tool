@@ -1,4 +1,4 @@
-"""C7: disk_space service (input size estimate and the 90 % free-space threshold)."""
+"""``disk_space`` service (input size estimate and the 90 % free-space threshold)."""
 
 import logging
 import shutil

@@ -1,4 +1,4 @@
-"""C3: ``anonymize`` needs the key, never overwrites a report and prints only labels and counts."""
+"""``anonymize`` needs the key, never overwrites a report and prints only labels and counts."""
 
 import logging
 from collections import namedtuple

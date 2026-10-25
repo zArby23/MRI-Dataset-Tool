@@ -1,4 +1,4 @@
-"""E5a: dataset_build service (validation before creating anything, status events, typed failures)."""
+"""``dataset_build`` service (validation before creating anything, status events, typed failures)."""
 
 from pathlib import Path
 

@@ -1,4 +1,4 @@
-"""C4: ``process`` runs the configured pipeline through pipeline_run; counts only on the console."""
+"""``process`` runs the configured pipeline through pipeline_run; counts only on the console."""
 
 import json
 import logging
