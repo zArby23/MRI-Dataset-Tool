@@ -49,6 +49,16 @@ def parse_classes(items: Sequence[str]) -> dict[str, str]:
     return classes
 
 
+def check_classes(items: Sequence[str]) -> dict[str, str]:
+    """Parsed and valid label classes (``NAME[=description]`` items); else ``InvalidBuildInput``."""
+    try:
+        classes = parse_classes(items)
+        LabelTable(classes)
+    except ValueError:
+        raise InvalidBuildInput("Invalid --classes.") from None
+    return classes
+
+
 def check_build_args(
     dataset_root: Path,
     output_dir: Path,
@@ -65,13 +75,7 @@ def check_build_args(
         raise InvalidBuildInput("Dataset directory not found.")
     if not config_path.is_file():
         raise InvalidBuildInput("Config file not found.")
-    classes = None
-    if class_items:
-        try:
-            classes = parse_classes(class_items)
-            LabelTable(classes)
-        except ValueError:
-            raise InvalidBuildInput("Invalid --classes.") from None
+    classes = check_classes(class_items) if class_items else None
     if corrections is not None and classes is None:
         raise InvalidBuildInput("--corrections needs --classes.")
     if corrections is not None and not corrections.is_file():

@@ -5,9 +5,9 @@ from collections.abc import Sequence
 
 from mri_dataset_tool.application.pipeline.manifest import collect_versions
 from mri_dataset_tool.presentation.cli._common import EXIT_USAGE, configure_output, spanish_help
-from mri_dataset_tool.presentation.cli.commands import anonymize, convert, inspect
+from mri_dataset_tool.presentation.cli.commands import anonymize, convert, dataset, inspect, labels, process
 
-COMMANDS: tuple = (inspect, convert, anonymize)  # modules with add_parser(subparsers) and run(args) -> int
+COMMANDS: tuple = (inspect, convert, anonymize, process, labels, dataset)  # modules with add_parser(subparsers) and run(args) -> int
 
 
 def build_parser() -> argparse.ArgumentParser:
