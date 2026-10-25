@@ -17,6 +17,9 @@ dependencies = [
     "openpyxl>=3.1"
 ]
 
+[project.scripts]
+mri-dataset = "mri_dataset_tool.presentation.cli.main:main"
+
 [project.optional-dependencies]
 dev = [
     "pytest>=9.1"
