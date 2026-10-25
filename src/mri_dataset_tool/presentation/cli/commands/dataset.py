@@ -12,6 +12,7 @@ from mri_dataset_tool.application.services.dataset_build import (
     is_exported_dataset,
     load_build_pipeline,
 )
+from mri_dataset_tool.application.services.dataset_ingest import load_mapping, plan_ingest
 from mri_dataset_tool.application.services.dataset_report import report_dataset
 from mri_dataset_tool.infrastructure.config.loader import DEFAULT_CONFIG_DIR
 from mri_dataset_tool.infrastructure.dataset.splits import DEFAULT_RATIOS, DEFAULT_SEED, check_split_params
@@ -40,6 +41,7 @@ _MESSAGES = {
     "ml_exports_skipped": "ML exports: skipped (labels incomplete; fix them or use --allow-unfinalized).",
     "ml_exports": "ML export files written: {files}",
     "report": "Report files written: {files}",
+    "mapping_labels_applied": "Mapping labels applied: {rows}",
 }
 
 
@@ -72,12 +74,20 @@ def add_parser(subparsers) -> None:
 
     build = add_command(
         actions, "build", help="flujo completo: pipeline, dataset BIDS, etiquetas, exportes y reporte",
-        description="Procesa IN (BIDS) con --config (debe incluir anonymize; requiere MRI_ANON_KEY) y escribe "
+        description="Procesa IN (BIDS; con --format, un árbol DICOM o NIfTI sueltos) con --config (debe incluir anonymize; requiere MRI_ANON_KEY) y escribe "
         "OUT/dataset y OUT/report. Con --classes escribe la plantilla de etiquetas; --corrections las asigna. "
         "Etiquetas completas: se cierran; incompletas: sin exportes para ML salvo --allow-unfinalized. "
         "config/default.yaml se lee desde el directorio actual.",
     )
-    build.add_argument("input", type=Path, help="dataset BIDS de entrada")
+    build.add_argument("input", type=Path, help="entrada: dataset BIDS, árbol DICOM o carpeta de NIfTI sueltos")
+    build.add_argument(
+        "--format", choices=("bids", "dicom", "nifti"), default="bids",
+        help="formato de la entrada (por defecto bids); dicom y nifti se organizan como BIDS (ver --mapping)",
+    )
+    build.add_argument(
+        "--mapping", type=Path,
+        help="TSV opcional (path, participant, session, suffix[, label]) para dicom y nifti; ver el manual",
+    )
     build.add_argument("--output-dir", type=Path, required=True, help="directorio nuevo, fuera de la entrada")
     build.add_argument("--config", type=Path, required=True, help="archivo YAML de la corrida (con anonymize)")
     build.add_argument("--classes", nargs="+", metavar="NAME[=DESCRIPTION]", help="clases; escribe la plantilla")
@@ -143,12 +153,23 @@ def _report(args: argparse.Namespace) -> int:
 def _print_status(event: str, counts: dict[str, int]) -> None:
     if event == "labels_incomplete":
         print(f"WARNING LABELS_INCOMPLETE: {counts}")
+    elif event == "ingested":  # warnings: printed also with --quiet
+        unmapped = {code: n for code, n in counts.items() if code not in ("MAPPING_UNUSED", "NOT_4D_DWI") and n}
+        if unmapped:
+            print(f"WARNING UNMAPPED_SERIES: {unmapped}")
+        if counts.get("NOT_4D_DWI"):  # a suffix was found, but the volume cannot be a dwi
+            print(f"WARNING NOT_4D_DWI: {counts['NOT_4D_DWI']}")
+        if counts.get("MAPPING_UNUSED"):
+            print(f"WARNING MAPPING_UNUSED: {counts['MAPPING_UNUSED']}")
     else:
         status(_MESSAGES[event].format(**counts))
 
 
 def _build(args: argparse.Namespace) -> int:
     if not check_key():
+        return EXIT_USAGE
+    if args.mapping is not None and args.format == "bids":  # an argument error: before the output checks
+        print("--mapping needs --format dicom or nifti.")
         return EXIT_USAGE
     try:
         classes = check_build_args(
@@ -165,10 +186,18 @@ def _build(args: argparse.Namespace) -> int:
     except InvalidBuildInput as error:
         print(error)
         return EXIT_USAGE
-    warn_if_low_disk_space(args.input, args.output_dir)
 
     # Separate counts: files the reader skips (e.g. git-annex pointers) are not export errors.
     skipped, on_skipped = error_counter("input file skipped")
+    ingest = None
+    if args.format != "bids":
+        try:  # headers only: ids, suffixes and mapping labels are decided before anything is created
+            mapping = None if args.mapping is None else load_mapping(args.mapping, args.input, classes)
+            ingest = plan_ingest(args.format, args.input, mapping=mapping, on_skipped=on_skipped)
+        except InvalidBuildInput as error:  # fixed text
+            print(error)
+            return EXIT_USAGE
+    warn_if_low_disk_space(args.input, args.output_dir)
     errors, on_error = error_counter("error")
     report_errors, on_report_error = error_counter("report read error")
     try:
@@ -177,6 +206,7 @@ def _build(args: argparse.Namespace) -> int:
             classes=classes, corrections=args.corrections, ratios=args.ratios, seed=args.seed,
             allow_unfinalized=args.allow_unfinalized,
             on_skipped=on_skipped, on_error=on_error, on_report_error=on_report_error, on_status=_print_status,
+            ingest=ingest,
         )
     except StageFailed as failure:  # its cause may name a file
         print(f"Run failed at {failure.stage}: {failure.error_type}")

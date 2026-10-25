@@ -112,11 +112,14 @@ salida de errores (stderr), de modo que un fallo deja la salida estándar vacía
 ## 4. Flujo recomendado
 
 ```text
-inspect → (DICOM) convert dicom-to-nifti → (opcional) anonymize → process → labels → dataset build / export-ml / report
+inspect → dataset build (--format bids|dicom|nifti) → labels → dataset export-ml / report
 ```
 
-- **DICOM:** `process` y `dataset build` trabajan sobre NIfTI o BIDS. Convierta primero con
-  `convert dicom-to-nifti`.
+- **Cualquier entrada llega al dataset:** `dataset build` acepta un BIDS (por defecto), un árbol DICOM
+  (`--format dicom`) o una carpeta de NIfTI sueltos (`--format nifti`), y todas terminan en el mismo dataset BIDS
+  anonimizado con etiquetas, particiones y reporte. Con DICOM **no hace falta convertir antes**.
+- **Solo procesar (sin dataset):** `process` trabaja sobre NIfTI o BIDS; para DICOM, `convert dicom-to-nifti`
+  primero. `convert` y `anonymize` siguen disponibles como pasos sueltos.
 - **Camino corto con un BIDS:** `dataset build` hace en un solo paso pipeline + dataset + etiquetas + exportes +
   reporte. Los subcomandos `labels`, `dataset export-ml` y `dataset report` permiten rehacer cada parte por separado.
 - **Etiquetar después del build:** pase `--classes` a `dataset build` (sin `--corrections`). Así se escribe la
@@ -281,17 +284,30 @@ servicio (p. ej. aplicar correcciones a etiquetas cerradas) terminan con código
 ### 5.6 `dataset`: construir, exportar y reportar (RF10, RF13, RF14)
 
 ```text
-mri-dataset dataset build IN --output-dir OUT --config CFG [--classes ...] [--corrections TSV]
+mri-dataset dataset build IN --output-dir OUT --config CFG [--format bids|dicom|nifti] [--mapping TSV]
+                            [--classes ...] [--corrections TSV]
                             [--ratios TRAIN VAL TEST] [--seed N] [--allow-unfinalized]
 mri-dataset dataset export-ml DATASET [--ratios TRAIN VAL TEST] [--seed N] [--allow-unfinalized]
 mri-dataset dataset report DATASET OUT
 ```
 
-- `build`: lee el BIDS `IN`, aplica `CFG` (debe incluir `anonymize`; requiere `MRI_ANON_KEY`) y escribe
+- `build`: lee `IN` (BIDS por defecto; con `--format dicom` un árbol DICOM y con `--format nifti` NIfTI sueltos),
+  aplica `CFG` (debe incluir `anonymize`; requiere `MRI_ANON_KEY`) y escribe
   `OUT/dataset` (BIDS con seudónimos) y `OUT/report`. `OUT` debe ser nueva y estar fuera de `IN`. Con `--classes`
   escribe la plantilla de etiquetas; `--corrections` (exige `--classes`) las asigna. Si quedan completas se cierran
   y se escriben los exportes para ML; si no, se avisa con `WARNING LABELS_INCOMPLETE` y se omiten salvo
   `--allow-unfinalized`.
+- `build --format dicom|nifti`: la identidad y el sufijo BIDS de cada serie se deciden antes de crear nada
+  (`docs/dataset/ingest.md`). DICOM: el participante es el `PatientID` seudonimizado y cada estudio es una sesión;
+  NIfTI sin tabla: un participante por archivo. El sufijo (T1w, T2w, FLAIR, T2starw, PDw, dwi) sale de reglas
+  conservadoras sobre la descripción de la serie o el nombre del archivo; lo dudoso se omite y se avisa con
+  `WARNING UNMAPPED_SERIES: {código: n}` (`EXCLUDED`, `AMBIGUOUS`, `NO_MATCH`); un `dwi` que no es 4D se omite con
+  `WARNING NOT_4D_DWI: n`. La tabla opcional `--mapping` (UTF-8, con o sin BOM; columnas `path`, `participant`,
+  `session`, `suffix` y, opcional, `label`; `path` relativo a `IN`, con `/` y con las mayúsculas exactas)
+  fuerza participante, sesión, sufijo o etiqueta; una fila que no aplica a ninguna serie se avisa con
+  `WARNING MAPPING_UNUSED: n`. Con `label` (exige `--classes`) las etiquetas se aplican al dataset y, si quedan
+  completas, se cierran: es la forma de etiquetar un DICOM, porque usted conoce sus carpetas, no los seudónimos.
+  Los avisos salen también con `--quiet`.
 - `export-ml`: escribe `dataset_index.csv`, `datalist.json`, `splits.tsv` y `splits.json` (particiones por
   participante, estratificadas, deterministas con `--seed`; por defecto 0.7/0.15/0.15 y semilla 0). Exige las
   etiquetas cerradas si existen, salvo `--allow-unfinalized`.
@@ -310,6 +326,22 @@ Report files written: 4
 Errors by type: {'ValueError': 1}
 Input files skipped by the reader: none
 Report read errors: none
+```
+
+Con un árbol DICOM y una tabla de etiquetas:
+
+```text
+> mri-dataset dataset build E:/mri/dicom --format dicom --mapping E:/mri/map.tsv --output-dir E:/mri/out --config config/stage3_bids.yaml --classes AD CN
+Exporting the dataset (pipeline)...
+Studies written: 2  series: 2  participants: 1  errors: 0
+WARNING UNMAPPED_SERIES: {'EXCLUDED': 1}
+Label template written (2 classes).
+Mapping labels applied: 2
+Label corrections: skipped (no --corrections).
+Labels finalized (2 labels).
+ML export files written: 4
+Report files written: 4
+...
 ```
 
 Después: `labels apply`, `labels finalize` y `dataset export-ml` sobre `E:/mri/out/dataset` (sección 4). Sin
@@ -361,6 +393,17 @@ pipeline:
 | `Labels finalize failed: ValueError` | Las etiquetas no están completas: revise con `labels review`. |
 | `Not a dataset exported by this tool.` | `labels`, `export-ml` o `report` recibieron un BIDS de entrada u otra carpeta; use el `OUT/dataset` de `dataset build`. |
 | `error: Invalid arguments (see --help).` | Falta un argumento, sobra uno o tiene un valor no admitido; el valor no se repite por privacidad. Revise con `--help`. |
+| `WARNING UNMAPPED_SERIES: {...}` | Series sin sufijo seguro (localizadores, mapas derivados, nombres ambiguos...): se omiten. Fuerce el sufijo con `--mapping` si corresponde (`docs/dataset/ingest.md`). |
+| `WARNING MAPPING_UNUSED: n` | Filas de `--mapping` que no aplican a ninguna serie (p. ej. una carpeta sin DICOM). |
+| `Mapping paths not found in the input: N.` | `path` de la tabla que no existe en la entrada (relativo a `IN`, con `/`). |
+| `Invalid --mapping.` | Cabecera, columnas, `path`, ids o sufijo inválidos en la tabla. |
+| `Mapping labels need --classes.` / `Mapping label is not one of --classes.` | La columna `label` exige `--classes` y una de esas clases. |
+| `Mapping assigns different labels to the same participant/session.` / `Mapping gives one study more than one participant or session.` | Filas en conflicto: revise las filas más profundas. |
+| `Mapping gives the same participant/session to more than one study.` | Dos estudios quedarían en el mismo par (p. ej. fila `.` con sesión): asigne la sesión por carpeta de estudio. |
+| `Mapping gives a participant both sessions and no session.` | Un participante tiene series con sesión y sin sesión: dé sesión a todas o a ninguna. |
+| `WARNING NOT_4D_DWI: n` | Series reconocidas como `dwi` cuyo volumen no es 4D (mapas derivados): se omiten. |
+| `--mapping needs --format dicom or nifti.` | Con BIDS los ids y sufijos salen de los nombres; la tabla no se admite. |
+| `No input series could be mapped to a BIDS suffix.` | Ninguna serie con sufijo seguro: use `--mapping`. |
 | `ML exports failed: ValueError` | Etiquetas sin cerrar: `labels finalize` o `--allow-unfinalized`. |
 | `ML export files already exist.` tras `dataset build` | `build` sin `--classes` ya escribió los exportes (sin etiquetas). Para etiquetar después, repita `build` en una carpeta nueva con `--classes` (sección 4). |
 
@@ -372,4 +415,6 @@ pipeline:
 - La anonimización no borra caras ni texto quemado en los píxeles y conserva cuasi-identificadores
   (`docs/anonymization/policy.md`).
 - El dataset BIDS no incluye `.bval/.bvec` para `dwi` ni `EchoTime1/2` para `phasediff` (el `bids-validator` lo marcará).
+- `dataset build --format dicom|nifti`: sufijos solo por reglas conservadoras o por tabla; `magnitude1/2` y
+  `phasediff` solo por tabla; `--mapping` no se admite con `--format bids` (`docs/dataset/ingest.md`).
 - La CLI no muestra rutas: el usuario conoce las que pasó como argumentos.

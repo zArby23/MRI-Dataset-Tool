@@ -80,7 +80,16 @@ como envoltorios con el mismo comportamiento, mensajes y códigos (sus pruebas n
 - `dataset_build.py`: `parse_classes`, `check_classes`, `check_build_args(...)` (→ `InvalidBuildInput` o
   `FileExistsError`), `load_build_pipeline(config, config_dir)` (exige `anonymize`), `label_defects(review)` y
   `build_dataset(...) -> DatasetBuildResult(exported, review, ml_files, report_files)`. Etapas `export`, `labels`,
-  `ml exports`, `report`.
+  `ml exports`, `report`. Con `ingest=IngestPlan` (DICOM o NIfTI sueltos) lee de `iter_ingested_studies` en vez del
+  lector BIDS, emite `ingested` (series omitidas por código y filas de tabla sin uso), falla en `export` si no se
+  exportó ningún estudio y aplica las etiquetas de la tabla tras la plantilla (`mapping_labels_applied`).
+- `dataset_ingest.py` (`docs/dataset/ingest.md`): `load_mapping(path, input_root, classes)` valida la tabla
+  `--mapping` (→ `InvalidBuildInput`); `plan_ingest(fmt, root, key=None, mapping, on_skipped) -> IngestPlan` (sin `key` lee `MRI_ANON_KEY`) decide, solo
+  con cabeceras y nombres y antes de crear nada, participante, sesión, sufijo y etiqueta de cada serie;
+  `iter_ingested_studies(plan, on_error)` cede un estudio a la vez (DICOM construido en `float32`, NIfTI lazy).
+  Apoyos en infraestructura: `infrastructure/dicom/identity.py` (`read_dicom_identities`: `PatientID` seudonimizado
+  por estudio y decisión de sufijo por serie; los textos de cabecera no salen de la función) e
+  `infrastructure/dataset/suffix_rules.py` (`suffix_from_text`, lista cerrada).
 - Ambos informan el progreso con `on_status(evento, conteos)` (solo nombres y enteros) y un fallo de etapa con
   `StageFailed(stage, error)`: atributos `stage` y `error_type`, mensaje fijo `Stage failed: <etapa>.` y la causa
   encadenada (su traceback puede retener el estudio; la CLI termina enseguida).
@@ -124,3 +133,13 @@ Los comandos conservan el streaming de los servicios (un estudio vivo a la vez; 
 9. `dataset build`: `IN` y `--config` obligatorios (sin los defectos del lanzador de la etapa 4). Sin `--classes`
    escribe los exportes para ML sin etiquetas (comportamiento de `build_dataset`), así que etiquetar después exige
    `build --classes` (etiquetas incompletas, exportes omitidos) → `labels apply`/`finalize` → `dataset export-ml`.
+10. `dataset build --format dicom|nifti`: toda entrada termina en el mismo dataset BIDS anonimizado, así que
+    etiquetas, particiones y reporte tienen un solo camino. Los ids automáticos usan el mismo seudónimo que el paso
+    `anonymize` (autoverificable, por eso `anonymize` no los cambia); los de la tabla se seudonimizan como en BIDS.
+11. Sufijos por reglas de lista cerrada: un sufijo errado contaminaría el dataset, así que lo excluido, ambiguo o
+    desconocido se omite con aviso (`UNMAPPED_SERIES`) y se corrige con la tabla; los mapas de campo solo por tabla.
+12. La planificación lee solo cabeceras antes de crear nada: errores de la tabla y etiquetas en conflicto dan 2 sin
+    salidas a medias. La columna `label` permite etiquetar un DICOM sin conocer los seudónimos (no hay tabla de
+    correspondencia por diseño); se aplica como corrección registrada en la bitácora de etiquetas.
+13. No se tocaron el dominio ni el lector DICOM: la identidad sale de una segunda pasada de cabeceras con sus propias
+    etiquetas DICOM, y `PatientID`/descripciones solo viven en memoria dentro de esa función.

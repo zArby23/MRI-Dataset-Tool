@@ -14,6 +14,8 @@ from mri_dataset_tool.application.services import disk_space
 from mri_dataset_tool.infrastructure.anonymization.pseudonym import load_key, pseudonymize_label
 from mri_dataset_tool.presentation.cli import _common
 from mri_dataset_tool.presentation.cli.main import main
+from test_anonymize_dicom_tree import PLANTED
+from test_service_dataset_ingest import STUDY_A, STUDY_B, dicom_tree
 
 REPO = Path(__file__).resolve().parents[2]
 KEY = "k" * 40
@@ -219,3 +221,120 @@ def test_low_disk_space_warns_without_changing_the_exit_code(tmp_path, monkeypat
     assert ("WARNING INSUFFICIENT_DISK_SPACE" in out) == warned
     assert "drive C:" not in out
     assert clean(out, tmp_path)
+
+
+# --- DICOM and loose NIfTI inputs ----------------------------------------------------------------------
+
+DICOM_SECRETS = [*PLANTED, STUDY_A, STUDY_B, "PlantedDesc", "PlantedProto", "MPRAGE", "PAT12345", "P01", "V1"]
+
+
+def _texts(root: Path) -> str:
+    """Every name and text content below *root* (images are binary and carry no text)."""
+    parts = []
+    for path in sorted(root.rglob("*")):
+        parts.append(path.relative_to(root).as_posix())
+        if path.is_file() and not path.name.endswith((".nii.gz", ".xlsx")):
+            parts.append(path.read_text(encoding="utf-8"))
+    return "\n".join(parts)
+
+
+def _tsv(path: Path, *lines: str) -> Path:
+    path.write_text("\n".join(lines) + "\n", encoding="utf-8")
+    return path
+
+
+def test_build_from_dicom_with_mapping_labels_is_finalized_and_clean(tmp_path, capsys, caplog):
+    caplog.set_level(logging.DEBUG)
+    root = dicom_tree(tmp_path / "in")
+    mapping = _tsv(tmp_path / "map.tsv", "path\tparticipant\tsession\tsuffix\tlabel", ".\tP01\t\t\t",
+                   "a\t\tV1\t\tAD", "b\t\tV2\t\tCN")
+    assert main(["--verbose", "dataset", "build", str(root), "--format", "dicom", "--mapping", str(mapping),
+                 "--output-dir", "out", "--config", "config/run.yaml", "--classes", "AD", "CN",
+                 "--ratios", "1", "0", "0"]) == 0
+    captured = capsys.readouterr()
+    assert "Studies written: 2  series: 2  participants: 1  errors: 0" in captured.out
+    assert "WARNING UNMAPPED_SERIES: {'EXCLUDED': 1}" in captured.out  # the ADC map
+    assert "Mapping labels applied: 2" in captured.out and "Labels finalized (2 labels)." in captured.out
+    assert "ML export files written: 4" in captured.out and "Report files written: 4" in captured.out
+    dataset = tmp_path / "out" / "dataset"
+    names = [p.name for p in dataset.rglob("*.nii.gz")]
+    assert len(names) == 2 and any(n.endswith("_T1w.nii.gz") for n in names) and any(n.endswith("_FLAIR.nii.gz") for n in names)
+    assert not (tmp_path / "out" / ".mapping_labels.tsv").exists()
+    for text in (captured.out, captured.err, caplog.text, _texts(tmp_path / "out")):
+        assert not [s for s in [*DICOM_SECRETS, str(tmp_path), tmp_path.as_posix()] if s in text]
+
+
+def test_build_from_dicom_without_mapping_uses_pseudonyms(tmp_path, capsys):
+    assert main(["--quiet", "dataset", "build", str(dicom_tree(tmp_path / "in")), "--format", "dicom",
+                 "--output-dir", "out", "--config", "config/run.yaml"]) == 0
+    out = capsys.readouterr().out
+    assert "WARNING UNMAPPED_SERIES: {'EXCLUDED': 1}" in out  # printed also with --quiet
+    assert len(list((tmp_path / "out" / "dataset").glob("sub-*/ses-*"))) == 2  # one patient, two studies
+    assert not [s for s in DICOM_SECRETS if s in _texts(tmp_path / "out")]
+
+
+def test_build_from_loose_nifti(tmp_path, capsys):
+    rng = np.random.default_rng(1)
+    for name in ("PlantedName_T1.nii.gz", "notes_scan.nii.gz"):
+        path = tmp_path / "in" / name
+        path.parent.mkdir(parents=True, exist_ok=True)
+        nib.save(nib.Nifti1Image(rng.uniform(1, 9, (4, 5, 3)).astype(np.float32), np.eye(4)), path)
+    assert main(["dataset", "build", str(tmp_path / "in"), "--format", "nifti", "--output-dir", "out",
+                 "--config", "config/run.yaml"]) == 0
+    out = capsys.readouterr().out
+    assert "Studies written: 1  series: 1  participants: 1" in out and "WARNING UNMAPPED_SERIES: {'NO_MATCH': 1}" in out
+    assert "Planted" not in _texts(tmp_path / "out")
+
+
+def test_not_4d_dwi_has_its_own_warning(tmp_path, capsys):
+    path = tmp_path / "in" / "dwi.nii.gz"  # 3D: a derived map, not a diffusion series
+    path.parent.mkdir(parents=True)
+    nib.save(nib.Nifti1Image(np.ones((4, 5, 3), np.float32), np.eye(4)), path)
+    nib.save(nib.Nifti1Image(np.ones((4, 5, 3), np.float32) * 2, np.eye(4)), tmp_path / "in" / "t1.nii.gz")
+    assert main(["--quiet", "dataset", "build", str(tmp_path / "in"), "--format", "nifti", "--output-dir", "out",
+                 "--config", "config/run.yaml"]) == 0
+    out = capsys.readouterr().out
+    assert "WARNING NOT_4D_DWI: 1" in out and "UNMAPPED_SERIES" not in out
+
+
+def test_mapping_with_bids_is_an_argument_error_even_if_the_output_exists(tmp_path, capsys):
+    bids_input(tmp_path / "in")
+    (tmp_path / "out").mkdir()
+    _tsv(tmp_path / "map.tsv", "path\tparticipant\tsession\tsuffix")
+    assert main(["dataset", "build", str(tmp_path / "in"), "--mapping", "map.tsv", "--output-dir", "out",
+                 "--config", "config/run.yaml"]) == 2
+    assert "--mapping needs --format dicom or nifti." in capsys.readouterr().out
+
+
+def test_build_from_dicom_with_no_exported_study_fails_at_export(tmp_path, monkeypatch, capsys):
+    from mri_dataset_tool.application.services import dataset_ingest
+
+    def broken(series):
+        raise ValueError("Unsupported geometry.")
+
+    monkeypatch.setattr(dataset_ingest, "build_series_volume", broken)
+    assert main(["dataset", "build", str(dicom_tree(tmp_path / "in")), "--format", "dicom", "--output-dir", "out",
+                 "--config", "config/run.yaml"]) == 1
+    out = capsys.readouterr().out
+    assert "Run failed at export: ValueError" in out and "input file skipped 2: ValueError" in out
+
+
+@pytest.mark.parametrize(
+    ("extra", "message"),
+    [
+        (["--format", "bids", "--mapping", "map.tsv"], "--mapping needs --format dicom or nifti."),
+        (["--format", "dicom", "--mapping", "map.tsv"], "Mapping paths not found in the input: 1."),
+        (["--format", "dicom", "--mapping", "none.tsv"], "Mapping file not found."),
+        (["--format", "dicom", "--mapping", "labels.tsv"], "Mapping labels need --classes."),
+        (["--format", "nifti"], "No valid input studies were found."),
+    ],
+)
+def test_build_ingest_validation_before_creating_anything(tmp_path, capsys, extra, message):
+    root = dicom_tree(tmp_path / "in")
+    _tsv(tmp_path / "map.tsv", "path\tparticipant\tsession\tsuffix", "nope\t\t\t")
+    _tsv(tmp_path / "labels.tsv", "path\tparticipant\tsession\tsuffix\tlabel", "a\t\t\t\tAD")
+    before = sorted(tmp_path.rglob("*"))
+    assert main(["dataset", "build", str(root), "--output-dir", "out", "--config", "config/run.yaml", *extra]) == 2
+    out = capsys.readouterr().out
+    assert message in out and not [s for s in [*DICOM_SECRETS, str(tmp_path)] if s in out]
+    assert sorted(tmp_path.rglob("*")) == before

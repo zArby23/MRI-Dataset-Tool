@@ -101,6 +101,7 @@ In development. Stages 1 to 4 (loading, conversion, pipeline, processing, anonym
 - Dataset: BIDS writer, labels with review, correction and closing, train/val/test splits by participant, ML/DL index files (`dataset_index.csv`, `datalist.json`) and a statistical report in JSON, Markdown, XML and XLSX.
 
 **How to run**
+- `mri-dataset dataset build` accepts a BIDS dataset, a DICOM tree or loose NIfTI files (`--format bids|dicom|nifti`) and organizes them into the same anonymized BIDS dataset, with labels, splits and report. For DICOM the participant is the pseudonymized PatientID and the BIDS suffix comes from conservative rules (doubtful series are skipped with a warning); an optional `--mapping` table fixes ids, suffixes and labels (see `docs/dataset/ingest.md`).
 - `mri-dataset --help` (or `python -m mri_dataset_tool.presentation.cli`): command line for the whole flow; see the user manual.
 - The scripts below are kept as thin wrappers and are superseded by the command line:
 - `scripts/run_stage3_pipeline.py` for loose NIfTI files.
@@ -236,6 +237,7 @@ En desarrollo. Las etapas 1 a 4 (carga, conversión, pipeline, procesamiento, an
 - Dataset: escritura en formato BIDS, etiquetas con revisión, corrección y cierre, particiones train/val/test por participante, índices para ML/DL (`dataset_index.csv`, `datalist.json`) y reporte estadístico en JSON, Markdown, XML y XLSX.
 
 **Cómo ejecutar**
+- `mri-dataset dataset build` acepta un dataset BIDS, un árbol DICOM o NIfTI sueltos (`--format bids|dicom|nifti`) y los organiza en el mismo dataset BIDS anonimizado, con etiquetas, particiones y reporte. En DICOM el participante es el PatientID seudonimizado y el sufijo BIDS se deduce con reglas conservadoras (lo dudoso se omite con aviso); una tabla opcional `--mapping` corrige ids, sufijos y etiquetas (ver `docs/dataset/ingest.md`).
 - `mri-dataset --help` (o `python -m mri_dataset_tool.presentation.cli`): línea de comandos para todo el flujo; ver el manual de usuario.
 - Los scripts siguientes se mantienen como envoltorios finos y quedan superados por la línea de comandos:
 - `scripts/run_stage3_pipeline.py` para archivos NIfTI sueltos.

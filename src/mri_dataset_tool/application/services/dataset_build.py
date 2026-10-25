@@ -9,7 +9,7 @@ import json
 from collections.abc import Callable, Sequence
 from dataclasses import dataclass
 from pathlib import Path
-from typing import Any
+from typing import TYPE_CHECKING, Any
 
 from mri_dataset_tool.application.pipeline.manifest import pipeline_from_config
 from mri_dataset_tool.application.pipeline.runner import Pipeline
@@ -18,6 +18,7 @@ from mri_dataset_tool.application.services.dataset_report import report_dataset
 from mri_dataset_tool.application.services.labels import (
     LabelReview,
     apply_label_corrections,
+    dataset_pairs,
     finalize_labels,
     review_labels,
     write_label_template,
@@ -28,6 +29,9 @@ from mri_dataset_tool.infrastructure.config.loader import load_config
 from mri_dataset_tool.infrastructure.dataset.bids_writer import TOOL_NAME
 from mri_dataset_tool.infrastructure.dataset.labels import LabelTable
 from mri_dataset_tool.infrastructure.dataset.splits import DEFAULT_RATIOS, DEFAULT_SEED, check_split_params
+
+if TYPE_CHECKING:
+    from mri_dataset_tool.application.services.dataset_ingest import IngestPlan
 
 
 class InvalidBuildInput(ValueError):
@@ -147,6 +151,7 @@ def build_dataset(
     on_error: ErrorCallback | None = None,
     on_report_error: ErrorCallback | None = None,
     on_status: StatusCallback | None = None,
+    ingest: "IngestPlan | None" = None,
 ) -> DatasetBuildResult:
     """Write ``<output_dir>/dataset`` and ``<output_dir>/report`` (call ``check_build_args`` and
     ``load_build_pipeline`` first).
@@ -157,6 +162,12 @@ def build_dataset(
     Status events, in order: ``export``, ``exported``, then ``labels_skipped`` or
     ``label_template``, ``corrections_skipped`` or ``corrections_applied``, ``labels_finalized``
     or ``labels_incomplete`` (defect counts), ``ml_exports_skipped`` or ``ml_exports``, ``report``.
+
+    With *ingest* (``dataset_ingest.plan_ingest`` for DICOM or loose NIfTI) the studies come from
+    ``iter_ingested_studies`` instead of the BIDS reader (series that fail to build go to
+    ``on_skipped``); ``ingested`` (skipped series by code, unused mapping rows) follows ``exported``,
+    no exported study fails the export stage, and the mapping labels are applied to the template
+    (``mapping_labels_applied``) before ``--corrections``.
     """
     status = on_status or (lambda event, counts: None)
     dataset, report_dir = output_dir / "dataset", output_dir / "report"
@@ -164,12 +175,21 @@ def build_dataset(
     try:
         status("export", {})
         output_dir.mkdir(parents=True)
-        studies = BIDSBatchReader().iter_studies(dataset_root, on_error=on_skipped, lazy=True)
+        if ingest is None:
+            studies = BIDSBatchReader().iter_studies(dataset_root, on_error=on_skipped, lazy=True)
+        else:
+            from mri_dataset_tool.application.services.dataset_ingest import iter_ingested_studies  # imports this module
+
+            studies = iter_ingested_studies(ingest, on_skipped)
         exported = export_dataset(studies, dataset, on_error, pipeline=pipeline, config=config, source_dir=dataset_root)
         status("exported", {
             "studies": exported.studies_written, "series": exported.series_written,
             "participants": exported.participants, "errors": exported.errors,
         })
+        if ingest is not None:
+            status("ingested", {**dict(sorted(ingest.skipped.items())), "MAPPING_UNUSED": ingest.mapping_unused})
+            if exported.studies_written == 0:
+                raise ValueError("No studies were exported.")
 
         stage = "labels"
         if classes is None:
@@ -177,6 +197,8 @@ def build_dataset(
         else:
             write_label_template(dataset, classes)
             status("label_template", {"classes": len(classes)})
+            if ingest is not None and ingest.labels:
+                status("mapping_labels_applied", {"rows": _apply_mapping_labels(dataset, output_dir, ingest.labels)})
             if corrections is None:
                 status("corrections_skipped", {})
             else:
@@ -202,3 +224,21 @@ def build_dataset(
     except Exception as error:  # its message or traceback may name a file (sub-<id>)
         raise StageFailed(stage, error) from error
     return DatasetBuildResult(exported, review, ml_files, report_files)
+
+
+def _apply_mapping_labels(dataset: Path, output_dir: Path, labels: dict[tuple[str, str | None], str]) -> int:
+    """Apply the mapping labels of the exported pairs with ``apply_label_corrections`` (all or nothing,
+    logged in ``labels_changes.tsv``). Pairs whose study was not exported are left out. The temporary
+    table holds only pseudonymized ids and is removed."""
+    present = set(dataset_pairs(dataset))
+    rows = ["participant_id\tsession_id\tlabel"] + [
+        f"sub-{subject}\t{'' if session is None else 'ses-' + session}\t{label}"
+        for (subject, session), label in sorted(labels.items(), key=lambda item: (item[0][0], item[0][1] or ""))
+        if (subject, session) in present
+    ]
+    table = output_dir / ".mapping_labels.tsv"
+    try:
+        table.write_text("\n".join(rows) + "\n", encoding="utf-8")
+        return apply_label_corrections(dataset, table)
+    finally:
+        table.unlink(missing_ok=True)
