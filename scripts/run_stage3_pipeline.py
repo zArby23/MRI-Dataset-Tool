@@ -9,8 +9,8 @@ The pipeline comes only from config/stage3_example.yaml. Studies are read lazily
 time, from data/raw/nifti_test_studies; each processed series is written as float32 to
 --output-dir (default data/processed)/study-NNN.nii.gz (NNN = position in the input order,
 never the source name) and the run manifest to --manifest-path (default report.path,
-data/output/). Large outputs should not go to C: or the temporary directory: a warning is
-printed, the run is not blocked. Nothing is overwritten: if outputs of a previous run exist the
+data/output/). If the estimated output (the size of the input) reaches 90 % of the free space of
+the output drive a warning is printed; the run is not blocked. Nothing is overwritten: if outputs of a previous run exist the
 script stops before running. The pipeline is then rebuilt from the saved manifest and run again
 to check reproducibility. Errors print only their exception type; neither the console nor the
 manifest show paths, names or messages. After "Run failed", delete the partial outputs
@@ -20,7 +20,6 @@ manifest show paths, names or messages. After "Run failed", delete the partial o
 import argparse
 import logging
 import sys
-import tempfile
 from collections import Counter
 from collections.abc import Callable, Sequence
 from pathlib import Path
@@ -38,17 +37,12 @@ from mri_dataset_tool.domain.models.transformation import StudyReport
 from mri_dataset_tool.infrastructure.anonymization.pseudonym import KEY_ENV_VAR, load_key
 from mri_dataset_tool.infrastructure.nifti.batch_reader import NIfTIBatchReader  # noqa: F401 (tests patch it)
 from mri_dataset_tool.infrastructure.config.loader import load_config
+from mri_dataset_tool.presentation.cli._common import warn_if_low_disk_space
 
 REPO = Path(__file__).resolve().parents[1]
 CONFIG_PATH = REPO / "config" / "stage3_example.yaml"
 INPUT_DIR = REPO / "data" / "raw" / "nifti_test_studies"
 OUTPUT_DIR = REPO / "data" / "processed"
-
-
-def is_discouraged_location(path: Path) -> bool:
-    """True if *path* is on drive C: or under the system temporary directory."""
-    resolved = path.resolve()
-    return resolved.drive.upper() == "C:" or resolved.is_relative_to(Path(tempfile.gettempdir()).resolve())
 
 
 def parse_args(argv: Sequence[str]) -> argparse.Namespace:
@@ -93,8 +87,7 @@ def main(argv: Sequence[str] = ()) -> int:
     logging.basicConfig(level=config["logging"]["level"])
     output_dir = args.output_dir or OUTPUT_DIR
     manifest_path = args.manifest_path or REPO / config["report"]["path"]
-    if is_discouraged_location(output_dir) or is_discouraged_location(manifest_path):
-        print("WARNING: an output is on drive C: or in the temporary directory; large runs should go elsewhere (E:/).")
+    warn_if_low_disk_space(INPUT_DIR, output_dir)
     if previous_outputs_exist(output_dir, manifest_path):
         print("Outputs of a previous run exist (study-*.nii.gz in the output directory or the manifest); remove them first.")
         return 1

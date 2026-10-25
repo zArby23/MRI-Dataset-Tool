@@ -73,3 +73,19 @@ def test_validation_exits_two_before_writing(tmp_path, dataset, capsys, argv, me
 
 def test_missing_action_exits_two(dataset):
     assert main(["labels", dataset]) == 2
+
+
+@pytest.mark.parametrize("argv", [["labels", "template", "{src}", "--classes", "A"], ["labels", "review", "{src}"],
+                                  ["dataset", "export-ml", "{src}", "--allow-unfinalized"], ["dataset", "report", "{src}", "rep"]])
+def test_a_raw_input_is_not_a_dataset(tmp_path, capsys, argv):
+    source = bids_input(tmp_path / "in")
+    before = sorted(tmp_path.rglob("*"))
+    assert main([arg.format(src=source) for arg in argv]) == 2
+    assert "Not a dataset exported by this tool." in capsys.readouterr().out
+    assert sorted(tmp_path.rglob("*")) == before
+
+
+def test_review_json_errors_go_to_stderr(tmp_path, capsys):
+    assert main(["labels", "review", str(bids_input(tmp_path / "in")), "--json"]) == 2
+    captured = capsys.readouterr()
+    assert captured.out == "" and "Not a dataset exported by this tool." in captured.err

@@ -107,7 +107,7 @@ In development. Stages 1 to 4 (loading, conversion, pipeline, processing, anonym
 - `scripts/run_stage3_bids_pipeline.py` for BIDS datasets.
 - `scripts/run_stage4_dataset.py` builds the full dataset (BIDS, labels, splits and report).
 - All of them need the `MRI_ANON_KEY` environment variable (at least 32 characters).
-- Send large outputs to a drive with enough free space, outside the repository.
+- Before writing, the command line compares the size of the input with the free space on the output drive and warns (it does not block) if the output may reach 90% of it.
 
 **Memory**
 - Resampling a 4D diffusion series to 1 mm can need several GB of RAM.
@@ -242,7 +242,7 @@ En desarrollo. Las etapas 1 a 4 (carga, conversión, pipeline, procesamiento, an
 - `scripts/run_stage3_bids_pipeline.py` para datasets BIDS.
 - `scripts/run_stage4_dataset.py` para construir el dataset completo (BIDS, etiquetas, particiones y reporte).
 - Todos requieren la variable de entorno `MRI_ANON_KEY` (de al menos 32 caracteres).
-- Dirige las salidas grandes a un disco con espacio libre, fuera del repositorio.
+- Antes de escribir, la línea de comandos compara el tamaño de la entrada con el espacio libre del disco de salida y avisa (no bloquea) si la salida podría llegar al 90 % de ese espacio.
 
 **Memoria**
 - Remuestrear una difusión 4D a 1 mm puede necesitar varios GB de RAM.

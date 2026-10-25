@@ -3,11 +3,13 @@
 import argparse
 import logging
 import subprocess
+from collections import namedtuple
 import sys
 from pathlib import Path
 
 import pytest
 
+from mri_dataset_tool.application.services import disk_space
 from mri_dataset_tool.presentation.cli import _common, main as cli_main
 from mri_dataset_tool.presentation.cli.main import main
 
@@ -122,8 +124,23 @@ def test_progress_line(capsys):
     assert capsys.readouterr().out == "[2/5] studies\n"
 
 
-def test_discouraged_location_warning(tmp_path, capsys):
-    assert _common.is_discouraged_location(tmp_path)  # pytest's tmp_path is under the temporary directory
-    _common.warn_if_discouraged(tmp_path / "out")
+def test_low_disk_space_warning_has_figures_only(tmp_path, monkeypatch, capsys):
+    (tmp_path / "in").mkdir()
+    (tmp_path / "in" / "sub-PATIENT01.nii.gz").write_bytes(b"x" * 2048)
+    usage = namedtuple("Usage", "total used free")
+    monkeypatch.setattr(disk_space.shutil, "disk_usage", lambda path: usage(4096, 2048, 2048))
+    _common.configure_output(quiet=True)  # the warning is printed even with --quiet
+    _common.warn_if_low_disk_space(tmp_path / "in", tmp_path / "out")
     out = capsys.readouterr().out
-    assert out.startswith("WARNING:") and str(tmp_path) not in out
+    assert out.startswith("WARNING INSUFFICIENT_DISK_SPACE: estimated output 0.0 GiB, 0.0 GiB free")
+    assert str(tmp_path) not in out and "PATIENT01" not in out
+    monkeypatch.setattr(disk_space.shutil, "disk_usage", lambda path: usage(10**12, 0, 10**12))
+    _common.warn_if_low_disk_space(tmp_path / "in", tmp_path / "out")
+    assert capsys.readouterr().out == ""
+
+
+@pytest.mark.parametrize("argv", [["fake"], ["--bogus", "fake", "x"], ["fake", "x", "E:/data/sub-PATIENT01"], ["sub-PATIENT01"]])
+def test_argparse_errors_print_a_fixed_message(fake, capsys, argv):
+    assert main(argv) == 2
+    err = capsys.readouterr().err
+    assert "error: Invalid arguments (see --help)." in err and "PATIENT01" not in err and "bogus" not in err

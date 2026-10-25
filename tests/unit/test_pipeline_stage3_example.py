@@ -4,17 +4,20 @@ import importlib.util
 import json
 import weakref
 from collections.abc import Iterator
+from collections import namedtuple
 from pathlib import Path
 
 import nibabel as nib
 import numpy as np
 import pytest
 
+from mri_dataset_tool.application.services import disk_space
 from mri_dataset_tool.application.pipeline.manifest import RunManifest, pipeline_from_config, pipeline_from_manifest
 from mri_dataset_tool.domain.models.study import MRIStudy
 from mri_dataset_tool.infrastructure.config.loader import load_config
 from mri_dataset_tool.infrastructure.nifti.batch_reader import NIfTIBatchReader
 
+_Usage = namedtuple("Usage", "total used free")
 REPO = Path(__file__).resolve().parents[2]
 _spec = importlib.util.spec_from_file_location("run_stage3_pipeline", REPO / "scripts" / "run_stage3_pipeline.py")
 stage3 = importlib.util.module_from_spec(_spec)
@@ -207,18 +210,19 @@ def test_main_with_missing_input_directory_prints_a_fixed_message(
     assert list(tmp_path.iterdir()) == []
 
 
-def test_main_with_output_options_writes_there_and_warns_in_the_temp_dir(
+def test_main_with_output_options_writes_there_and_warns_on_low_disk_space(
     monkeypatch: pytest.MonkeyPatch, tmp_path: Path, capsys: pytest.CaptureFixture[str]
 ) -> None:
     batch = _batch(tmp_path)
     monkeypatch.setattr(stage3, "INPUT_DIR", batch)
     monkeypatch.setattr(stage3, "OUTPUT_DIR", tmp_path / "default-not-used")
+    monkeypatch.setattr(disk_space.shutil, "disk_usage", lambda path: _Usage(10, 0, 10))  # almost no free space
     output_dir, manifest_path = tmp_path / "out", tmp_path / "manifests" / "run.json"
 
     assert stage3.main(["--output-dir", str(output_dir), "--manifest-path", str(manifest_path)]) == 0
 
     out = capsys.readouterr().out
-    assert "WARNING: an output is on drive C: or in the temporary directory" in out
+    assert "WARNING INSUFFICIENT_DISK_SPACE: estimated output" in out
     assert len(list(output_dir.glob("study-*.nii.gz"))) == 3 and manifest_path.is_file()
     assert not (tmp_path / "default-not-used").exists()
     assert "sub-" not in out and str(tmp_path) not in out and tmp_path.as_posix() not in out and "data/" not in out

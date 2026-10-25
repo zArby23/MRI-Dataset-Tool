@@ -1,15 +1,19 @@
 """C2: ``convert`` in both directions; validation before creating anything; counts only."""
 
 import logging
+from collections import namedtuple
 from pathlib import Path
 
 import nibabel as nib
 import numpy as np
 import pytest
 
+from mri_dataset_tool.application.services import disk_space
 from mri_dataset_tool.presentation.cli import _common
 from mri_dataset_tool.presentation.cli.main import main
 from test_anonymize_dicom_tree import PLANTED, write_synthetic_series
+
+Usage = namedtuple("Usage", "total used free")
 
 
 @pytest.fixture(autouse=True)
@@ -88,7 +92,11 @@ def test_no_valid_input_fails_with_type_only(tmp_path, capsys):
     assert "Run failed: ValueError" in capsys.readouterr().out
 
 
-def test_discouraged_output_warns(tmp_path, capsys):
-    _nifti(tmp_path / "in" / "a.nii.gz")
+@pytest.mark.parametrize(("free", "warned"), [(10, True), (10**15, False)])
+def test_low_disk_space_warns_without_changing_the_exit_code(tmp_path, monkeypatch, capsys, free, warned):
+    monkeypatch.setattr(disk_space.shutil, "disk_usage", lambda path: Usage(free, 0, free))
+    _nifti(tmp_path / "in" / "sub-PATIENT01_T1w.nii.gz")
     assert main(["convert", "nifti-to-dicom", str(tmp_path / "in"), str(tmp_path / "out")]) == 0
-    assert "WARNING: an output is on drive C: or in the temporary directory" in capsys.readouterr().out
+    out = capsys.readouterr().out
+    assert ("WARNING INSUFFICIENT_DISK_SPACE" in out) == warned
+    assert "drive C:" not in out and _clean(out, ["PATIENT01"], tmp_path)

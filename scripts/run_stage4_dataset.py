@@ -13,8 +13,8 @@ dataset ids are pseudonyms) and written to <output-dir>/dataset; the report goes
 <output-dir>/report. With --classes a label template (every session unlabeled)
 is written; --corrections (same columns as labels.tsv) then assigns labels and needs --classes.
 Complete labels are finalized (finalize_labels) before the ML exports; incomplete ones skip the
-ML exports with a warning (codes and counts) unless --allow-unfinalized. --output-dir must not exist; large runs should go to
-E:/ (a warning is printed for C: or the temporary directory, the run is not blocked). The
+ML exports with a warning (codes and counts) unless --allow-unfinalized. --output-dir must not exist; if the estimated output (the
+size of the input) reaches 90 % of the free space of the output drive a warning is printed, the run is not blocked. The
 console shows only exception types and counts, never paths or ids.
 Exit codes: 0 ok, 1 previous output or a failed stage, 2 key or arguments.
 """
@@ -22,7 +22,6 @@ Exit codes: 0 ok, 1 previous output or a failed stage, 2 key or arguments.
 import argparse
 import logging
 import sys
-import tempfile
 from collections import Counter
 from collections.abc import Callable, Sequence
 from pathlib import Path
@@ -37,16 +36,11 @@ from mri_dataset_tool.application.services.dataset_build import (
 )
 from mri_dataset_tool.infrastructure.anonymization.pseudonym import KEY_ENV_VAR, load_key
 from mri_dataset_tool.infrastructure.dataset.splits import DEFAULT_RATIOS, DEFAULT_SEED
+from mri_dataset_tool.presentation.cli._common import warn_if_low_disk_space
 
 REPO = Path(__file__).resolve().parents[1]
 CONFIG_PATH = REPO / "config" / "stage3_bids.yaml"
 DEFAULT_DATASET = REPO / "data" / "raw" / "bids_test_studies"
-
-
-def is_discouraged_location(path: Path) -> bool:
-    """True if *path* is on drive C: or under the system temporary directory."""
-    resolved = path.resolve()
-    return resolved.drive.upper() == "C:" or resolved.is_relative_to(Path(tempfile.gettempdir()).resolve())
 
 
 def _counter(label: str) -> tuple[Counter[str], Callable[[Path, Exception], None]]:
@@ -115,8 +109,7 @@ def main(argv: Sequence[str] | None = None) -> int:
         print(error)
         return 1
     output_dir = args.output_dir
-    if is_discouraged_location(output_dir):
-        print("WARNING: the output is on drive C: or in the temporary directory; large runs should go elsewhere (E:/).")
+    warn_if_low_disk_space(args.dataset_root, output_dir)
 
     try:
         config, pipeline = load_build_pipeline(args.config, REPO / "config")

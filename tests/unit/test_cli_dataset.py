@@ -2,6 +2,7 @@
 
 import json
 import logging
+from collections import namedtuple
 import shutil
 from pathlib import Path
 
@@ -9,6 +10,7 @@ import nibabel as nib
 import numpy as np
 import pytest
 
+from mri_dataset_tool.application.services import disk_space
 from mri_dataset_tool.infrastructure.anonymization.pseudonym import load_key, pseudonymize_label
 from mri_dataset_tool.presentation.cli import _common
 from mri_dataset_tool.presentation.cli.main import main
@@ -182,6 +184,8 @@ def test_export_ml_allow_unfinalized(tmp_path, capsys):
 )
 def test_export_ml_and_report_validation(tmp_path, capsys, argv, message):
     bids_input(tmp_path / "in")
+    # passes is_exported_dataset, so the later checks are reached
+    (tmp_path / "in" / "dataset_description.json").write_text('{"GeneratedBy": [{"Name": "MRI-Dataset-Tool"}]}', "utf-8")
     (tmp_path / "a_file").write_text("x", encoding="utf-8")
     before = sorted(tmp_path.rglob("*"))
     assert main(argv) == 2
@@ -203,3 +207,15 @@ def test_report_writes_four_files_and_never_overwrites(tmp_path, capsys, caplog)
         assert clean(text, tmp_path)
     assert main(["dataset", "report", dataset, "rep"]) == 1
     assert "Report files already exist." in capsys.readouterr().out
+
+
+@pytest.mark.parametrize(("free", "warned"), [(10, True), (10**15, False)])
+def test_low_disk_space_warns_without_changing_the_exit_code(tmp_path, monkeypatch, capsys, free, warned):
+    usage = namedtuple("Usage", "total used free")
+    monkeypatch.setattr(disk_space.shutil, "disk_usage", lambda path: usage(free, 0, free))
+    bids_input(tmp_path / "in")
+    assert build(tmp_path) == 0
+    out = capsys.readouterr().out
+    assert ("WARNING INSUFFICIENT_DISK_SPACE" in out) == warned
+    assert "drive C:" not in out
+    assert clean(out, tmp_path)

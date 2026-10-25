@@ -2,9 +2,15 @@
 
 import argparse
 import json
+import sys
 from pathlib import Path
 
-from mri_dataset_tool.application.services.dataset_build import InvalidBuildInput, check_classes, label_defects
+from mri_dataset_tool.application.services.dataset_build import (
+    InvalidBuildInput,
+    check_classes,
+    is_exported_dataset,
+    label_defects,
+)
 from mri_dataset_tool.application.services.labels import (
     apply_label_corrections,
     finalize_labels,
@@ -56,8 +62,12 @@ def _review(dataset: Path, as_json: bool) -> None:
 
 def run(args: argparse.Namespace) -> int:
     dataset = args.dataset
+    errors = sys.stderr if getattr(args, "json", False) else sys.stdout  # --json: stdout holds only JSON
     if not dataset.is_dir():
-        print("Dataset directory not found.")
+        print("Dataset directory not found.", file=errors)
+        return EXIT_USAGE
+    if not is_exported_dataset(dataset):  # never write label files (source ids) into a raw input
+        print("Not a dataset exported by this tool.", file=errors)
         return EXIT_USAGE
     classes = None
     if args.action == "template":
@@ -85,6 +95,6 @@ def run(args: argparse.Namespace) -> int:
             reopen_labels(dataset)
             print("Labels reopened.")
     except Exception as error:  # fixed messages, but only the type is shown
-        print(f"Labels {args.action} failed: {type(error).__name__}")
+        print(f"Labels {args.action} failed: {type(error).__name__}", file=errors)
         return EXIT_FAILED
     return EXIT_OK

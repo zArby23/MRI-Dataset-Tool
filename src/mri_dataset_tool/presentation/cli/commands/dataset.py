@@ -9,6 +9,7 @@ from mri_dataset_tool.application.services.dataset_build import (
     StageFailed,
     build_dataset,
     check_build_args,
+    is_exported_dataset,
     load_build_pipeline,
 )
 from mri_dataset_tool.application.services.dataset_report import report_dataset
@@ -24,7 +25,7 @@ from mri_dataset_tool.presentation.cli._common import (
     format_counts,
     is_inside,
     status,
-    warn_if_discouraged,
+    warn_if_low_disk_space,
 )
 
 # Status events of build_dataset -> console text (counts only).
@@ -96,6 +97,9 @@ def _export_ml(args: argparse.Namespace) -> int:
     if not args.dataset.is_dir():
         print("Dataset directory not found.")
         return EXIT_USAGE
+    if not is_exported_dataset(args.dataset):  # never write ML files (source ids) into a raw input
+        print("Not a dataset exported by this tool.")
+        return EXIT_USAGE
     try:
         written = write_ml_exports(args.dataset, args.ratios, args.seed, allow_unfinalized=args.allow_unfinalized)
     except FileExistsError:
@@ -112,13 +116,15 @@ def _report(args: argparse.Namespace) -> int:
     if not args.dataset.is_dir():
         print("Dataset directory not found.")
         return EXIT_USAGE
+    if not is_exported_dataset(args.dataset):
+        print("Not a dataset exported by this tool.")
+        return EXIT_USAGE
     if is_inside(args.output, args.dataset):
         print("Report directory must be outside the dataset.")
         return EXIT_USAGE
     if args.output.exists() and not args.output.is_dir():
         print("Output path is not a directory.")
         return EXIT_USAGE
-    warn_if_discouraged(args.output)
     errors, on_error = error_counter("report read error")
     status("Writing the dataset report...")
     try:
@@ -159,7 +165,7 @@ def _build(args: argparse.Namespace) -> int:
     except InvalidBuildInput as error:
         print(error)
         return EXIT_USAGE
-    warn_if_discouraged(args.output_dir)
+    warn_if_low_disk_space(args.input, args.output_dir)
 
     # Separate counts: files the reader skips (e.g. git-annex pointers) are not export errors.
     skipped, on_skipped = error_counter("input file skipped")

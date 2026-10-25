@@ -15,7 +15,7 @@ python scripts/run_stage4_dataset.py <dataset_root> --output-dir E:/mri/stage4 `
 | Argumento | Defecto | Qué hace |
 |---|---|---|
 | `dataset_root` | `data/raw/bids_test_studies` | BIDS de entrada, leído con `BIDSBatchReader(lazy=True)` |
-| `--output-dir` | obligatorio | Directorio **nuevo**; si ya existe, código 1. En `C:` o en el temporal sale un WARNING fijo (no bloquea): las corridas grandes van en `E:/` |
+| `--output-dir` | obligatorio | Directorio **nuevo**; si ya existe, código 1. Si la salida estimada (el tamaño de la entrada) alcanza el 90 % del espacio libre del disco de salida sale `WARNING INSUFFICIENT_DISK_SPACE` (no bloquea) |
 | `--config` | `config/stage3_bids.yaml` | Configuración de la corrida (pasos del pipeline). **Debe incluir el paso `anonymize`**: si no, «The pipeline must include the anonymize step.» y código 2 antes de crear nada (QA4-01) |
 | `--classes NAME[=DESCRIPCIÓN] ...` | — | Clases de las etiquetas; escribe la plantilla (`write_label_template`, todas las sesiones sin etiquetar) |
 | `--corrections` | — | TSV con las columnas de `labels.tsv`; se aplica con `apply_label_corrections`. Exige `--classes` |

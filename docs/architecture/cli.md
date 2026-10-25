@@ -44,9 +44,10 @@ Puntos de entrada: `mri-dataset` (`[project.scripts]` en `pyproject.toml` →
 | `error_counter(label, echo=True)` | `on_error` que cuenta por tipo de excepción e imprime solo el tipo; `echo=False` para `--json` |
 | `format_counts(counter)` | `{'Tipo': n}` ordenado o `none` |
 | `check_key()` | `load_key()` con mensaje fijo; nunca imprime la clave |
-| `is_discouraged_location`, `warn_if_discouraged(*paths)` | WARNING fijo si una salida cae en `C:` o en el temporal |
+| `warn_if_low_disk_space(source, output)` | `WARNING INSUFFICIENT_DISK_SPACE` (cifras en GiB, sin rutas; también con `--quiet`) si `services/disk_space` estima que la salida (≈ tamaño de la entrada) alcanza el 90 % del espacio libre del disco de salida. Solo aviso; lo usan `convert`, `anonymize`, `process` y `dataset build` |
 | `is_inside(path, parent)`, `is_non_empty_dir(path)` | validación previa de rutas |
 | `add_command`, `spanish_help`, `SpanishHelpFormatter` | ayuda en español |
+| `CliArgumentParser` | `error()` con mensaje fijo, sin el valor tecleado |
 
 ## Validación y códigos de salida
 
@@ -75,6 +76,7 @@ como envoltorios con el mismo comportamiento, mensajes y códigos (sus pruebas n
   (escribe cada serie en `float32` con `output_name`), `previous_outputs_exist(out, manifest)` y
   `run_pipeline(pipeline, config, fmt, root, out, manifest, on_error, *, verify, on_replay_error, on_status)
   -> PipelineRunResult(reports, files_written, no_sources, reproduced)`. Etapas `process`, `manifest`, `verify`.
+  Si una etapa falla y la corrida creó `output_dir`, lo borra cuando quedó vacío.
 - `dataset_build.py`: `parse_classes`, `check_classes`, `check_build_args(...)` (→ `InvalidBuildInput` o
   `FileExistsError`), `load_build_pipeline(config, config_dir)` (exige `anonymize`), `label_defects(review)` y
   `build_dataset(...) -> DatasetBuildResult(exported, review, ml_files, report_files)`. Etapas `export`, `labels`,
@@ -90,7 +92,13 @@ como envoltorios con el mismo comportamiento, mensajes y códigos (sus pruebas n
   de cabecera.
 - Las pruebas (`tests/unit/test_cli_*.py`) plantan identificadores (nombres, ids `sub-`/`ses-`, UIDs, valores de
   sidecar, la clave) y barren stdout, stderr, los logs en DEBUG, el `--json` y el manifiesto.
-- Excepción aceptada: los errores de `argparse` repiten el argumento que tecleó el usuario.
+- `argparse` no repite lo tecleado: `_common.CliArgumentParser` (parser raíz; los subparsers heredan la clase)
+  redefine `error()` para imprimir el uso y `<prog>: error: Invalid arguments (see --help).` con código 2.
+- Con `--json` (`inspect`, `labels review`) los mensajes van a stderr: stdout queda vacío o con JSON válido.
+- Los comandos sobre un `DATASET` (`labels *`, `dataset export-ml`, `dataset report`) exigen
+  `dataset_build.is_exported_dataset` (`dataset_description.json` con `GeneratedBy` = `MRI-Dataset-Tool`, escrito por
+  `BIDSDatasetWriter.finalize`); si no, código 2 antes de escribir. Evita escribir etiquetas o índices con los ids de
+  origen dentro de un BIDS de entrada.
 
 ## Memoria (RNF02)
 
@@ -100,7 +108,8 @@ Los comandos conservan el streaming de los servicios (un estudio vivo a la vez; 
 
 ## Decisiones de C0–C6
 
-1. `argparse` (stdlib), ayuda en español, mensajes fijos en inglés; los errores propios de `argparse` quedan en inglés.
+1. `argparse` (stdlib), ayuda en español, mensajes fijos en inglés; los errores de `argparse` se reemplazan por un
+   mensaje fijo sin el valor tecleado.
 2. Nivel de log por `--quiet`/`--verbose` (excluyentes); `logging.level` de la configuración no se usa en la CLI.
    Los resúmenes finales y los `WARNING` se imprimen también con `--quiet`.
 3. `--version` usa `collect_versions()` del manifiesto.

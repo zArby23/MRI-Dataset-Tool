@@ -16,7 +16,7 @@ from mri_dataset_tool.presentation.cli._common import (
     format_counts,
     is_inside,
     status,
-    warn_if_discouraged,
+    warn_if_low_disk_space,
 )
 
 _STAGES = {
@@ -86,7 +86,7 @@ def run(args: argparse.Namespace) -> int:
     if previous_outputs_exist(output_dir, manifest_path):
         print("Outputs of a previous run exist (study-*.nii.gz in the output directory or the manifest); remove them first.")
         return EXIT_FAILED
-    warn_if_discouraged(output_dir, manifest_path)
+    warn_if_low_disk_space(source, output_dir)
 
     errors, on_error = error_counter("error")
     replay_errors, on_replay_error = error_counter("replay error")

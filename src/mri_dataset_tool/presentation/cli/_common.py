@@ -2,11 +2,12 @@
 
 import argparse
 import logging
-import tempfile
+import sys
 from collections import Counter
 from collections.abc import Callable
 from pathlib import Path
 
+from mri_dataset_tool.application.services.disk_space import check_free_space, estimate_input_bytes
 from mri_dataset_tool.infrastructure.anonymization.pseudonym import KEY_ENV_VAR, load_key
 
 EXIT_OK = 0  # also when some studies failed and were reported (RF16)
@@ -19,6 +20,15 @@ _quiet = False
 class SpanishHelpFormatter(argparse.HelpFormatter):
     def add_usage(self, usage, actions, groups, prefix=None):
         super().add_usage(usage, actions, groups, "uso: " if prefix is None else prefix)
+
+
+class CliArgumentParser(argparse.ArgumentParser):
+    """``error()`` prints the usage and a fixed message: argparse's own message repeats the typed value
+    (an invalid choice, an unrecognized path...), which may be an id. Subparsers inherit this class."""
+
+    def error(self, message: str):
+        self.print_usage(sys.stderr)
+        self.exit(EXIT_USAGE, f"{self.prog}: error: Invalid arguments (see --help).\n")
 
 
 def spanish_help(parser: argparse.ArgumentParser) -> argparse.ArgumentParser:
@@ -53,15 +63,15 @@ def progress(done: int, total: int, label: str) -> None:
     status(f"[{done}/{total}] {label}")
 
 
-def is_discouraged_location(path: Path) -> bool:
-    """True if *path* is on drive C: or under the system temporary directory."""
-    resolved = path.resolve()
-    return resolved.drive.upper() == "C:" or resolved.is_relative_to(Path(tempfile.gettempdir()).resolve())
-
-
-def warn_if_discouraged(*paths: Path) -> None:
-    if any(is_discouraged_location(path) for path in paths):
-        print("WARNING: an output is on drive C: or in the temporary directory; large runs should go elsewhere (E:/).")
+def warn_if_low_disk_space(source: Path, output: Path) -> None:
+    """Fixed WARNING (also with ``--quiet``) if the estimated output reaches 90 % of the free space
+    of the output drive; only aggregate figures, never paths. It does not block the run."""
+    check = check_free_space(output, estimate_input_bytes(source))
+    if check.insufficient:
+        print(
+            f"WARNING INSUFFICIENT_DISK_SPACE: estimated output {check.required / 2**30:.1f} GiB, "
+            f"{check.free / 2**30:.1f} GiB free on the output drive; consider another drive."
+        )
 
 
 def check_key() -> bool:

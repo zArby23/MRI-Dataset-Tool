@@ -5,6 +5,7 @@ to ``on_status(stage, counts)`` (stage names and counts only, never paths or ids
 a whole stage raise ``StageFailed`` (stage and exception type only).
 """
 
+import contextlib
 from collections.abc import Callable, Iterable
 from dataclasses import dataclass, replace
 from pathlib import Path
@@ -125,6 +126,7 @@ def run_pipeline(
     """
     status = on_status or (lambda stage, counts: None)
     stage = "process"
+    created = not output_dir.exists()
     try:
         status(stage, {})
         output_dir.mkdir(parents=True, exist_ok=True)
@@ -155,5 +157,10 @@ def run_pipeline(
             )
             reproduced = RunManifest.from_run(saved.config, replay, replay_reports) == saved
     except Exception as error:  # its message or traceback may name a file (sub-<id>)
+        # e.g. no valid studies: do not leave the empty directory this run created; a cleanup failure
+        # (locked by another program, a file appeared meanwhile) must not replace StageFailed
+        with contextlib.suppress(OSError):
+            if created and output_dir.is_dir() and not any(output_dir.iterdir()):
+                output_dir.rmdir()
         raise StageFailed(stage, error) from error
     return PipelineRunResult(reports, written, no_sources, reproduced)

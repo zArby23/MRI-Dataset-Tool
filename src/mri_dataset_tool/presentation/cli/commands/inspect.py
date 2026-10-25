@@ -2,6 +2,7 @@
 
 import argparse
 import json
+import sys
 from collections.abc import Callable, Iterable
 from pathlib import Path
 from typing import Any
@@ -60,14 +61,15 @@ def _print_study(number: int, summary: dict[str, Any]) -> None:
 
 def run(args: argparse.Namespace) -> int:
     path: Path = args.path
+    err_out = sys.stderr if args.json else sys.stdout  # --json: stdout holds only JSON
     if not path.exists():
-        print("Input path not found.")
+        print("Input path not found.", file=err_out)
         return EXIT_USAGE
     if args.format == "dicom" and not path.is_dir():
-        print("DICOM input must be a directory.")
+        print("DICOM input must be a directory.", file=err_out)
         return EXIT_USAGE
     if args.format == "nifti" and path.is_file() and not is_nifti_file(path):
-        print("NIfTI input must be a .nii or .nii.gz file or a directory.")
+        print("NIfTI input must be a .nii or .nii.gz file or a directory.", file=err_out)
         return EXIT_USAGE
 
     errors, on_error = error_counter("file skipped", echo=not args.json)
@@ -85,7 +87,7 @@ def run(args: argparse.Namespace) -> int:
             if not args.json:
                 _print_study(len(summaries), summary)
     except Exception as error:  # the reader failed (invalid root, no valid studies); its message may name a file
-        print(f"Run failed: {type(error).__name__}")
+        print(f"Run failed: {type(error).__name__}", file=err_out)
         return EXIT_FAILED
 
     if args.json:

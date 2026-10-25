@@ -15,7 +15,7 @@ from mri_dataset_tool.presentation.cli._common import (
     format_counts,
     is_inside,
     status,
-    warn_if_discouraged,
+    warn_if_low_disk_space,
 )
 
 
@@ -48,7 +48,7 @@ def run(args: argparse.Namespace) -> int:
     if (output / REPORT_NAME).exists():
         print("Anonymization report already exists; use a new output directory.")
         return EXIT_FAILED
-    warn_if_discouraged(output)
+    warn_if_low_disk_space(source, output)
 
     errors, on_error = error_counter("file skipped or failed")
     status("Anonymizing DICOM files...")

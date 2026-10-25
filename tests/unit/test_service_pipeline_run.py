@@ -129,3 +129,30 @@ def test_process_studies_releases_each_study_before_the_next(tmp_path):
         pipeline_from_config(_config("stage3_bids.yaml")), studies, tmp_path / "out", lambda p, e: None, "bids"
     )
     assert (len(reports), written, len(alive)) == (3, 2, 3)
+
+
+def test_failure_removes_the_empty_output_directory_it_created(tmp_path):
+    (tmp_path / "empty").mkdir()
+    with pytest.raises(StageFailed) as raised:
+        _run("stage3_bids.yaml", "bids", tmp_path / "empty", tmp_path)
+    assert raised.value.stage == "process" and not (tmp_path / "out").exists()
+
+
+def test_failure_keeps_an_output_directory_that_already_existed(tmp_path):
+    (tmp_path / "empty").mkdir()
+    (tmp_path / "out").mkdir()
+    with pytest.raises(StageFailed):
+        _run("stage3_bids.yaml", "bids", tmp_path / "empty", tmp_path)
+    assert (tmp_path / "out").is_dir()
+
+
+def test_a_failed_cleanup_still_raises_stage_failed_without_the_path(tmp_path, monkeypatch):
+    def locked(self):
+        raise PermissionError(f"locked {self}")
+
+    monkeypatch.setattr(Path, "rmdir", locked)
+    (tmp_path / "empty").mkdir()
+    with pytest.raises(StageFailed) as raised:
+        _run("stage3_bids.yaml", "bids", tmp_path / "empty", tmp_path)
+    assert raised.value.stage == "process" and str(tmp_path) not in str(raised.value)
+    assert (tmp_path / "out").is_dir()  # left in place, the run still reports its own failure

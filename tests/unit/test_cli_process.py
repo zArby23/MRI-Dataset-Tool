@@ -2,6 +2,7 @@
 
 import json
 import logging
+from collections import namedtuple
 import shutil
 from pathlib import Path
 
@@ -9,6 +10,7 @@ import nibabel as nib
 import numpy as np
 import pytest
 
+from mri_dataset_tool.application.services import disk_space
 from mri_dataset_tool.presentation.cli import _common
 from mri_dataset_tool.presentation.cli.main import main
 
@@ -156,3 +158,21 @@ def test_failed_stage_exits_one_with_type_only(tmp_path, capsys):
     assert main(_argv(_bids(tmp_path / "ds"))) == 1
     out = capsys.readouterr().out
     assert "Run failed at manifest: " in out and _clean(out, tmp_path)
+
+
+@pytest.mark.parametrize(("free", "warned"), [(10, True), (10**15, False)])
+def test_low_disk_space_warns_without_changing_the_exit_code(tmp_path, monkeypatch, capsys, free, warned):
+    usage = namedtuple("Usage", "total used free")
+    monkeypatch.setattr(disk_space.shutil, "disk_usage", lambda path: usage(free, 0, free))
+    assert main(_argv(_bids(tmp_path / "ds"))) == 0
+    out = capsys.readouterr().out
+    assert ("WARNING INSUFFICIENT_DISK_SPACE" in out) == warned
+    assert "drive C:" not in out
+    assert _clean(out, tmp_path)
+
+
+def test_empty_input_fails_without_leaving_the_output_directory(tmp_path, capsys):
+    (tmp_path / "empty").mkdir()
+    assert main(_argv(tmp_path / "empty")) == 1
+    assert "Run failed at process: ValueError" in capsys.readouterr().out
+    assert not (tmp_path / "out").exists() and not (tmp_path / "m").exists()

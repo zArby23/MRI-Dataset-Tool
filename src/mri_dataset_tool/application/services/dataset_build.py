@@ -5,6 +5,7 @@ Nothing here prints. Validation raises ``InvalidBuildInput`` (fixed message, saf
 (event names and counts only); a failed stage raises ``StageFailed`` (stage and exception type).
 """
 
+import json
 from collections.abc import Callable, Sequence
 from dataclasses import dataclass
 from pathlib import Path
@@ -24,6 +25,7 @@ from mri_dataset_tool.application.services.labels import (
 from mri_dataset_tool.application.services.pipeline_run import ErrorCallback, StageFailed, StatusCallback
 from mri_dataset_tool.infrastructure.bids.batch_reader import BIDSBatchReader
 from mri_dataset_tool.infrastructure.config.loader import load_config
+from mri_dataset_tool.infrastructure.dataset.bids_writer import TOOL_NAME
 from mri_dataset_tool.infrastructure.dataset.labels import LabelTable
 from mri_dataset_tool.infrastructure.dataset.splits import DEFAULT_RATIOS, DEFAULT_SEED, check_split_params
 
@@ -38,6 +40,20 @@ class DatasetBuildResult:
     review: LabelReview | None  # None without classes
     ml_files: list[Path] | None  # None when skipped (labels incomplete)
     report_files: list[Path]
+
+
+def is_exported_dataset(root: Path) -> bool:
+    """True if *root* is a dataset written by this tool: its ``dataset_description.json`` (written by
+    ``BIDSDatasetWriter.finalize``) names the tool in ``GeneratedBy``. A raw BIDS input does not, so the
+    dataset commands never write label or ML files, with source ids, into an input."""
+    try:
+        description = json.loads((root / "dataset_description.json").read_text(encoding="utf-8"))
+    except (OSError, UnicodeDecodeError, json.JSONDecodeError):
+        return False
+    generated_by = description.get("GeneratedBy") if isinstance(description, dict) else None
+    return isinstance(generated_by, list) and any(
+        isinstance(entry, dict) and entry.get("Name") == TOOL_NAME for entry in generated_by
+    )
 
 
 def parse_classes(items: Sequence[str]) -> dict[str, str]:

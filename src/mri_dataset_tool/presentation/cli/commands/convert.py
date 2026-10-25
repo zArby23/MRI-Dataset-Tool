@@ -15,7 +15,7 @@ from mri_dataset_tool.presentation.cli._common import (
     is_inside,
     is_non_empty_dir,
     status,
-    warn_if_discouraged,
+    warn_if_low_disk_space,
 )
 
 
@@ -56,7 +56,7 @@ def run(args: argparse.Namespace) -> int:
     if is_non_empty_dir(output):
         print("Output directory is not empty; use a new one.")
         return EXIT_FAILED
-    warn_if_discouraged(output)
+    warn_if_low_disk_space(source, output)
 
     # DICOM: also counts the files of the tree the reader skips (README, DICOMDIR, ...).
     errors, on_error = error_counter("file skipped or failed")

@@ -11,8 +11,9 @@ a series whose modality is in neither list is not resampled). Studies are read l
 (subject, session) at a time, with BIDSBatchReader from <dataset_root> (default
 data/raw/bids_test_studies). Each series is written as float32 to
 <output-dir>/study-NNN_series-MMM.nii.gz (positions in the input order, never source names)
-and the run manifest to --manifest-path. Both are required: large outputs must not go to C:
-or the temporary directory (a warning is printed, the run is not blocked). Nothing is
+and the run manifest to --manifest-path. Both are required. If the estimated output (the size of
+the input) reaches 90 % of the free space of the output drive a warning is printed; the run is
+not blocked. Nothing is
 overwritten: if outputs of a previous run exist the script stops before running. The pipeline
 is then rebuilt from the saved manifest and run again to check reproducibility. Errors print
 only their exception type; neither the console nor the manifest show paths, names or messages.
@@ -22,7 +23,6 @@ After "Run failed", delete the partial outputs (study-*.nii.gz) before retrying.
 import argparse
 import logging
 import sys
-import tempfile
 from collections import Counter
 from collections.abc import Callable, Sequence
 from pathlib import Path
@@ -40,16 +40,11 @@ from mri_dataset_tool.domain.models.transformation import StudyReport
 from mri_dataset_tool.infrastructure.anonymization.pseudonym import KEY_ENV_VAR, load_key
 from mri_dataset_tool.infrastructure.bids.batch_reader import BIDSBatchReader  # noqa: F401 (tests patch it)
 from mri_dataset_tool.infrastructure.config.loader import load_config
+from mri_dataset_tool.presentation.cli._common import warn_if_low_disk_space
 
 REPO = Path(__file__).resolve().parents[1]
 CONFIG_PATH = REPO / "config" / "stage3_bids.yaml"
 DEFAULT_DATASET = REPO / "data" / "raw" / "bids_test_studies"
-
-
-def is_discouraged_location(path: Path) -> bool:
-    """True if *path* is on drive C: or under the system temporary directory."""
-    resolved = path.resolve()
-    return resolved.drive.upper() == "C:" or resolved.is_relative_to(Path(tempfile.gettempdir()).resolve())
 
 
 def _printer() -> tuple[Counter[str], Callable[[Path, Exception], None]]:
@@ -91,8 +86,7 @@ def main(argv: Sequence[str] | None = None) -> int:
     if not dataset_root.is_dir():
         print("Dataset directory not found.")  # fixed text: never the path
         return 2
-    if is_discouraged_location(output_dir) or is_discouraged_location(manifest_path):
-        print("WARNING: an output is on drive C: or in the temporary directory; large runs should go elsewhere (E:/).")
+    warn_if_low_disk_space(dataset_root, output_dir)
 
     config = load_config(CONFIG_PATH, config_dir=REPO / "config")
     logging.basicConfig(level=config["logging"]["level"])

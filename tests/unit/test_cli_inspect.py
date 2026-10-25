@@ -151,3 +151,12 @@ def test_truncated_volume_is_counted_and_the_batch_continues(tmp_path, capsys, f
     assert main(["inspect", str(root), "--format", fmt, "--json"]) == 0
     result = json.loads(capsys.readouterr().out)
     assert len(result["studies"]) == 1 and result["errors"] == {"ValueError": 2}
+
+
+@pytest.mark.parametrize("argv", [["inspect", "{tmp}/missing", "--format", "nifti", "--json"],
+                                  ["inspect", "{tmp}/empty", "--format", "bids", "--json"]])
+def test_json_errors_go_to_stderr_and_stdout_stays_empty(tmp_path, capsys, argv):
+    (tmp_path / "empty").mkdir()
+    assert main([arg.format(tmp=tmp_path) for arg in argv]) in (1, 2)
+    captured = capsys.readouterr()
+    assert captured.out == "" and captured.err and str(tmp_path) not in captured.err

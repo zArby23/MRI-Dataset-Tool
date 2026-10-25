@@ -65,10 +65,21 @@ Configuraciones incluidas:
 
 ### Dónde escribir las salidas
 
-Las conversiones y los pipelines sobre datos reales generan archivos grandes. Escríbalos en un disco con espacio
-(en el equipo de desarrollo, `E:/`), **no** en `C:` ni en la carpeta temporal del sistema: la CLI imprime un
-`WARNING` fijo si la salida cae ahí, pero no bloquea la ejecución. La CLI **nunca sobrescribe**: si una salida ya
-existe termina con código 1; bórrela o elija otra carpeta.
+Las conversiones y los pipelines sobre datos reales generan archivos grandes; la salida puede ir en cualquier
+disco. Antes de empezar, `convert`, `anonymize`, `process` y `dataset build` estiman el tamaño de la salida como
+el tamaño de la entrada y lo comparan con el espacio libre del disco de la carpeta de salida. Si la estimación
+alcanza el 90 % del espacio libre (margen del 10 %), imprimen, también con `--quiet`:
+
+```text
+WARNING INSUFFICIENT_DISK_SPACE: estimated output 12.3 GiB, 11.0 GiB free on the output drive; consider another drive.
+```
+
+Es solo un aviso: la ejecución sigue y el código de salida no cambia. La estimación es aproximada; el
+remuestreo a un espaciado menor o la salida en `float32` de entradas `int16` pueden ocupar bastante más que la
+entrada. Si el espacio libre no se puede leer, no hay aviso. `dataset report` y `dataset export-ml` escriben
+archivos pequeños y no avisan.
+
+La CLI **nunca sobrescribe**: si una salida ya existe termina con código 1; bórrela o elija otra carpeta.
 
 ## 3. Opciones globales y códigos de salida
 
@@ -89,7 +100,12 @@ Las opciones globales van **antes** del comando: `mri-dataset --quiet process ..
 | **2** | Argumentos, clave, configuración o entrada inválidos. Se comprueba antes de crear nada. |
 
 Los errores de cada archivo o estudio se cuentan por tipo de excepción (`Errors by type: {'ValueError': 1}`); el
-mensaje y la ruta no se muestran porque pueden contener datos del paciente.
+mensaje y la ruta no se muestran porque pueden contener datos del paciente. Por la misma razón, un argumento mal
+escrito no se repite: la CLI muestra el uso del comando y `error: Invalid arguments (see --help).` (código 2);
+revise la línea con `--help`.
+
+Con `--json` (`inspect`, `labels review`) la salida estándar contiene solo el JSON; los mensajes de error van a la
+salida de errores (stderr), de modo que un fallo deja la salida estándar vacía.
 
 ## 4. Flujo recomendado
 
@@ -216,7 +232,9 @@ Replay errors by type: {'ValueError': 1}
 Reproduced from manifest: yes
 ```
 
-Termina con código 1 si `--verify` no reproduce la corrida, o si hay un paso `anonymize` y el manifiesto aún
+Si una etapa falla (p. ej. la entrada no tiene estudios válidos) y la carpeta de salida la creó esta corrida y quedó
+vacía, se borra (no así las carpetas padre intermedias que se crearon para ella ni la del manifiesto, ni la carpeta
+si otro programa la bloquea). Termina con código 1 si `--verify` no reproduce la corrida, o si hay un paso `anonymize` y el manifiesto aún
 contiene rutas. Sin `anonymize` el manifiesto guarda las rutas por diseño y se indica
 `Manifest without source paths: no (no anonymize step; ...)`.
 
@@ -224,6 +242,11 @@ contiene rutas. Sin `anonymize` el manifiesto guarda las rutas por diseño y se 
 
 Una clase por (participante, sesión) de un dataset exportado, en `labels.tsv` y `labels.json` en su raíz
 (`docs/dataset/labels.md`). Los ids del dataset son seudónimos; la consola no los muestra.
+
+`labels`, `dataset export-ml` y `dataset report` solo aceptan un **dataset exportado por la herramienta** (su
+`dataset_description.json` tiene `GeneratedBy` con `MRI-Dataset-Tool`, como el `OUT/dataset` de `dataset build`).
+Con un BIDS de entrada terminan con código 2 sin escribir nada: así nunca se escriben etiquetas ni índices para ML
+con los ids originales dentro de la entrada.
 
 ```text
 mri-dataset labels template DATASET --classes NAME[=DESCRIPCIÓN] ...
@@ -334,6 +357,8 @@ pipeline:
 | `Run failed at <etapa>: <Tipo>` | Falló una etapa completa (p. ej. no hay estudios válidos, disco lleno). Borre la salida parcial antes de reintentar. Con `--verbose` verá logs de depuración (sin rutas). |
 | `Errors by type: {'ValueError': n}` con código 0 | Algunos estudios fallaron (p. ej. valores NaN, memoria insuficiente); el resto se procesó. |
 | `Labels finalize failed: ValueError` | Las etiquetas no están completas: revise con `labels review`. |
+| `Not a dataset exported by this tool.` | `labels`, `export-ml` o `report` recibieron un BIDS de entrada u otra carpeta; use el `OUT/dataset` de `dataset build`. |
+| `error: Invalid arguments (see --help).` | Falta un argumento, sobra uno o tiene un valor no admitido; el valor no se repite por privacidad. Revise con `--help`. |
 | `ML exports failed: ValueError` | Etiquetas sin cerrar: `labels finalize` o `--allow-unfinalized`. |
 | `ML export files already exist.` tras `dataset build` | `build` sin `--classes` ya escribió los exportes (sin etiquetas). Para etiquetar después, repita `build` en una carpeta nueva con `--classes` (sección 4). |
 
@@ -346,4 +371,3 @@ pipeline:
   (`docs/anonymization/policy.md`).
 - El dataset BIDS no incluye `.bval/.bvec` para `dwi` ni `EchoTime1/2` para `phasediff` (el `bids-validator` lo marcará).
 - La CLI no muestra rutas: el usuario conoce las que pasó como argumentos.
-- Los mensajes de error de `argparse` (argumentos inválidos) repiten lo que se tecleó.
