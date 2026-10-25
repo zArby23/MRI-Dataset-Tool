@@ -27,20 +27,16 @@ from collections import Counter
 from collections.abc import Callable, Sequence
 from pathlib import Path
 
-from mri_dataset_tool.application.pipeline.manifest import pipeline_from_config
-from mri_dataset_tool.application.services.dataset import export_dataset, write_ml_exports
-from mri_dataset_tool.application.services.dataset_report import report_dataset
-from mri_dataset_tool.application.services.labels import (
-    apply_label_corrections,
-    finalize_labels,
-    review_labels,
-    write_label_template,
+from mri_dataset_tool.application.services.dataset_build import (
+    InvalidBuildInput,
+    StageFailed,
+    build_dataset,
+    check_build_args,
+    load_build_pipeline,
+    parse_classes,  # noqa: F401 (tests use it from here)
 )
 from mri_dataset_tool.infrastructure.anonymization.pseudonym import KEY_ENV_VAR, load_key
-from mri_dataset_tool.infrastructure.bids.batch_reader import BIDSBatchReader
-from mri_dataset_tool.infrastructure.config.loader import load_config
-from mri_dataset_tool.infrastructure.dataset.labels import LabelTable
-from mri_dataset_tool.infrastructure.dataset.splits import DEFAULT_RATIOS, DEFAULT_SEED, check_split_params
+from mri_dataset_tool.infrastructure.dataset.splits import DEFAULT_RATIOS, DEFAULT_SEED
 
 REPO = Path(__file__).resolve().parents[1]
 CONFIG_PATH = REPO / "config" / "stage3_bids.yaml"
@@ -51,15 +47,6 @@ def is_discouraged_location(path: Path) -> bool:
     """True if *path* is on drive C: or under the system temporary directory."""
     resolved = path.resolve()
     return resolved.drive.upper() == "C:" or resolved.is_relative_to(Path(tempfile.gettempdir()).resolve())
-
-
-def parse_classes(items: Sequence[str]) -> dict[str, str]:
-    """``NAME`` or ``NAME=description`` → class → description; a repeated name → ``ValueError``."""
-    pairs = [item.partition("=")[::2] for item in items]
-    classes = dict(pairs)
-    if len(classes) != len(pairs):
-        raise ValueError("Repeated class name.")
-    return classes
 
 
 def _counter(label: str) -> tuple[Counter[str], Callable[[Path, Exception], None]]:
@@ -88,6 +75,27 @@ def parse_args(argv: Sequence[str] | None) -> argparse.Namespace:
     return parser.parse_args(argv)
 
 
+_MESSAGES = {
+    "export": "Exporting the dataset (stage 3 pipeline)...",
+    "exported": "Studies written: {studies}  series: {series}  participants: {participants}  errors: {errors}",
+    "labels_skipped": "Labels: skipped (no --classes).",
+    "label_template": "Label template written ({classes} classes).",
+    "corrections_skipped": "Label corrections: skipped (no --corrections).",
+    "corrections_applied": "Label corrections applied: {rows}",
+    "labels_finalized": "Labels finalized ({labels} labels).",
+    "ml_exports_skipped": "ML exports: skipped (labels incomplete; fix them or use --allow-unfinalized).",
+    "ml_exports": "ML export files written: {files}",
+    "report": "Report files written: {files}",
+}
+
+
+def _print_status(event: str, counts: dict[str, int]) -> None:
+    if event == "labels_incomplete":
+        print(f"WARNING LABELS_INCOMPLETE: {counts}")
+    else:
+        print(_MESSAGES[event].format(**counts))
+
+
 def main(argv: Sequence[str] | None = None) -> int:
     args = parse_args(argv)  # bad or missing arguments: argparse prints usage and exits with 2
     try:
@@ -96,105 +104,40 @@ def main(argv: Sequence[str] | None = None) -> int:
         print(f"{KEY_ENV_VAR} is not set or is shorter than 32 characters; nothing was run.")
         return 2
     # Every message is fixed text: never a path, an id or an exception message.
-    if not args.dataset_root.is_dir():
-        print("Dataset directory not found.")
-        return 2
-    if not args.config.is_file():
-        print("Config file not found.")
-        return 2
-    classes = None
-    if args.classes:
-        try:
-            classes = parse_classes(args.classes)
-            LabelTable(classes)
-        except ValueError:
-            print("Invalid --classes.")
-            return 2
-    if args.corrections is not None and classes is None:
-        print("--corrections needs --classes.")
-        return 2
-    if args.corrections is not None and not args.corrections.is_file():
-        print("Corrections file not found.")
-        return 2
     try:
-        check_split_params(args.ratios, args.seed)
-    except ValueError:
-        print("Invalid --ratios.")
+        classes = check_build_args(
+            args.dataset_root, args.output_dir, args.config, args.classes, args.corrections, args.ratios, args.seed
+        )
+    except InvalidBuildInput as error:
+        print(error)
         return 2
-    output_dir = args.output_dir
-    if output_dir.resolve().is_relative_to(args.dataset_root.resolve()):  # never create anything in the input
-        print("Output directory must be outside the dataset directory.")
-        return 2
-    if output_dir.exists():
-        print("Output directory already exists; choose a new one.")
+    except FileExistsError as error:
+        print(error)
         return 1
+    output_dir = args.output_dir
     if is_discouraged_location(output_dir):
         print("WARNING: the output is on drive C: or in the temporary directory; large runs should go elsewhere (E:/).")
 
     try:
-        config = load_config(args.config, config_dir=REPO / "config")
-        pipeline = pipeline_from_config(config)
-    except Exception as error:
-        print(f"Invalid config: {type(error).__name__}")
-        return 2
-    if not any(step.name == "anonymize" for step in pipeline.steps):  # without it the dataset ids would be the source ones
-        print("The pipeline must include the anonymize step.")
+        config, pipeline = load_build_pipeline(args.config, REPO / "config")
+    except InvalidBuildInput as error:
+        print(error)
         return 2
     logging.basicConfig(level=config["logging"]["level"])
-    dataset, report_dir = output_dir / "dataset", output_dir / "report"
     # Separate counts: files the reader skips (e.g. git-annex pointers) are not export errors.
     skipped, on_skipped = _counter("input file skipped")
     errors, on_error = _counter("error")  # the same events as DatasetReport.errors
     report_errors, on_report_error = _counter("report read error")
 
-    stage, labels_open = "export", False
     try:
-        print("Exporting the dataset (stage 3 pipeline)...")
-        output_dir.mkdir(parents=True)
-        studies = BIDSBatchReader().iter_studies(args.dataset_root, on_error=on_skipped, lazy=True)
-        exported = export_dataset(
-            studies, dataset, on_error, pipeline=pipeline, config=config, source_dir=args.dataset_root
+        build_dataset(
+            args.dataset_root, output_dir, pipeline, config,
+            classes=classes, corrections=args.corrections, ratios=args.ratios, seed=args.seed,
+            allow_unfinalized=args.allow_unfinalized,
+            on_skipped=on_skipped, on_error=on_error, on_report_error=on_report_error, on_status=_print_status,
         )
-        print(f"Studies written: {exported.studies_written}  series: {exported.series_written}  "
-              f"participants: {exported.participants}  errors: {exported.errors}")
-
-        stage = "labels"
-        if classes is None:
-            print("Labels: skipped (no --classes).")
-        else:
-            write_label_template(dataset, classes)
-            print(f"Label template written ({len(classes)} classes).")
-            if args.corrections is None:
-                print("Label corrections: skipped (no --corrections).")
-            else:
-                print(f"Label corrections applied: {apply_label_corrections(dataset, args.corrections)}")
-            review = review_labels(dataset)
-            if review.is_complete:
-                finalize_labels(dataset)
-                print(f"Labels finalized ({review.labeled} labels).")
-            else:
-                defects = {
-                    "UNLABELED": len(review.unlabeled),
-                    "UNKNOWN_CLASS": len(review.unknown_class),
-                    "DUPLICATED": len(review.duplicated),
-                    "MISSING": len(review.missing),
-                    "NOT_IN_DATASET": review.not_in_dataset,
-                    "INVALID_IDS": review.invalid_ids,
-                }
-                print(f"WARNING LABELS_INCOMPLETE: { {code: n for code, n in defects.items() if n} }")
-                labels_open = True
-
-        stage = "ml exports"
-        if labels_open and not args.allow_unfinalized:
-            print("ML exports: skipped (labels incomplete; fix them or use --allow-unfinalized).")
-        else:
-            written = write_ml_exports(dataset, args.ratios, args.seed, allow_unfinalized=args.allow_unfinalized)
-            print(f"ML export files written: {len(written)}")
-
-        stage = "report"
-        print(f"Report files written: {len(report_dataset(dataset, report_dir, on_report_error))}")
-    except Exception as error:  # its message or traceback may name a file (sub-<id>)
-        print(f"Run failed at {stage}: {type(error).__name__}")
+    except StageFailed as failure:
+        print(f"Run failed at {failure.stage}: {failure.error_type}")
         return 1
 
     print(f"Errors by type: {dict(sorted(errors.items())) or 'none'}")
