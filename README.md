@@ -99,6 +99,8 @@ In development. Stages 1 to 4 (loading, conversion, pipeline, processing, anonym
 - Processing pipeline core: step contract, batch runner, run manifest and YAML configuration.
 - Processing steps: validation, anonymization, reorientation, resampling and normalization.
 - Dataset: BIDS writer, labels with review, correction and closing, train/val/test splits by participant, ML/DL index files (`dataset_index.csv`, `datalist.json`) and a statistical report in JSON, Markdown, XML and XLSX.
+- Command line `mri-dataset` (stage 5A): `inspect`, `convert`, `anonymize`, `process`, `labels` and `dataset` (`build`, `export-ml`, `report`), with fixed messages, exit codes 0/1/2, no patient data on the console and a disk-space warning.
+- Unified input: DICOM trees and loose NIfTI files are organized into the same anonymized BIDS dataset as a BIDS input, so labels, splits and reports work for all three formats.
 
 **How to run**
 - `mri-dataset dataset build` accepts a BIDS dataset, a DICOM tree or loose NIfTI files (`--format bids|dicom|nifti`) and organizes them into the same anonymized BIDS dataset, with labels, splits and report. For DICOM the participant is the pseudonymized PatientID and the BIDS suffix comes from conservative rules (doubtful series are skipped with a warning); an optional `--mapping` table fixes ids, suffixes and labels (see `docs/dataset/ingest.md`).
@@ -116,7 +118,8 @@ In development. Stages 1 to 4 (loading, conversion, pipeline, processing, anonym
 - You can force it with `allow_insufficient_memory: true`; the choice is recorded in the run manifest.
 
 **Verification so far**
-- Stages 3 and 4 were audited with synthetic data and with the local test datasets.
+- Stages 3 to 5A were audited with synthetic data and with the local test datasets; the command line has its own adversarial audit and end-to-end integration tests.
+- The unified input (DICOM and loose NIfTI) has integration tests but no independent adversarial audit yet.
 - The NIfTI output was checked in a viewer.
 - Still pending: runs on Linux and with compressed DICOM.
 
@@ -127,7 +130,9 @@ In development. Stages 1 to 4 (loading, conversion, pipeline, processing, anonym
 - The generated DICOM does not conform to the strict MR IOD.
 - Visual checks of converted DICOM volumes are pending.
 - The exported dataset has no `.bval`/`.bvec` for `dwi` and no `EchoTime1/2` for `phasediff`: the official BIDS validator will flag them.
-- Labels are assigned through files; there is no review interface yet.
+- Labels are assigned through files or the `--mapping` table; there is no graphical review interface yet.
+- The BIDS suffix of DICOM and loose NIfTI series is deduced with conservative rules: doubtful series are skipped with a warning and can be fixed with the `--mapping` table.
+- Files that are git-annex pointers without downloaded content are skipped as unreadable.
 
 **Not implemented yet**
 - GUI.
@@ -235,6 +240,8 @@ En desarrollo. Las etapas 1 a 4 (carga, conversión, pipeline, procesamiento, an
 - Núcleo del pipeline de procesamiento: contrato de paso, runner por lotes, manifiesto de corrida y configuración YAML.
 - Pasos de procesamiento: validación, anonimización, reorientación, remuestreo y normalización.
 - Dataset: escritura en formato BIDS, etiquetas con revisión, corrección y cierre, particiones train/val/test por participante, índices para ML/DL (`dataset_index.csv`, `datalist.json`) y reporte estadístico en JSON, Markdown, XML y XLSX.
+- Línea de comandos `mri-dataset` (etapa 5A): `inspect`, `convert`, `anonymize`, `process`, `labels` y `dataset` (`build`, `export-ml`, `report`), con mensajes fijos, códigos de salida 0/1/2, sin datos de pacientes en la consola y aviso de espacio en disco.
+- Entrada unificada: los árboles DICOM y los NIfTI sueltos se organizan en el mismo dataset BIDS anonimizado que una entrada BIDS, de modo que etiquetas, particiones y reportes funcionan con los tres formatos.
 
 **Cómo ejecutar**
 - `mri-dataset dataset build` acepta un dataset BIDS, un árbol DICOM o NIfTI sueltos (`--format bids|dicom|nifti`) y los organiza en el mismo dataset BIDS anonimizado, con etiquetas, particiones y reporte. En DICOM el participante es el PatientID seudonimizado y el sufijo BIDS se deduce con reglas conservadoras (lo dudoso se omite con aviso); una tabla opcional `--mapping` corrige ids, sufijos y etiquetas (ver `docs/dataset/ingest.md`).
@@ -252,7 +259,8 @@ En desarrollo. Las etapas 1 a 4 (carga, conversión, pipeline, procesamiento, an
 - Puedes forzarlo con `allow_insufficient_memory: true`; la decisión queda registrada en el manifiesto de la corrida.
 
 **Verificación hasta ahora**
-- Las etapas 3 y 4 se auditaron con datos sintéticos y con los datasets locales de prueba.
+- Las etapas 3 a 5A se auditaron con datos sintéticos y con los datasets locales de prueba; la línea de comandos tiene su propia auditoría adversarial y pruebas de integración de punta a punta.
+- La entrada unificada (DICOM y NIfTI sueltos) tiene pruebas de integración pero todavía no una auditoría adversarial independiente.
 - La salida NIfTI se revisó en un visor.
 - Siguen pendientes las corridas en Linux y con DICOM comprimido.
 
@@ -263,7 +271,9 @@ En desarrollo. Las etapas 1 a 4 (carga, conversión, pipeline, procesamiento, an
 - El DICOM generado no es conforme al IOD MR estricto.
 - La verificación visual de los volúmenes DICOM convertidos está pendiente.
 - El dataset exportado no incluye `.bval`/`.bvec` para `dwi` ni `EchoTime1/2` para `phasediff`: el validador oficial de BIDS los marcará.
-- Las etiquetas las asigna el usuario por archivos; no hay interfaz de revisión todavía.
+- Las etiquetas se asignan por archivos o con la tabla `--mapping`; todavía no hay una interfaz gráfica de revisión.
+- El sufijo BIDS de las series DICOM y NIfTI sueltas se deduce con reglas conservadoras: las series dudosas se omiten con un aviso y se corrigen con la tabla `--mapping`.
+- Los archivos que son punteros de git-annex sin contenido descargado se omiten como ilegibles.
 
 **Todavía no implementado**
 - GUI.
