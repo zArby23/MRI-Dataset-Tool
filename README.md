@@ -92,7 +92,7 @@ python -m pytest
 
 ## Status
 
-In development. Stages 1 to 3 are complete and stage 4 (dataset) has code and tests; the manual checks and the merge into `main` are pending.
+In development. Stages 1 to 4 (loading, conversion, pipeline, processing, anonymization and dataset) are complete. Stage 5A adds the `mri-dataset` command line (inspect, convert, anonymize, process, labels, dataset); see `docs/user_manual/cli.md` and `docs/architecture/cli.md`. Pending: GUI (5B) and closing (stage 6).
 
 **Implemented** (library code under `src/mri_dataset_tool`)
 - Loading of DICOM, NIfTI and BIDS studies, and DICOM <-> NIfTI conversion.
@@ -100,12 +100,15 @@ In development. Stages 1 to 3 are complete and stage 4 (dataset) has code and te
 - Processing steps: validation, anonymization, reorientation, resampling and normalization.
 - Dataset: BIDS writer, labels with review, correction and closing, train/val/test splits by participant, ML/DL index files (`dataset_index.csv`, `datalist.json`) and a statistical report in JSON, Markdown, XML and XLSX.
 
-**How to run the processing steps**
+**How to run**
+- `mri-dataset dataset build` accepts a BIDS dataset, a DICOM tree or loose NIfTI files (`--format bids|dicom|nifti`) and organizes them into the same anonymized BIDS dataset, with labels, splits and report. For DICOM the participant is the pseudonymized PatientID and the BIDS suffix comes from conservative rules (doubtful series are skipped with a warning); an optional `--mapping` table fixes ids, suffixes and labels (see `docs/dataset/ingest.md`).
+- `mri-dataset --help` (or `python -m mri_dataset_tool.presentation.cli`): command line for the whole flow; see the user manual.
+- The scripts below are kept as thin wrappers and are superseded by the command line:
 - `scripts/run_stage3_pipeline.py` for loose NIfTI files.
 - `scripts/run_stage3_bids_pipeline.py` for BIDS datasets.
 - `scripts/run_stage4_dataset.py` builds the full dataset (BIDS, labels, splits and report).
 - All of them need the `MRI_ANON_KEY` environment variable (at least 32 characters).
-- Send large outputs to a drive with enough free space, outside the repository.
+- Before writing, the command line compares the size of the input with the free space on the output drive and warns (it does not block) if the output may reach 90% of it.
 
 **Memory**
 - Resampling a 4D diffusion series to 1 mm can need several GB of RAM.
@@ -127,7 +130,7 @@ In development. Stages 1 to 3 are complete and stage 4 (dataset) has code and te
 - Labels are assigned through files; there is no review interface yet.
 
 **Not implemented yet**
-- CLI and GUI.
+- GUI.
 
 ---
 
@@ -225,7 +228,7 @@ python -m pytest
 
 ## Estado
 
-En desarrollo. Las etapas 1 a 3 están completas y la etapa 4 (dataset) tiene código y pruebas, a falta de las verificaciones manuales y de la fusión en `main`.
+En desarrollo. Las etapas 1 a 4 (carga, conversión, pipeline, procesamiento, anonimización y dataset) están completas. La etapa 5A añade la línea de comandos `mri-dataset` (inspect, convert, anonymize, process, labels, dataset); ver `docs/user_manual/cli.md` y `docs/architecture/cli.md`. Pendiente: GUI (5B) y cierre (etapa 6).
 
 **Implementado** (código de biblioteca en `src/mri_dataset_tool`)
 - Carga de estudios DICOM, NIfTI y BIDS, y conversión DICOM <-> NIfTI.
@@ -233,12 +236,15 @@ En desarrollo. Las etapas 1 a 3 están completas y la etapa 4 (dataset) tiene c�
 - Pasos de procesamiento: validación, anonimización, reorientación, remuestreo y normalización.
 - Dataset: escritura en formato BIDS, etiquetas con revisión, corrección y cierre, particiones train/val/test por participante, índices para ML/DL (`dataset_index.csv`, `datalist.json`) y reporte estadístico en JSON, Markdown, XML y XLSX.
 
-**Cómo ejecutar los pasos de procesamiento**
+**Cómo ejecutar**
+- `mri-dataset dataset build` acepta un dataset BIDS, un árbol DICOM o NIfTI sueltos (`--format bids|dicom|nifti`) y los organiza en el mismo dataset BIDS anonimizado, con etiquetas, particiones y reporte. En DICOM el participante es el PatientID seudonimizado y el sufijo BIDS se deduce con reglas conservadoras (lo dudoso se omite con aviso); una tabla opcional `--mapping` corrige ids, sufijos y etiquetas (ver `docs/dataset/ingest.md`).
+- `mri-dataset --help` (o `python -m mri_dataset_tool.presentation.cli`): línea de comandos para todo el flujo; ver el manual de usuario.
+- Los scripts siguientes se mantienen como envoltorios finos y quedan superados por la línea de comandos:
 - `scripts/run_stage3_pipeline.py` para archivos NIfTI sueltos.
 - `scripts/run_stage3_bids_pipeline.py` para datasets BIDS.
 - `scripts/run_stage4_dataset.py` para construir el dataset completo (BIDS, etiquetas, particiones y reporte).
 - Todos requieren la variable de entorno `MRI_ANON_KEY` (de al menos 32 caracteres).
-- Dirige las salidas grandes a un disco con espacio libre, fuera del repositorio.
+- Antes de escribir, la línea de comandos compara el tamaño de la entrada con el espacio libre del disco de salida y avisa (no bloquea) si la salida podría llegar al 90 % de ese espacio.
 
 **Memoria**
 - Remuestrear una difusión 4D a 1 mm puede necesitar varios GB de RAM.
@@ -260,4 +266,4 @@ En desarrollo. Las etapas 1 a 3 están completas y la etapa 4 (dataset) tiene c�
 - Las etiquetas las asigna el usuario por archivos; no hay interfaz de revisión todavía.
 
 **Todavía no implementado**
-- CLI y GUI.
+- GUI.

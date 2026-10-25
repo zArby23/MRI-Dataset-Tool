@@ -3,14 +3,17 @@
 import importlib.util
 import json
 import re
+from collections import namedtuple
 from pathlib import Path
 
 import nibabel as nib
 import numpy as np
 import pytest
 
+from mri_dataset_tool.application.services import disk_space
 from mri_dataset_tool.infrastructure.anonymization.pseudonym import load_key, pseudonymize_label
 
+_Usage = namedtuple("Usage", "total used free")
 REPO = Path(__file__).resolve().parents[2]
 KEY = "k" * 40
 
@@ -49,7 +52,8 @@ def _assert_clean(out: str, tmp_path: Path) -> None:
     assert "sub-" not in out and str(tmp_path) not in out and tmp_path.as_posix() not in out and KEY not in out
 
 
-def test_full_run_writes_dataset_labels_exports_and_report(tmp_path: Path, capsys) -> None:
+def test_full_run_writes_dataset_labels_exports_and_report(tmp_path: Path, capsys, monkeypatch) -> None:
+    monkeypatch.setattr(disk_space.shutil, "disk_usage", lambda path: _Usage(10, 0, 10))  # almost no free space
     source = _dataset(tmp_path)
     corrections = _corrections(tmp_path / "fix.tsv", [("01", "AD"), ("02", "CN")])
     out_dir = tmp_path / "out"
@@ -65,7 +69,7 @@ def test_full_run_writes_dataset_labels_exports_and_report(tmp_path: Path, capsy
     assert "ML export files written: 4" in out and "Report files written: 4" in out
     assert "Errors by type: {'ValueError': 1}" in out  # the NaN study, also in "errors: 1" above
     assert "Input files skipped by the reader: none" in out and "Report read errors: none" in out
-    assert "WARNING: the output is on drive C: or in the temporary directory" in out  # tmp_path
+    assert "WARNING INSUFFICIENT_DISK_SPACE: estimated output" in out
     _assert_clean(out, tmp_path)
     dataset = out_dir / "dataset"
     assert json.loads((dataset / "labels.json").read_text(encoding="utf-8"))["label"]["Levels"] == {
