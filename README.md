@@ -92,7 +92,7 @@ python -m pytest
 
 ## Status
 
-In development. Stages 1 to 3 are complete and stage 4 (dataset) has code and tests; the manual checks and the merge into `main` are pending.
+In development. Stages 1 to 4 (loading, conversion, pipeline, processing, anonymization and dataset) are complete. Stage 5A adds the `mri-dataset` command line (inspect, convert, anonymize, process, labels, dataset); see `docs/user_manual/cli.md` and `docs/architecture/cli.md`. Pending: GUI (5B) and closing (stage 6).
 
 **Implemented** (library code under `src/mri_dataset_tool`)
 - Loading of DICOM, NIfTI and BIDS studies, and DICOM <-> NIfTI conversion.
@@ -100,7 +100,9 @@ In development. Stages 1 to 3 are complete and stage 4 (dataset) has code and te
 - Processing steps: validation, anonymization, reorientation, resampling and normalization.
 - Dataset: BIDS writer, labels with review, correction and closing, train/val/test splits by participant, ML/DL index files (`dataset_index.csv`, `datalist.json`) and a statistical report in JSON, Markdown, XML and XLSX.
 
-**How to run the processing steps**
+**How to run**
+- `mri-dataset --help` (or `python -m mri_dataset_tool.presentation.cli`): command line for the whole flow; see the user manual.
+- The scripts below are kept as thin wrappers and are superseded by the command line:
 - `scripts/run_stage3_pipeline.py` for loose NIfTI files.
 - `scripts/run_stage3_bids_pipeline.py` for BIDS datasets.
 - `scripts/run_stage4_dataset.py` builds the full dataset (BIDS, labels, splits and report).
@@ -127,7 +129,7 @@ In development. Stages 1 to 3 are complete and stage 4 (dataset) has code and te
 - Labels are assigned through files; there is no review interface yet.
 
 **Not implemented yet**
-- CLI and GUI.
+- GUI.
 
 ---
 
@@ -225,7 +227,7 @@ python -m pytest
 
 ## Estado
 
-En desarrollo. Las etapas 1 a 3 están completas y la etapa 4 (dataset) tiene código y pruebas, a falta de las verificaciones manuales y de la fusión en `main`.
+En desarrollo. Las etapas 1 a 4 (carga, conversión, pipeline, procesamiento, anonimización y dataset) están completas. La etapa 5A añade la línea de comandos `mri-dataset` (inspect, convert, anonymize, process, labels, dataset); ver `docs/user_manual/cli.md` y `docs/architecture/cli.md`. Pendiente: GUI (5B) y cierre (etapa 6).
 
 **Implementado** (código de biblioteca en `src/mri_dataset_tool`)
 - Carga de estudios DICOM, NIfTI y BIDS, y conversión DICOM <-> NIfTI.
@@ -233,7 +235,9 @@ En desarrollo. Las etapas 1 a 3 están completas y la etapa 4 (dataset) tiene c�
 - Pasos de procesamiento: validación, anonimización, reorientación, remuestreo y normalización.
 - Dataset: escritura en formato BIDS, etiquetas con revisión, corrección y cierre, particiones train/val/test por participante, índices para ML/DL (`dataset_index.csv`, `datalist.json`) y reporte estadístico en JSON, Markdown, XML y XLSX.
 
-**Cómo ejecutar los pasos de procesamiento**
+**Cómo ejecutar**
+- `mri-dataset --help` (o `python -m mri_dataset_tool.presentation.cli`): línea de comandos para todo el flujo; ver el manual de usuario.
+- Los scripts siguientes se mantienen como envoltorios finos y quedan superados por la línea de comandos:
 - `scripts/run_stage3_pipeline.py` para archivos NIfTI sueltos.
 - `scripts/run_stage3_bids_pipeline.py` para datasets BIDS.
 - `scripts/run_stage4_dataset.py` para construir el dataset completo (BIDS, etiquetas, particiones y reporte).
@@ -260,4 +264,4 @@ En desarrollo. Las etapas 1 a 3 están completas y la etapa 4 (dataset) tiene c�
 - Las etiquetas las asigna el usuario por archivos; no hay interfaz de revisión todavía.
 
 **Todavía no implementado**
-- CLI y GUI.
+- GUI.

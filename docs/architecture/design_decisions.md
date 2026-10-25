@@ -3,7 +3,7 @@
 Guía para sustentar el proyecto: por cada bloque, qué hace, por qué se diseñó así y qué alternativas se descartaron. El detalle técnico de cada módulo está en `docs/` (enlazado en cada sección).
 
 ## 1. Arquitectura en capas
-- **Qué:** `domain` (modelos), `infrastructure` (formatos, procesamiento, dataset), `application` (servicios y pipeline) y `presentation` (reservada).
+- **Qué:** `domain` (modelos), `infrastructure` (formatos, procesamiento, dataset), `application` (servicios y pipeline) y `presentation` (CLI; GUI pendiente).
 - **Por qué:** los modelos `MRIStudy`/`MRISeries` no dependen de `pydicom` ni `nibabel`; cualquier formato de entrada termina en ellos y cualquier escritor los consume. Se pueden cambiar lectores y escritores sin tocar el procesamiento.
 - **Descartado:** funciones sueltas por formato (cada paso tendría que conocer DICOM y NIfTI) y lógica de negocio en la CLI.
 
@@ -55,8 +55,14 @@ Guía para sustentar el proyecto: por cada bloque, qué hace, por qué se diseñ
 - **Por qué:** RNF07 y RNF06; una excepción o un log no debe filtrar datos de paciente ni dejar archivos a medias.
 - **Verificación:** pruebas con datos personales plantados y barrido de todo el árbol de salida, nombres y logs; auditoría adversarial en `docs/testing/qa_etapa3.md` y `qa_etapa4.md`.
 
+## 11. Línea de comandos
+- **Qué:** `mri-dataset` (`argparse`) con un subcomando por caso de uso; cada comando valida, llama a un servicio y muestra conteos. La orquestación de los scripts se extrajo a `pipeline_run` y `dataset_build`, con eventos de estado y excepciones tipadas (`StageFailed`, `InvalidBuildInput`). (`docs/architecture/cli.md`)
+- **Por qué:** sin lógica de negocio en la presentación, la futura GUI reutilizará los mismos servicios. Los códigos 0/1/2 se deciden por tipo de excepción, no comparando mensajes. Toda la validación ocurre antes de crear nada, así un error no deja salidas a medias.
+- **Límites declarados:** la consola no muestra rutas (el usuario ya conoce las que pasó). Los errores de `argparse` repiten lo tecleado. Las rutas de la configuración son relativas al directorio actual. `--verify` es opcional porque duplica el tiempo.
+- **Descartado:** duplicar la orquestación de los scripts en la CLI, hacer importable `scripts/` y añadir dependencias como `click` o `typer` (RNF12).
+
 ## Qué no cubre el proyecto (para declararlo con honestidad)
 - Defacing y texto quemado en los píxeles.
-- Interfaz de usuario (CLI/GUI) y revisión interactiva de etiquetas.
+- Interfaz gráfica (GUI) y revisión interactiva de etiquetas.
 - Validación con `bids-validator` oficial sin avisos, y verificación en Linux.
 - Medición de rendimiento formal (RNF01).
