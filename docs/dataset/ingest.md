@@ -41,7 +41,15 @@ de exportación falla (código 1).
 - **Participante:** `PatientID` seudonimizado con HMAC-SHA256 y `MRI_ANON_KEY` (`pseudonymize_label`, el mismo de la
   política de anonimización). Dos estudios del mismo `PatientID` son el mismo participante.
 - **Sin `PatientID`**, o con valores distintos dentro del estudio: un participante por estudio, seudónimo del
-  `StudyInstanceUID`.
+  `StudyInstanceUID`. Basta un archivo sin `PatientID` para que el estudio quede así, aunque los otros estudios del
+  paciente lo tengan: el paciente se parte en varios participantes y las particiones de ML podrían ponerlo en
+  `train` y en `test`. Los estudios afectados (sin participante en la tabla) se avisan con
+  `WARNING MISSING_PATIENT_ID: n`, también con `--quiet`, solo con el conteo; corríjalo con una fila de la tabla
+  con la carpeta del estudio.
+  Un estudio con **varios `PatientID` distintos** también queda como participante propio, pero **sin aviso**
+  (`MISSING_PATIENT_ID` solo cuenta archivos sin `PatientID`): revise la tabla si un árbol mezcla pacientes.
+- `PatientID` se compara exactamente: `pat1` y `PAT1` son participantes distintos (los espacios en los bordes se
+  ignoran).
 - **Sesión:** cada `StudyInstanceUID` es una sesión (seudónimo del UID).
 - `PatientID`, `SeriesDescription` y `ProtocolName` se leen en una segunda pasada de cabeceras
   (`stop_before_pixels`) y **solo viven en memoria**: no se devuelven, no se registran en logs y no se escriben.
@@ -68,7 +76,7 @@ distinta de `MR` se excluye.
 | Sufijo | Palabras | Ejemplos |
 |---|---|---|
 | `FLAIR` | `flair` (gana a `t2`) | `t2_flair_tra`, `FLAIR` |
-| `T2starw` | `t2star`, o el texto `t2*` (también `t2 *`) | `T2*`, `t2star` |
+| `T2starw` | `t2star`, o el texto `t2*` (también `t2 *`) o `t2 star` (también `t2_star`, `t2-star`) | `T2*`, `t2star`, `T2_STAR_HEMO`, `Ax T2 Star` |
 | `T2w` | `t2`, `t2w` | `T2 TSE axial`, `sub-01_T2w` |
 | `T1w` | `t1`, `t1w`, `mprage`, `bravo`, `spgr` | `T1_MPRAGE_SAG`, `Sag BRAVO`, `3D SPGR` |
 | `PDw` | `pd`, `pdw`, o `proton` + `density` | `PD TSE`, `proton density` |
@@ -89,12 +97,12 @@ Exclusiones (cualquiera → `EXCLUDED`):
 | Grupo | Palabras | Ejemplos excluidos |
 |---|---|---|
 | Localizadores | `localizer`, `localiser`, `scout`, `survey`, `loc` | `localizer`, `AAHead_Scout` |
-| Mapas derivados | `adc`, `fa`, `trace`, `tracew`, `colfa`, `exp`, `tensor`, `dixon`, `mpr`, `mip`, `reformat` | `ep2d_diff_ADC`, `DWI TRACEW`, `dti FA`, `ep2d_diff_TENSOR`, `t1_vibe_dixon_W`, `t1 MPR cor` |
+| Mapas derivados | `adc`, `fa`, `trace`, `tracew`, `colfa`, `exp`, `tensor`, `dixon`, `mpr`, `mip`, `reformat`, `reformatted`, `nd` (copia sin corrección de distorsión de Siemens), y en nombres NIfTI derivados `desc`, `preproc` | `ep2d_diff_ADC`, `DWI TRACEW`, `dti FA`, `ep2d_diff_TENSOR`, `t1_vibe_dixon_W`, `t1 MPR cor`, `Sag T1 Reformatted`, `t1_mprage_sag_ND`, `sub-01_space-MNI_desc-preproc_T1w` |
 | Contraste | `c`, `km`, `mdc`, `ce`, y `post`, `gd`, `gad`, `contrast` también dentro de una palabra | `+C Ax T1`, `T1+C`, `T1_MPRAGE_postGd`, `T1 postcontrast`, `t1_se_tra_KM`, `sub-01_ce-gd_T1w` |
 | Sustracción | `subtraction`; en DICOM también `sub` | `T1_SUB`, `t1_mprage_sag_SUB` |
-| Dark-fluid llamado T2 | `dark`, `darkfluid`, `tirm` | `t2_tse_dark-fluid_tra`, `t2_tirm_tra_dark-fluid` |
+| Dark-fluid o inversión llamados T2 | `dark`, `darkfluid`, `tirm`, `stir`, y el texto `da-fl` (también `da_fl`, `dafl`; SPACE dark-fluid de Siemens) | `t2_tse_dark-fluid_tra`, `t2_tirm_tra_dark-fluid`, `t2_spc_da-fl_sag_p2_iso`, `Cor T2 STIR` |
 | Eco de gradiente llamado T2 | `gre`, `ffe`, `fl2d`, `fl3d`, `medic`, `merge` | `Ax T2 GRE`, `T2W_FFE`, `t2_fl2d_tra`, `T2 * GRE` |
-| Mapas cuantitativos y dinámicos | `map`, `mapping`, `molli`, `dyn`, `dynamic`, `perf`, `twist` | `T1 map`, `T2_mapping`, `T1_MOLLI`, `t1_vibe_dyn`, `T1 perf` |
+| Mapas cuantitativos y dinámicos | `map`, `mapping`, `relaxometry`, `molli`, `dyn`, `dynamic`, `perf`, `twist` | `T1 map`, `T2_mapping`, `T2 relaxometry`, `T1_MOLLI`, `t1_vibe_dyn`, `T1 perf` |
 | Perfusión, angiografía, SWI | `perfusion`, `dsc`, `dce`, `asl`, `swi`, `mra`, `tof` | `perfusion DSC`, `DCE`, `TOF MRA`, `SWI` |
 | Funcionales | `bold`, `fmri`, `rest`, `resting` | `ep2d_bold_rest` |
 | Varias imágenes por serie | `mp2rage`, `inv1`, `inv2`, `uni` | `MP2RAGE UNI` |
@@ -169,3 +177,11 @@ usted conoce sus carpetas, no los seudónimos.
   nada (sección 1). La comparación se hace con los seudónimos finales: un id de la tabla igual al `PatientID` de otro
   estudio es el mismo participante.
 - Sin tabla, los NIfTI de un mismo paciente quedan como participantes distintos.
+- Una tabla que da el mismo participante a cada carpeta de serie de un estudio, sin una fila con la carpeta del
+  estudio entero, se rechaza con `Mapping gives one study more than one participant or session.` aunque los
+  valores coincidan: el participante y la sesión salen de las filas que contienen el estudio entero (sección 4).
+- Las rutas de la tabla se comparan byte a byte: una ruta en otra normalización Unicode que la carpeta (NFC frente
+  a NFD, típico de macOS o de texto copiado) no se encuentra (`Mapping paths not found in the input: N.`).
+  Escríbala o cópiela desde el propio explorador de archivos.
+- pydicom no valida los valores al leer las cabeceras (sus avisos citarían el valor, p. ej. un UID no conforme):
+  un archivo con valores fuera del estándar se lee igual que antes y no deja rastro en la consola ni en los logs.

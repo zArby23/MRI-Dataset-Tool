@@ -14,6 +14,7 @@ import pydicom
 
 from mri_dataset_tool.infrastructure.anonymization.pseudonym import pseudonymize_label
 from mri_dataset_tool.infrastructure.dataset.suffix_rules import EXCLUDED, suffix_from_text
+from mri_dataset_tool.infrastructure.dicom._study_assembler import quiet_value_validation
 from mri_dataset_tool.infrastructure.dicom.batch_reader import _iter_visible_files
 from mri_dataset_tool.infrastructure.logging.logger import get_logger
 
@@ -26,12 +27,14 @@ IDENTITY_TAGS = ["StudyInstanceUID", "SeriesInstanceUID", "Modality", "PatientID
 class DicomIdentities:
     subject_by_study: dict[str, str]  # study UID -> 16-hex participant pseudonym
     suffix_by_series: dict[str, tuple[str | None, str]]  # series UID -> (suffix, code)
+    missing_patient_id: frozenset[str] = frozenset()  # study UIDs with a file without PatientID (QA6-06)
 
 
 def _text(value) -> str:
     return str(value).strip() if value is not None else ""
 
 
+@quiet_value_validation()
 def read_dicom_identities(directory: Path, key: bytes) -> DicomIdentities:
     """Read the identity tags below *directory* (same files and order as ``DICOMBatchReader``).
 
@@ -70,4 +73,5 @@ def read_dicom_identities(directory: Path, key: bytes) -> DicomIdentities:
         for series, words in texts.items()  # every series has an entry, with or without descriptions
     }
     logger.debug("DICOM identities: %d studies, %d series, %d files skipped.", len(subject_by_study), len(suffix_by_series), skipped)
-    return DicomIdentities(subject_by_study, suffix_by_series)
+    missing = frozenset(study for study, ids in patients.items() if "" in ids)
+    return DicomIdentities(subject_by_study, suffix_by_series, missing)

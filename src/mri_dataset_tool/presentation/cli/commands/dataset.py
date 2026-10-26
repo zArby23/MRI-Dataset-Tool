@@ -154,13 +154,15 @@ def _print_status(event: str, counts: dict[str, int]) -> None:
     if event == "labels_incomplete":
         print(f"WARNING LABELS_INCOMPLETE: {counts}")
     elif event == "ingested":  # warnings: printed also with --quiet
-        unmapped = {code: n for code, n in counts.items() if code not in ("MAPPING_UNUSED", "NOT_4D_DWI") and n}
+        unmapped = {code: n for code, n in counts.items() if code not in ("MAPPING_UNUSED", "NOT_4D_DWI", "MISSING_PATIENT_ID") and n}
         if unmapped:
             print(f"WARNING UNMAPPED_SERIES: {unmapped}")
         if counts.get("NOT_4D_DWI"):  # a suffix was found, but the volume cannot be a dwi
             print(f"WARNING NOT_4D_DWI: {counts['NOT_4D_DWI']}")
         if counts.get("MAPPING_UNUSED"):
             print(f"WARNING MAPPING_UNUSED: {counts['MAPPING_UNUSED']}")
+        if counts.get("MISSING_PATIENT_ID"):  # the patient may be split into several participants
+            print(f"WARNING MISSING_PATIENT_ID: {counts['MISSING_PATIENT_ID']}")
     else:
         status(_MESSAGES[event].format(**counts))
 

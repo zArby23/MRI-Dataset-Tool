@@ -60,6 +60,7 @@ class IngestPlan:
     labels: dict[LabelKey, str] = field(default_factory=dict)  # final (pseudonymized) pair -> class
     skipped: Counter = field(default_factory=Counter)
     mapping_unused: int = 0
+    missing_patient_id: int = 0  # DICOM studies whose participant fell back to the study (no PatientID, not mapped)
 
     @property
     def series(self) -> int:
@@ -182,6 +183,7 @@ def plan_ingest(
             study_files = [PurePosixPath(f.relative_to(root).as_posix()) for s in study.series for f in s.files]
             study_values = _resolve(rows, study_files, used)  # rows that contain the whole study
             subject = study_values.get("participant", subject_default)
+            plan.missing_patient_id += "participant" not in study_values and study.study_uid in identities.missing_patient_id
             session = study_values.get("session", session_default)
             suffixes = []
             for series in study.series:

@@ -7,6 +7,7 @@ import pydicom
 from pydicom.dataset import Dataset
 
 from mri_dataset_tool.domain.models.serie import MRISeries
+from mri_dataset_tool.infrastructure.dicom._study_assembler import quiet_value_validation
 from mri_dataset_tool.infrastructure.logging.logger import get_logger
 
 logger = get_logger(__name__)
@@ -27,6 +28,7 @@ def ras_to_lps(affine: np.ndarray) -> np.ndarray:
     return _FLIP_XY @ affine
 
 
+@quiet_value_validation()
 def build_series_volume(series: MRISeries) -> MRISeries:
     """Load pixels of a single-frame MR series into a 3D or 4D RAS+ volume.
 

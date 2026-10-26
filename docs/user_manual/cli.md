@@ -395,6 +395,7 @@ pipeline:
 | `error: Invalid arguments (see --help).` | Falta un argumento, sobra uno o tiene un valor no admitido; el valor no se repite por privacidad. Revise con `--help`. |
 | `WARNING UNMAPPED_SERIES: {...}` | Series sin sufijo seguro (localizadores, mapas derivados, nombres ambiguos...): se omiten. Fuerce el sufijo con `--mapping` si corresponde (`docs/dataset/ingest.md`). |
 | `WARNING MAPPING_UNUSED: n` | Filas de `--mapping` que no aplican a ninguna serie (p. ej. una carpeta sin DICOM). |
+| `WARNING MISSING_PATIENT_ID: n` | Estudios DICOM con algún archivo sin `PatientID` y sin participante en `--mapping`: cada uno queda como un participante propio y el paciente puede partirse. Use una fila con la carpeta del estudio. |
 | `Mapping paths not found in the input: N.` | `path` de la tabla que no existe en la entrada (relativo a `IN`, con `/`). |
 | `Invalid --mapping.` | Cabecera, columnas, `path`, ids o sufijo inválidos en la tabla. |
 | `Mapping labels need --classes.` / `Mapping label is not one of --classes.` | La columna `label` exige `--classes` y una de esas clases. |

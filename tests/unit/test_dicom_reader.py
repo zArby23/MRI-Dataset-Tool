@@ -1,8 +1,13 @@
 from pathlib import Path
 
+import threading
+
+import pydicom.config
+import pytest
 from pydicom.dataset import Dataset, FileDataset
 from pydicom.uid import ExplicitVRLittleEndian, generate_uid
 
+from mri_dataset_tool.infrastructure.dicom._study_assembler import quiet_value_validation
 from mri_dataset_tool.infrastructure.dicom.reader import DICOMReader
 
 
@@ -58,3 +63,34 @@ def test_load_study_groups_dicom_instances_and_extracts_series_metadata(
         "spacing_between_slices": 1.5,
         "image_orientation": [1, 0, 0, 0, 1, 0],
     }
+
+
+def test_quiet_value_validation_restores_the_pydicom_setting():  # QA6-01
+    before = pydicom.config.settings.reading_validation_mode
+    with pytest.raises(RuntimeError):
+        with quiet_value_validation():
+            assert pydicom.config.settings.reading_validation_mode == pydicom.config.IGNORE
+            raise RuntimeError
+    assert pydicom.config.settings.reading_validation_mode == before
+
+
+def test_quiet_value_validation_is_restored_by_the_last_overlapping_thread():
+    before = pydicom.config.settings.reading_validation_mode
+    first_in, second_out = threading.Event(), threading.Event()
+    seen = []
+
+    def first():
+        with quiet_value_validation():
+            first_in.set()
+            second_out.wait(5)
+            seen.append(pydicom.config.settings.reading_validation_mode)  # the other thread left first
+
+    thread = threading.Thread(target=first)
+    thread.start()
+    first_in.wait(5)
+    with quiet_value_validation():
+        pass
+    second_out.set()
+    thread.join(5)
+    assert seen == [pydicom.config.IGNORE]
+    assert pydicom.config.settings.reading_validation_mode == before

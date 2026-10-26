@@ -165,7 +165,7 @@ def build_dataset(
 
     With *ingest* (``dataset_ingest.plan_ingest`` for DICOM or loose NIfTI) the studies come from
     ``iter_ingested_studies`` instead of the BIDS reader (series that fail to build go to
-    ``on_skipped``); ``ingested`` (skipped series by code, unused mapping rows) follows ``exported``,
+    ``on_skipped``); ``ingested`` (skipped series by code, unused mapping rows, studies without PatientID) follows ``exported``,
     no exported study fails the export stage, and the mapping labels are applied to the template
     (``mapping_labels_applied``) before ``--corrections``.
     """
@@ -187,7 +187,10 @@ def build_dataset(
             "participants": exported.participants, "errors": exported.errors,
         })
         if ingest is not None:
-            status("ingested", {**dict(sorted(ingest.skipped.items())), "MAPPING_UNUSED": ingest.mapping_unused})
+            status("ingested", {
+                **dict(sorted(ingest.skipped.items())), "MAPPING_UNUSED": ingest.mapping_unused,
+                "MISSING_PATIENT_ID": ingest.missing_patient_id,
+            })
             if exported.studies_written == 0:
                 raise ValueError("No studies were exported.")
 
