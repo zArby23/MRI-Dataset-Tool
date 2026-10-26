@@ -1,7 +1,7 @@
 """Full dataset build: BIDS input → pipeline (with anonymize) → BIDS dataset, labels, ML exports, report.
 
 Nothing here prints. Validation raises ``InvalidBuildInput`` (fixed message, safe to show) or
-``FileExistsError`` before anything is created; progress goes to ``on_status(event, counts)``
+``FileExistsError`` before anything is created (the output must be new or an empty folder); progress goes to ``on_status(event, counts)``
 (event names and counts only); a failed stage raises ``StageFailed`` (stage and exception type).
 """
 
@@ -90,7 +90,8 @@ def check_build_args(
 ) -> dict[str, str] | None:
     """Validate everything that needs no config; return the classes (``None`` without them).
 
-    ``InvalidBuildInput`` for invalid arguments; ``FileExistsError`` if *output_dir* exists."""
+    ``InvalidBuildInput`` for invalid arguments; ``FileExistsError`` if *output_dir* exists and is not an
+    empty folder (an empty one is used: nothing in it can be overwritten)."""
     if not dataset_root.is_dir():
         raise InvalidBuildInput("Dataset directory not found.")
     if not config_path.is_file():
@@ -106,9 +107,16 @@ def check_build_args(
         raise InvalidBuildInput("Invalid --ratios.") from None
     if output_dir.resolve().is_relative_to(dataset_root.resolve()):  # never create anything in the input
         raise InvalidBuildInput("Output directory must be outside the dataset directory.")
-    if output_dir.exists():
+    if not is_new_or_empty_dir(output_dir):
         raise FileExistsError("Output directory already exists; choose a new one.")
     return classes
+
+
+def is_new_or_empty_dir(path: Path) -> bool:
+    """True if *path* does not exist or is a folder with no entry at all (hidden ones included)."""
+    if not path.exists():
+        return True
+    return path.is_dir() and next(path.iterdir(), None) is None
 
 
 def load_build_pipeline(config_path: Path, config_dir: Path) -> tuple[dict[str, Any], Pipeline]:
@@ -174,7 +182,9 @@ def build_dataset(
     stage, review, ml_files, labels_open = "export", None, None, False
     try:
         status("export", {})
-        output_dir.mkdir(parents=True)
+        output_dir.mkdir(parents=True, exist_ok=True)
+        if not is_new_or_empty_dir(output_dir):  # filled since check_build_args: never mix with other files
+            raise FileExistsError("Output directory already exists; choose a new one.")
         if ingest is None:
             studies = BIDSBatchReader().iter_studies(dataset_root, on_error=on_skipped, lazy=True)
         else:

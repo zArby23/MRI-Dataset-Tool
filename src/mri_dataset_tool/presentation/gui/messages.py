@@ -1,0 +1,263 @@
+"""GUI texts in Spanish (default) and English, by code (``docs/architecture/gui.md``).
+
+The window shows only these texts, filled with counts, stage names or exception type names; never the
+message of an exception, a path read from the data, an id, a UID or a header value.
+"""
+
+import re
+
+LANGUAGES = ("es", "en")
+DEFAULT_LANGUAGE = "es"
+
+CATALOG: dict[str, dict[str, str]] = {
+    "es": {
+        "APP_TITLE": "MRI Dataset Tool: asistente",
+        "MENU_LANGUAGE": "Idioma",
+        "LANGUAGE_es": "Español",
+        "LANGUAGE_en": "Inglés",
+        "BACK": "< Atrás",
+        "NEXT": "Siguiente >",
+        "STEP_HEADER": "Paso {number} de {total}: {title}",
+        "STEP_input": "Entrada",
+        "STEP_config": "Configuración",
+        "STEP_mapping": "Mapeo de series",
+        "STEP_run": "Ejecución",
+        "STEP_labels": "Etiquetas",
+        "STEP_export": "Exportes y reporte",
+        "STEP_PENDING": "Este paso aún no está disponible.",
+        "TASK_RUNNING": "Hay una tarea en curso; espere a que termine.",
+        "CLOSE_TITLE": "Tarea en curso",
+        "CLOSE_WHILE_RUNNING": (
+            "Hay una tarea en curso. Si cierra ahora, la tarea se corta y la salida queda incompleta: "
+            "vacíe o borre la carpeta de salida antes de reintentar. ¿Cerrar de todos modos?"
+        ),
+        "INVALID_INPUT": "Entrada no válida ({error_type}).",
+        "OUTPUT_EXISTS": "La salida ya existe; elija una carpeta nueva.",
+        "STAGE_FAILED": "Falló la etapa «{stage}» ({error_type}).",
+        "UNEXPECTED": "Error inesperado ({error_type}).",
+        # step 1: input
+        "INPUT_DIR": "Carpeta de entrada",
+        "INPUT_FORMAT": "Formato de la entrada",
+        "OUTPUT_DIR": "Carpeta de salida (nueva)",
+        "BROWSE": "Examinar…",
+        "VALIDATE": "Validar",
+        "KEY_DEFINED": "Clave de anonimización: definida en el entorno (MRI_ANON_KEY).",
+        "KEY_GENERATED": (
+            "Clave de anonimización: generada para esta sesión. Los seudónimos cambian cada vez que se abre el "
+            "programa (vea el manual)."
+        ),
+        "INPUT_OK": "Entrada y salida válidas.",
+        "CHECKING_DISK_SPACE": "Comprobando el espacio en disco…",
+        "DISK_SPACE_OK": "Espacio en disco suficiente para la salida estimada.",
+        "LOW_DISK_SPACE": (
+            "Aviso: la salida estimada ({required} GiB) alcanza el 90 % del espacio libre del disco de salida "
+            "({free} GiB). Considere otro disco; la ejecución no se bloquea."
+        ),
+        "INPUT_REQUIRED": "Elija la carpeta de entrada.",
+        "OUTPUT_REQUIRED": "Elija la carpeta de salida.",
+        "NEW_FOLDER": "Nombre de la carpeta nueva",
+        "OUTPUT_NOT_EMPTY": (
+            "La carpeta de salida tiene contenido y no se sobrescribe: escriba el nombre de una carpeta nueva que "
+            "se creará dentro de ella."
+        ),
+        "INVALID_FOLDER_NAME": (
+            "Nombre de carpeta no válido: un nombre simple, sin / \\ : * ? \" < > |, sin «..» y sin punto ni "
+            "espacio al final."
+        ),
+        "FOLDER_NAME_EXISTS": "Ya existe una carpeta o un archivo con ese nombre; elija otro.",
+        # step 2: configuration
+        "CONFIG_FILE": "Archivo de configuración (preajuste o propio)",
+        "MEMORY_TITLE": "Uso de memoria",
+        "MEMORY_NOTICE": (
+            "Antes de remuestrear (resample) o normalizar (normalize), la herramienta estima la memoria que "
+            "necesita el volumen de salida y la compara con la RAM disponible en ese momento. Si no alcanza, el "
+            "estudio se marca como fallido y el lote continúa con los demás. Puede forzar la ejecución con la "
+            "casilla de abajo, que equivale al parámetro allow_insufficient_memory: true de los pasos resample y "
+            "normalize del archivo de configuración; ese consentimiento queda registrado en el manifiesto de la "
+            "corrida. Hágalo bajo su responsabilidad: si la memoria no alcanza, el equipo puede volverse muy lento "
+            "por el uso de disco como memoria, otros programas pueden cerrarse, y el proceso puede terminar "
+            "abruptamente sin guardar resultados (en Linux, el sistema puede finalizarlo). La comprobación es una "
+            "estimación en un instante y no cubre la memoria de otros pasos ni de otros programas que se abran "
+            "durante la ejecución. Volúmenes 4D grandes, como las difusiones, pueden necesitar varios GB. Además, "
+            "resample rechaza cualquier salida de más de max_output_voxels vóxeles (por defecto 2**32, eje temporal "
+            "incluido), aunque haya memoria; ese límite solo se cambia en el archivo de configuración."
+        ),
+        "ALLOW_MEMORY": "Permitir continuar aunque la memoria disponible no alcance (bajo mi responsabilidad)",
+        "CLASSES": "Clases de etiqueta, una por línea: NOMBRE o NOMBRE=descripción (vacío = sin etiquetas)",
+        "RATIOS": "Proporciones entrenamiento / validación / prueba",
+        "SEED": "Semilla de las particiones",
+        "CONFIG_OK": "Configuración válida. Pasos del pipeline:",
+        "INVALID_SEED": "La semilla debe ser un número entero.",
+        # fixed service messages (``FIXED_MESSAGES``)
+        "INPUT_NOT_FOUND": "No se encuentra la carpeta de entrada.",
+        "CONFIG_NOT_FOUND": "No se encuentra el archivo de configuración.",
+        "CORRECTIONS_NEED_CLASSES": "Las correcciones de etiquetas necesitan clases.",
+        "CORRECTIONS_NOT_FOUND": "No se encuentra el archivo de correcciones.",
+        "INVALID_CLASSES": "Clases no válidas (letras y números, sin repetir; la descripción tras «=»).",
+        "INVALID_FORMAT": "Formato de entrada no válido.",
+        "INVALID_MAPPING": "Tabla de mapeo no válida.",
+        "INVALID_RATIOS": "Proporciones no válidas: tres números no negativos que sumen 1.",
+        "INVALID_CONFIG": "Configuración no válida ({error_type}).",
+        "MAPPING_NOT_FOUND": "No se encuentra la tabla de mapeo.",
+        "MAPPING_PATHS_NOT_FOUND": "Rutas de la tabla que no existen en la entrada: {count}.",
+        "MAPPING_LABEL_CONFLICT": "La tabla asigna etiquetas distintas al mismo participante y sesión.",
+        "MAPPING_SESSION_MIX": "La tabla deja a un participante con sesión y sin sesión.",
+        "MAPPING_STUDY_SPLIT": (
+            "La tabla da a un estudio más de un participante o sesión; use una fila con la carpeta del estudio."
+        ),
+        "MAPPING_PAIR_REPEATED": "La tabla da el mismo participante y sesión a más de un estudio.",
+        "MAPPING_LABEL_UNKNOWN": "Una etiqueta de la tabla no es una de las clases.",
+        "MAPPING_LABELS_NEED_CLASSES": "Las etiquetas de la tabla necesitan clases.",
+        "NO_MAPPED_SERIES": "Ninguna serie de la entrada tiene un sufijo BIDS.",
+        "NO_INPUT_STUDIES": "No hay estudios válidos en la entrada.",
+        "OUTPUT_INSIDE_INPUT": "La carpeta de salida debe estar fuera de la entrada.",
+        "PIPELINE_WITHOUT_ANONYMIZE": "El pipeline debe incluir el paso anonymize.",
+    },
+    "en": {
+        "APP_TITLE": "MRI Dataset Tool: wizard",
+        "MENU_LANGUAGE": "Language",
+        "LANGUAGE_es": "Spanish",
+        "LANGUAGE_en": "English",
+        "BACK": "< Back",
+        "NEXT": "Next >",
+        "STEP_HEADER": "Step {number} of {total}: {title}",
+        "STEP_input": "Input",
+        "STEP_config": "Configuration",
+        "STEP_mapping": "Series mapping",
+        "STEP_run": "Run",
+        "STEP_labels": "Labels",
+        "STEP_export": "Exports and report",
+        "STEP_PENDING": "This step is not available yet.",
+        "TASK_RUNNING": "A task is running; wait for it to finish.",
+        "CLOSE_TITLE": "Task running",
+        "CLOSE_WHILE_RUNNING": (
+            "A task is running. If you close now, the task stops and the output is left incomplete: "
+            "empty or delete the output folder before retrying. Close anyway?"
+        ),
+        "INVALID_INPUT": "Invalid input ({error_type}).",
+        "OUTPUT_EXISTS": "The output already exists; choose a new folder.",
+        "STAGE_FAILED": "Stage \"{stage}\" failed ({error_type}).",
+        "UNEXPECTED": "Unexpected error ({error_type}).",
+        # step 1: input
+        "INPUT_DIR": "Input folder",
+        "INPUT_FORMAT": "Input format",
+        "OUTPUT_DIR": "Output folder (new)",
+        "BROWSE": "Browse…",
+        "VALIDATE": "Validate",
+        "KEY_DEFINED": "Anonymization key: defined in the environment (MRI_ANON_KEY).",
+        "KEY_GENERATED": (
+            "Anonymization key: generated for this session. The pseudonyms change each time the program is "
+            "opened (see the manual)."
+        ),
+        "INPUT_OK": "Valid input and output.",
+        "CHECKING_DISK_SPACE": "Checking the disk space…",
+        "DISK_SPACE_OK": "Enough disk space for the estimated output.",
+        "LOW_DISK_SPACE": (
+            "Warning: the estimated output ({required} GiB) reaches 90 % of the free space of the output drive "
+            "({free} GiB). Consider another drive; the run is not blocked."
+        ),
+        "INPUT_REQUIRED": "Choose the input folder.",
+        "OUTPUT_REQUIRED": "Choose the output folder.",
+        "NEW_FOLDER": "Name of the new folder",
+        "OUTPUT_NOT_EMPTY": (
+            "The output folder has content and is not overwritten: type the name of a new folder to create "
+            "inside it."
+        ),
+        "INVALID_FOLDER_NAME": (
+            "Invalid folder name: a plain name, without / \\ : * ? \" < > |, without \"..\" and without a "
+            "trailing dot or space."
+        ),
+        "FOLDER_NAME_EXISTS": "A folder or file with that name already exists; choose another.",
+        # step 2: configuration
+        "CONFIG_FILE": "Configuration file (preset or your own)",
+        "MEMORY_TITLE": "Memory use",
+        "MEMORY_NOTICE": (
+            "Before resampling (resample) or normalizing (normalize), the tool estimates the memory the output "
+            "volume needs and compares it with the RAM available at that moment. If it is not enough, the study "
+            "is marked as failed and the batch goes on with the others. You can force the run with the checkbox "
+            "below, which is the same as the allow_insufficient_memory: true parameter of the resample and "
+            "normalize steps in the configuration file; that consent is recorded in the run manifest. Do it at "
+            "your own risk: if the memory is not enough, the computer may become very slow because the disk is "
+            "used as memory, other programs may close, and the process may end abruptly without saving results "
+            "(on Linux, the system may kill it). The check is an estimate at one moment and does not cover the "
+            "memory of other steps or of other programs opened during the run. Large 4D volumes, such as "
+            "diffusion series, may need several GB. Also, resample rejects any output larger than "
+            "max_output_voxels voxels (2**32 by default, time axis included) even with enough memory; that limit "
+            "is changed only in the configuration file."
+        ),
+        "ALLOW_MEMORY": "Allow the run to continue even if the available memory is not enough (at my own risk)",
+        "CLASSES": "Label classes, one per line: NAME or NAME=description (empty = no labels)",
+        "RATIOS": "Training / validation / test ratios",
+        "SEED": "Split seed",
+        "CONFIG_OK": "Valid configuration. Pipeline steps:",
+        "INVALID_SEED": "The seed must be an integer.",
+        # fixed service messages (``FIXED_MESSAGES``)
+        "INPUT_NOT_FOUND": "The input folder was not found.",
+        "CONFIG_NOT_FOUND": "The configuration file was not found.",
+        "CORRECTIONS_NEED_CLASSES": "Label corrections need classes.",
+        "CORRECTIONS_NOT_FOUND": "The corrections file was not found.",
+        "INVALID_CLASSES": "Invalid classes (letters and digits, no repeats; the description after \"=\").",
+        "INVALID_FORMAT": "Invalid input format.",
+        "INVALID_MAPPING": "Invalid mapping table.",
+        "INVALID_RATIOS": "Invalid ratios: three non-negative numbers that sum to 1.",
+        "INVALID_CONFIG": "Invalid configuration ({error_type}).",
+        "MAPPING_NOT_FOUND": "The mapping table was not found.",
+        "MAPPING_PATHS_NOT_FOUND": "Table paths that do not exist in the input: {count}.",
+        "MAPPING_LABEL_CONFLICT": "The table gives different labels to the same participant and session.",
+        "MAPPING_SESSION_MIX": "The table leaves a participant both with and without a session.",
+        "MAPPING_STUDY_SPLIT": (
+            "The table gives a study more than one participant or session; use a row with the study folder."
+        ),
+        "MAPPING_PAIR_REPEATED": "The table gives the same participant and session to more than one study.",
+        "MAPPING_LABEL_UNKNOWN": "A label of the table is not one of the classes.",
+        "MAPPING_LABELS_NEED_CLASSES": "The table labels need classes.",
+        "NO_MAPPED_SERIES": "No input series has a BIDS suffix.",
+        "NO_INPUT_STUDIES": "There are no valid studies in the input.",
+        "OUTPUT_INSIDE_INPUT": "The output folder must be outside the input.",
+        "PIPELINE_WITHOUT_ANONYMIZE": "The pipeline must include the anonymize step.",
+    },
+}
+
+
+def text(code: str, language: str = DEFAULT_LANGUAGE, **values: object) -> str:
+    """The text of *code* in *language*, filled with *values* (counts, stage or type names only)."""
+    return CATALOG[language][code].format(**values)
+
+
+# Fixed messages of ``InvalidBuildInput`` (English, in the services) -> code. The message is only looked
+# up here, never shown.
+FIXED_MESSAGES = {
+    "Dataset directory not found.": "INPUT_NOT_FOUND",
+    "Config file not found.": "CONFIG_NOT_FOUND",
+    "--corrections needs --classes.": "CORRECTIONS_NEED_CLASSES",
+    "Corrections file not found.": "CORRECTIONS_NOT_FOUND",
+    "Invalid --classes.": "INVALID_CLASSES",
+    "Invalid --format.": "INVALID_FORMAT",
+    "Invalid --mapping.": "INVALID_MAPPING",
+    "Invalid --ratios.": "INVALID_RATIOS",
+    "Mapping file not found.": "MAPPING_NOT_FOUND",
+    "Mapping assigns different labels to the same participant/session.": "MAPPING_LABEL_CONFLICT",
+    "Mapping gives a participant both sessions and no session.": "MAPPING_SESSION_MIX",
+    "Mapping gives one study more than one participant or session.": "MAPPING_STUDY_SPLIT",
+    "Mapping gives the same participant/session to more than one study.": "MAPPING_PAIR_REPEATED",
+    "Mapping label is not one of --classes.": "MAPPING_LABEL_UNKNOWN",
+    "Mapping labels need --classes.": "MAPPING_LABELS_NEED_CLASSES",
+    "No input series could be mapped to a BIDS suffix.": "NO_MAPPED_SERIES",
+    "No valid input studies were found.": "NO_INPUT_STUDIES",
+    "Output directory must be outside the dataset directory.": "OUTPUT_INSIDE_INPUT",
+    "The pipeline must include the anonymize step.": "PIPELINE_WITHOUT_ANONYMIZE",
+}
+_INVALID_CONFIG = re.compile(r"Invalid config: (\w+)")
+_MAPPING_PATHS = re.compile(r"Mapping paths not found in the input: (\d+)\.")
+
+
+def invalid_input(error: Exception) -> tuple[str, dict[str, object]]:
+    """The code and values of an ``InvalidBuildInput`` (only type names and counts)."""
+    message = str(error)
+    if message in FIXED_MESSAGES:
+        return FIXED_MESSAGES[message], {}
+    if match := _INVALID_CONFIG.fullmatch(message):
+        return "INVALID_CONFIG", {"error_type": match[1]}
+    if match := _MAPPING_PATHS.fullmatch(message):
+        return "MAPPING_PATHS_NOT_FOUND", {"count": int(match[1])}
+    return "INVALID_INPUT", {"error_type": type(error).__name__}

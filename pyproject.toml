@@ -20,6 +20,9 @@ dependencies = [
 [project.scripts]
 mri-dataset = "mri_dataset_tool.presentation.cli.main:main"
 
+[project.gui-scripts]
+mri-dataset-gui = "mri_dataset_tool.presentation.gui.app:main"
+
 [project.optional-dependencies]
 dev = [
     "pytest>=9.1"

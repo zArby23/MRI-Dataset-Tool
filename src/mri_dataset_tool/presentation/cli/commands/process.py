@@ -4,8 +4,8 @@ import argparse
 from pathlib import Path
 
 from mri_dataset_tool.application.pipeline.manifest import pipeline_from_config
+from mri_dataset_tool.application.services.inputs import load_config
 from mri_dataset_tool.application.services.pipeline_run import StageFailed, previous_outputs_exist, run_pipeline
-from mri_dataset_tool.infrastructure.config.loader import load_config
 from mri_dataset_tool.presentation.cli._common import (
     EXIT_FAILED,
     EXIT_OK,
