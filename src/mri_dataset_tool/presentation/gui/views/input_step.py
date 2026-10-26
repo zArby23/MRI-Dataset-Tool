@@ -105,5 +105,5 @@ class InputStep(StepView):
         if isinstance(event, Done):
             self._disk_summary = event.summary
         elif isinstance(event, Failed):  # the estimate failed: the run is not blocked
-            self._disk.configure(text=self.controller.text(event.code, error_type=event.error_type, **event.values))
+            self._disk.configure(text=self.controller.failure_text(event))
         self.refresh_texts()

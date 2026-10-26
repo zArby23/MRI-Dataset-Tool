@@ -1,7 +1,8 @@
 """One long task at a time in a background thread; its events go to a ``queue.Queue``.
 
 Only the main (Tk) thread touches widgets: it drains the queue with ``after``. The task gets a
-``Reporter`` whose callbacks fit the services (``on_status``, ``on_skipped``, ``on_error``) and
+``Reporter`` whose callbacks fit the services (``on_status``, ``on_skipped``, ``on_error``,
+``on_report_error``) and
 publish only stage names, integer counts and exception type names. Tasks cannot be cancelled; the
 thread is a daemon, so closing the window stops it (the window warns first).
 """
@@ -37,6 +38,11 @@ class StudyFailed:  # a study failed and the batch went on (RF16)
 
 
 @dataclass(frozen=True)
+class ReportReadError:  # a file the dataset report could not read
+    error_type: str
+
+
+@dataclass(frozen=True)
 class Failed:  # the task stopped; ``code`` is a ``messages`` code, ``values`` fill its text
     code: str
     error_type: str
@@ -49,7 +55,7 @@ class Done:
     summary: dict[str, int] = field(default_factory=dict)
 
 
-Event = Status | Skipped | StudyFailed | Failed | Done
+Event = Status | Skipped | StudyFailed | ReportReadError | Failed | Done
 
 
 class Reporter:
@@ -66,6 +72,9 @@ class Reporter:
 
     def on_error(self, path: Path, error: Exception) -> None:
         self._events.put(StudyFailed(type(error).__name__))
+
+    def on_report_error(self, path: Path, error: Exception) -> None:
+        self._events.put(ReportReadError(type(error).__name__))
 
 
 def failure(error: Exception) -> Failed:

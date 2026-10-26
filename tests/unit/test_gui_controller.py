@@ -1,5 +1,6 @@
 """GUI controller without Tk: navigation of the wizard, texts, events and the close warning."""
 
+import logging
 import shutil
 import threading
 from collections import namedtuple
@@ -9,6 +10,7 @@ import pytest
 
 from mri_dataset_tool.application.services import disk_space
 from mri_dataset_tool.application.services.inputs import project_config_dir
+from mri_dataset_tool.presentation.cli import _common
 from mri_dataset_tool.presentation.cli.main import main
 from mri_dataset_tool.presentation.gui import messages
 from mri_dataset_tool.presentation.gui.controller import STEPS, Check, Controller
@@ -97,7 +99,11 @@ def project(tmp_path, monkeypatch):
     (anat / "sub-PlantedSubject_ses-PlantedVisit_T1w.nii.gz").write_bytes(b"")
     (tmp_path / "taken").mkdir()
     (tmp_path / "taken" / "notes.txt").write_text("x", encoding="utf-8")
-    return tmp_path
+    root = logging.getLogger()
+    level = root.level
+    yield tmp_path
+    _common.configure_output()  # the CLI calls change the root log level
+    root.setLevel(level)
 
 
 CASES = {  # name: (input, output, config, classes, ratios, seed)

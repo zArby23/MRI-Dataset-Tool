@@ -10,8 +10,10 @@ from mri_dataset_tool.presentation.gui.controller import STEPS, Controller
 from mri_dataset_tool.presentation.gui.views import StepView
 from mri_dataset_tool.presentation.gui.views.config_step import ConfigStep
 from mri_dataset_tool.presentation.gui.views.input_step import InputStep
+from mri_dataset_tool.presentation.gui.views.mapping_step import MappingStep
+from mri_dataset_tool.presentation.gui.views.run_step import RunStep
 
-VIEWS = {"input": InputStep, "config": ConfigStep}  # the other steps: placeholders until built
+VIEWS = {"input": InputStep, "config": ConfigStep, "mapping": MappingStep, "run": RunStep}  # the other steps: placeholders until built
 
 POLL_MS = 100
 

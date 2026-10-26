@@ -88,6 +88,70 @@ CATALOG: dict[str, dict[str, str]] = {
         "SEED": "Semilla de las particiones",
         "CONFIG_OK": "Configuración válida. Pasos del pipeline:",
         "INVALID_SEED": "La semilla debe ser un número entero.",
+        # step 3: mapping
+        "PREVIEW": "Vista previa",
+        "LOAD_MAPPING": "Cargar tabla…",
+        "SAVE_MAPPING": "Guardar tabla…",
+        "MAPPING_HELP": (
+            "Doble clic en una celda de sufijo, participante, sesión o etiqueta para editarla (vacía = automático). "
+            "El sufijo se aplica a la serie; participante, sesión y etiqueta a todo el estudio. Después pulse "
+            "«Vista previa» para comprobar los cambios; sin vista previa válida no se puede seguir."
+        ),
+        "COL_location": "Carpeta o archivo",
+        "COL_suffix": "Sufijo",
+        "COL_code": "Decisión",
+        "COL_participant": "Participante",
+        "COL_session": "Sesión",
+        "COL_label": "Etiqueta",
+        "CODE_MATCHED": "detectado",
+        "CODE_MAPPED": "por tabla",
+        "CODE_NO_MATCH": "omitida: sin coincidencia",
+        "CODE_AMBIGUOUS": "omitida: ambigua",
+        "CODE_EXCLUDED": "omitida: excluida",
+        "PREVIEW_RUNNING": "Leyendo cabeceras…",
+        "PREVIEW_OK": "Series: {series}; omitidas: {skipped}; archivos omitidos por el lector: {files}.",
+        "EDIT_PENDING": "Cambios sin comprobar: pulse «Vista previa».",
+        "MAPPING_SAVED": "Tabla guardada.",
+        "MAPPING_LOADED": "Tabla cargada: pulse «Vista previa».",
+        "MAPPING_FILE_EXISTS": "El archivo ya existe; elija otro nombre.",
+        "SHARED_SERIES_FOLDER": (
+            "Varias series comparten esta carpeta: el sufijo no se puede fijar desde aquí (use un archivo de tabla)."
+        ),
+        "SHARED_STUDY_FOLDER": (
+            "La carpeta del estudio contiene también otros estudios: edítelo con un archivo de tabla."
+        ),
+        # step 4: run
+        "RUN": "Ejecutar",
+        "RUN_HELP": (
+            "Construye el dataset BIDS anonimizado, las etiquetas, los exportes para ML y el reporte en la carpeta de "
+            "salida. La tarea no se puede cancelar; la ventana sigue respondiendo."
+        ),
+        "RUN_RUNNING": "Ejecutando…",
+        "RUN_DONE": "Terminado.",
+        "RUN_FAILED_HINT": "Vacíe o borre la carpeta de salida antes de reintentar.",
+        "RUN_ERRORS": "Errores por tipo: {counts}.",
+        "RUN_SKIPPED": "Archivos omitidos por el lector: {counts}.",
+        "RUN_REPORT_ERRORS": "Errores de lectura del reporte: {counts}.",
+        "NONE": "ninguno",
+        "EV_export": "Exportando el dataset (pipeline)…",
+        "EV_exported": "Estudios escritos: {studies}; series: {series}; participantes: {participants}; errores: {errors}.",
+        "EV_labels_skipped": "Etiquetas: omitidas (sin clases).",
+        "EV_label_template": "Plantilla de etiquetas escrita ({classes} clases).",
+        "EV_mapping_labels_applied": "Etiquetas de la tabla aplicadas: {rows}.",
+        "EV_corrections_skipped": "Correcciones de etiquetas: ninguna.",
+        "EV_corrections_applied": "Correcciones de etiquetas aplicadas: {rows}.",
+        "EV_labels_finalized": "Etiquetas cerradas ({labels} etiquetas).",
+        "EV_ml_exports_skipped": "Exportes para ML: omitidos (etiquetas incompletas; complételas en el paso siguiente).",
+        "EV_ml_exports": "Archivos de exportes para ML escritos: {files}.",
+        "EV_report": "Archivos del reporte escritos: {files}.",
+        "WARN_UNMAPPED_SERIES": "Aviso UNMAPPED_SERIES: series omitidas por código: {codes}.",
+        "WARN_NOT_4D_DWI": "Aviso NOT_4D_DWI: {count} series dwi no son 4D y se omitieron.",
+        "WARN_MAPPING_UNUSED": "Aviso MAPPING_UNUSED: {count} filas de la tabla no aplican a ninguna serie.",
+        "WARN_MISSING_PATIENT_ID": (
+            "Aviso MISSING_PATIENT_ID: {count} estudios con archivos sin PatientID; el paciente puede quedar partido "
+            "en varios participantes (corríjalo en la tabla)."
+        ),
+        "WARN_LABELS_INCOMPLETE": "Aviso LABELS_INCOMPLETE: etiquetas incompletas ({codes}).",
         # fixed service messages (``FIXED_MESSAGES``)
         "INPUT_NOT_FOUND": "No se encuentra la carpeta de entrada.",
         "CONFIG_NOT_FOUND": "No se encuentra el archivo de configuración.",
@@ -191,6 +255,68 @@ CATALOG: dict[str, dict[str, str]] = {
         "SEED": "Split seed",
         "CONFIG_OK": "Valid configuration. Pipeline steps:",
         "INVALID_SEED": "The seed must be an integer.",
+        # step 3: mapping
+        "PREVIEW": "Preview",
+        "LOAD_MAPPING": "Load table…",
+        "SAVE_MAPPING": "Save table…",
+        "MAPPING_HELP": (
+            "Double-click a suffix, participant, session or label cell to edit it (empty = automatic). The suffix "
+            "applies to the series; participant, session and label to the whole study. Then press \"Preview\" "
+            "to check the changes; without a valid preview you cannot go on."
+        ),
+        "COL_location": "Folder or file",
+        "COL_suffix": "Suffix",
+        "COL_code": "Decision",
+        "COL_participant": "Participant",
+        "COL_session": "Session",
+        "COL_label": "Label",
+        "CODE_MATCHED": "detected",
+        "CODE_MAPPED": "by table",
+        "CODE_NO_MATCH": "skipped: no match",
+        "CODE_AMBIGUOUS": "skipped: ambiguous",
+        "CODE_EXCLUDED": "skipped: excluded",
+        "PREVIEW_RUNNING": "Reading headers…",
+        "PREVIEW_OK": "Series: {series}; skipped: {skipped}; files skipped by the reader: {files}.",
+        "EDIT_PENDING": "Unchecked changes: press \"Preview\".",
+        "MAPPING_SAVED": "Table saved.",
+        "MAPPING_LOADED": "Table loaded: press \"Preview\".",
+        "MAPPING_FILE_EXISTS": "The file already exists; choose another name.",
+        "SHARED_SERIES_FOLDER": (
+            "Several series share this folder: the suffix cannot be set from here (use a table file)."
+        ),
+        "SHARED_STUDY_FOLDER": "The study folder also holds other studies: edit it with a table file.",
+        # step 4: run
+        "RUN": "Run",
+        "RUN_HELP": (
+            "Builds the anonymized BIDS dataset, the labels, the ML exports and the report in the output folder. "
+            "The task cannot be cancelled; the window keeps responding."
+        ),
+        "RUN_RUNNING": "Running…",
+        "RUN_DONE": "Done.",
+        "RUN_FAILED_HINT": "Empty or delete the output folder before retrying.",
+        "RUN_ERRORS": "Errors by type: {counts}.",
+        "RUN_SKIPPED": "Input files skipped by the reader: {counts}.",
+        "RUN_REPORT_ERRORS": "Report read errors: {counts}.",
+        "NONE": "none",
+        "EV_export": "Exporting the dataset (pipeline)…",
+        "EV_exported": "Studies written: {studies}; series: {series}; participants: {participants}; errors: {errors}.",
+        "EV_labels_skipped": "Labels: skipped (no classes).",
+        "EV_label_template": "Label template written ({classes} classes).",
+        "EV_mapping_labels_applied": "Table labels applied: {rows}.",
+        "EV_corrections_skipped": "Label corrections: none.",
+        "EV_corrections_applied": "Label corrections applied: {rows}.",
+        "EV_labels_finalized": "Labels finalized ({labels} labels).",
+        "EV_ml_exports_skipped": "ML exports: skipped (labels incomplete; complete them in the next step).",
+        "EV_ml_exports": "ML export files written: {files}.",
+        "EV_report": "Report files written: {files}.",
+        "WARN_UNMAPPED_SERIES": "Warning UNMAPPED_SERIES: series skipped by code: {codes}.",
+        "WARN_NOT_4D_DWI": "Warning NOT_4D_DWI: {count} dwi series are not 4D and were skipped.",
+        "WARN_MAPPING_UNUSED": "Warning MAPPING_UNUSED: {count} table rows apply to no series.",
+        "WARN_MISSING_PATIENT_ID": (
+            "Warning MISSING_PATIENT_ID: {count} studies with files without PatientID; the patient may be split "
+            "into several participants (fix it in the table)."
+        ),
+        "WARN_LABELS_INCOMPLETE": "Warning LABELS_INCOMPLETE: incomplete labels ({codes}).",
         # fixed service messages (``FIXED_MESSAGES``)
         "INPUT_NOT_FOUND": "The input folder was not found.",
         "CONFIG_NOT_FOUND": "The configuration file was not found.",
@@ -246,6 +372,8 @@ FIXED_MESSAGES = {
     "No valid input studies were found.": "NO_INPUT_STUDIES",
     "Output directory must be outside the dataset directory.": "OUTPUT_INSIDE_INPUT",
     "The pipeline must include the anonymize step.": "PIPELINE_WITHOUT_ANONYMIZE",
+    "Several series share this folder.": "SHARED_SERIES_FOLDER",
+    "The study folder also holds other studies.": "SHARED_STUDY_FOLDER",
 }
 _INVALID_CONFIG = re.compile(r"Invalid config: (\w+)")
 _MAPPING_PATHS = re.compile(r"Mapping paths not found in the input: (\d+)\.")

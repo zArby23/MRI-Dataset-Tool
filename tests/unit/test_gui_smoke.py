@@ -1,5 +1,6 @@
 """Tk smoke test of the wizard window; skipped without a display."""
 
+import logging
 import shutil
 import threading
 import tkinter as tk
@@ -111,6 +112,7 @@ def test_validate_is_disabled_while_the_disk_check_runs(tmp_path, monkeypatch):
 
 
 def test_a_callback_exception_shows_only_its_type(capsys, caplog):
+    caplog.set_level(logging.WARNING)  # independent of the root level other tests (CLI --quiet) leave behind
     app = _app()
     try:
         def boom():

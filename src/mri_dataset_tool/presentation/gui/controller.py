@@ -15,10 +15,13 @@ from typing import Any
 from mri_dataset_tool.application.pipeline.runner import Pipeline
 from mri_dataset_tool.application.services.dataset_build import (
     InvalidBuildInput,
+    build_dataset,
     check_build_args,
     load_build_pipeline,
 )
+from mri_dataset_tool.application.services.dataset_ingest import MappingRow, load_mapping, plan_ingest
 from mri_dataset_tool.application.services.disk_space import check_free_space, estimate_input_bytes
+from mri_dataset_tool.application.services.ingest_preview import PreviewRow, apply_edit, preview_ingest, write_mapping
 from mri_dataset_tool.application.services.inputs import (
     DEFAULT_RATIOS,
     DEFAULT_SEED,
@@ -28,7 +31,7 @@ from mri_dataset_tool.application.services.inputs import (
     with_memory_consent,
 )
 from mri_dataset_tool.presentation.gui import messages
-from mri_dataset_tool.presentation.gui.worker import Event, Reporter, Worker
+from mri_dataset_tool.presentation.gui.worker import Event, Failed, Reporter, Status, Worker
 
 STEPS = ("input", "config", "mapping", "run", "labels", "export")
 FORMATS = ("bids", "dicom", "nifti")
@@ -48,6 +51,11 @@ class WizardState:
     seed: int = DEFAULT_SEED
     config: dict[str, Any] | None = None
     pipeline: Pipeline | None = None
+    # Step 3 (DICOM / loose NIfTI). Rows hold paths relative to the input (D2): only in memory, out of repr.
+    preview: list[PreviewRow] = field(default_factory=list, repr=False)
+    mapping: list[MappingRow] = field(default_factory=list, repr=False)
+    # Step 4.
+    dataset_root: Path | None = None  # <output>/dataset once the run succeeded
 
 
 @dataclass(frozen=True)
@@ -80,6 +88,7 @@ class Controller:
         self.language = language
         self.step = STEPS[0]
         self._complete: set[str] = set()
+        self._new_preview: list[PreviewRow] = []  # set by the preview task (worker thread), read on its Done
 
     # --- texts ------------------------------------------------------------------------------------
 
@@ -93,6 +102,9 @@ class Controller:
 
     def check_text(self, check: Check, ok_code: str) -> str:
         return self.text(ok_code) if check.ok else self.text(check.code, **check.values)
+
+    def failure_text(self, event: Failed) -> str:
+        return self.text(event.code, **{"error_type": event.error_type, "stage": event.stage, **event.values})
 
     def step_header(self) -> str:
         steps = self.steps()
@@ -126,6 +138,8 @@ class Controller:
         if check.code == "OUTPUT_EXISTS" and not new_folder:
             return Check("OUTPUT_NOT_EMPTY")
         if check.ok:
+            if (source, input_format) != (self.state.input_dir, self.state.input_format):
+                self.state.preview, self.state.mapping = [], []  # they belong to the previous input
             self.state.input_dir, self.state.input_format, self.state.output_dir = source, input_format, output
             self.complete("input")
         return check
@@ -194,6 +208,105 @@ class Controller:
             return []
         return [f"{step.name} {json.dumps(step.params, sort_keys=True)}" for step in self.state.pipeline.steps]
 
+    # --- step 3: mapping (DICOM / loose NIfTI) -----------------------------------------------------
+
+    def preview_task(self) -> Callable[[Reporter], dict[str, int]]:
+        """A worker task: the ingest decisions with the current mapping (headers only). Its rows are kept
+        for ``preview_finished``; the event carries only counts."""
+        self.reopen("mapping")
+        state = self.state
+        fmt, root, mapping, classes = state.input_format, state.input_dir, list(state.mapping), state.classes
+
+        def task(reporter: Reporter) -> dict[str, int]:
+            rows = preview_ingest(fmt, root, mapping, classes, reporter.on_skipped)
+            self._new_preview = rows
+            return {"series": len(rows), "skipped": sum(row.suffix is None for row in rows)}
+
+        return task
+
+    def preview_finished(self) -> None:
+        """Main thread, on the ``Done`` of ``preview_task``: show its rows; the step is valid."""
+        self.state.preview, self._new_preview = self._new_preview, []
+        self.complete("mapping")
+
+    def edit_mapping(self, index: int, column: str, value: str) -> Check:
+        """Edit a cell of the preview table; valid edits are kept as mapping rows until the next preview."""
+        check, mapping = _check(lambda: apply_edit(
+            self.state.mapping, self.state.preview, self.state.input_format, index, column, value, self.state.classes
+        ))
+        if check.ok:
+            self.state.mapping = mapping
+            self.reopen("mapping")
+        return check
+
+    def load_mapping_file(self, path: str) -> Check:
+        check, mapping = _check(lambda: load_mapping(Path(path), self.state.input_dir, self.state.classes))
+        if check.ok:
+            self.state.mapping = mapping
+            self.reopen("mapping")
+        return check
+
+    def save_mapping_file(self, path: str) -> Check:
+        try:
+            write_mapping(self.state.mapping, Path(path), self.state.input_dir, self.state.classes)
+        except FileExistsError:
+            return Check("MAPPING_FILE_EXISTS")
+        except InvalidBuildInput as error:
+            code, values = messages.invalid_input(error)
+            return Check(code, values)
+        return Check()
+
+    # --- step 4: run ------------------------------------------------------------------------------
+
+    def run_task(self) -> Callable[[Reporter], dict[str, int]]:
+        """A worker task: ``build_dataset`` as ``mri-dataset dataset build`` (output checked again, DICOM and
+        loose NIfTI planned with the mapping of step 3). Events carry only stage names, counts and types."""
+        self.reopen("run")
+        state = self.state
+        # Taken now, not in the thread: the window may change the state while the task runs.
+        source, output, fmt, mapping = state.input_dir, state.output_dir, state.input_format, list(state.mapping)
+        pipeline, config, classes, ratios, seed = state.pipeline, state.config, state.classes, state.ratios, state.seed
+
+        def task(reporter: Reporter) -> dict[str, int]:
+            check_input_paths(source, output)  # the output may have changed since step 1
+            ingest = None if fmt == "bids" else plan_ingest(fmt, source, mapping=mapping, on_skipped=reporter.on_skipped)
+            result = build_dataset(
+                source, output, pipeline, config, classes=classes, ratios=ratios,
+                seed=seed, on_skipped=reporter.on_skipped, on_error=reporter.on_error,
+                on_report_error=reporter.on_report_error, on_status=reporter.on_status, ingest=ingest,
+            )
+            exported = result.exported
+            return {"studies": exported.studies_written, "series": exported.series_written,
+                    "participants": exported.participants, "errors": exported.errors,
+                    "report_files": len(result.report_files)}
+
+        return task
+
+    def run_finished(self) -> None:
+        """Main thread, on the ``Done`` of ``run_task``: the dataset exists; the labels step opens."""
+        self.state.dataset_root = self.state.output_dir / "dataset"
+        self.complete("run")
+
+    def status_lines(self, event: Status) -> list[str]:
+        """The texts of a ``build_dataset`` status event, with the fixed warnings of the CLI."""
+        counts = event.counts
+        if event.stage == "ingested":
+            unmapped = {code: n for code, n in counts.items()
+                        if code not in ("MAPPING_UNUSED", "NOT_4D_DWI", "MISSING_PATIENT_ID") and n}
+            lines = [self.text("WARN_UNMAPPED_SERIES", codes=self.counts_text(unmapped))] if unmapped else []
+            for code in ("NOT_4D_DWI", "MAPPING_UNUSED", "MISSING_PATIENT_ID"):
+                if counts.get(code):
+                    lines.append(self.text(f"WARN_{code}", count=counts[code]))
+            return lines
+        if event.stage == "labels_incomplete":
+            return [self.text("WARN_LABELS_INCOMPLETE", codes=self.counts_text(counts))]
+        code = f"EV_{event.stage}"
+        return [self.text(code, **counts)] if code in messages.CATALOG[self.language] else []
+
+    def counts_text(self, counts: dict[str, int]) -> str:
+        """``CODE n, CODE n`` (codes or exception type names and counts only), or "none"."""
+        return ", ".join(f"{name} {n}" for name, n in sorted(counts.items())) or self.text("NONE")
+
     # --- navigation -------------------------------------------------------------------------------
 
     def steps(self) -> list[str]:
@@ -207,6 +320,8 @@ class Controller:
     def reopen(self, step: str) -> None:
         """A change in *step* invalidates it and every later step."""
         self._complete -= set(STEPS[STEPS.index(step):])
+        if STEPS.index(step) <= STEPS.index("run"):
+            self.state.dataset_root = None  # a change before the run needs a new run
 
     def can_go_next(self) -> bool:
         steps = self.steps()
