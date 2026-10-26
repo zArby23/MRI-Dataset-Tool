@@ -114,3 +114,11 @@ def test_corrections_are_read_as_edits_with_the_cli_rules(tmp_path):
         read_label_corrections(root, path)
     with pytest.raises(FileNotFoundError, match="Corrections file not found."):
         read_label_corrections(root, tmp_path / "none.tsv")
+
+
+def test_an_unreadable_corrections_file_has_a_fixed_message(tmp_path):
+    root = _dataset(tmp_path / "dataset")
+    (tmp_path / "folder.tsv").mkdir()
+    with pytest.raises(OSError) as raised:
+        read_label_corrections(root, tmp_path / "folder.tsv")
+    assert str(raised.value) == "Corrections file could not be read." and "folder" not in str(raised.value)

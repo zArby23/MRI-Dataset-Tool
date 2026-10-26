@@ -132,7 +132,9 @@ class LabelsStep(StepView):
             self.on_change()
 
     def on_event(self, event: Event) -> None:
-        if isinstance(event, Done):
+        if isinstance(event, Done) and self._action == "corrections":
+            self._message = ("CORRECTIONS_LOADED", self.controller.corrections_finished(event).values)
+        elif isinstance(event, Done):
             check = self.controller.labels_finished(event)
             if not check.ok:  # NO_LABELS: the step is valid, nothing to edit
                 self._message = (check.code, check.values)
@@ -169,7 +171,17 @@ class LabelsStep(StepView):
 
     def _load_corrections(self) -> None:
         if path := filedialog.askopenfilename(parent=self, filetypes=TSV_TYPES):
-            self._say(self.controller.load_label_corrections(path), "CORRECTIONS_LOADED")
+            self.run_corrections(path)
+
+    def run_corrections(self, path: str) -> None:
+        check, task = self.controller.corrections_task(path)
+        if not check.ok:
+            self._say(check)
+        elif self.controller.start_task(task, self.controller.labels_failure):
+            self._action = "corrections"
+            self._message = ("TASK_STARTED", {})
+            self.refresh_texts()
+            self.on_change()
 
     # --- one cell ---------------------------------------------------------------------------------
 

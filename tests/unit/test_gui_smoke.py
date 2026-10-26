@@ -83,7 +83,7 @@ def test_input_and_config_steps_validate_through_the_controller(tmp_path, monkey
         config.validate()
         assert config._result.cget("text").startswith(app.controller.text("CONFIG_OK"))
         assert str(app._next.cget("state")) == "normal"
-        config.seed.set("x")  # an edit invalidates the step
+        config.allow_memory.set(True)  # an edit invalidates the step
         assert str(app._next.cget("state")) == "disabled"
         assert not (tmp_path / "out").exists()
     finally:

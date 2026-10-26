@@ -11,9 +11,7 @@ class ConfigStep(StepView):
         state = self.controller.state
         self.config_path = tk.StringVar(value=str(state.config_path))
         self.allow_memory = tk.BooleanVar(value=state.allow_insufficient_memory)
-        self.ratios = [tk.StringVar(value=str(r)) for r in state.ratios]
-        self.seed = tk.StringVar(value=str(state.seed))
-        self.invalidate_on_edit(self.config_path, self.allow_memory, self.seed, *self.ratios)
+        self.invalidate_on_edit(self.config_path, self.allow_memory)
         self.columnconfigure(1, weight=1)
 
         self._config_label = ttk.Label(self)
@@ -34,16 +32,7 @@ class ConfigStep(StepView):
         self.classes = tk.Text(self, height=4, width=40)
         self.classes.grid(row=3, column=0, columnspan=3, sticky="ew", pady=4)
         self.classes.bind("<<Modified>>", self._classes_edited)
-
-        self._ratios_label = ttk.Label(self)
-        self._ratios_label.grid(row=4, column=0, sticky="w", pady=4)
-        ratios = ttk.Frame(self)
-        ratios.grid(row=4, column=1, sticky="w", padx=6)
-        for variable in self.ratios:
-            ttk.Entry(ratios, textvariable=variable, width=6).pack(side="left", padx=(0, 6))
-        self._seed_label = ttk.Label(self)
-        self._seed_label.grid(row=5, column=0, sticky="w", pady=4)
-        ttk.Entry(self, textvariable=self.seed, width=8).grid(row=5, column=1, sticky="w", padx=6)
+        self._validated_classes = self.classes.get("1.0", "end")  # the text of the last validation
 
         self._validate = ttk.Button(self, command=self.validate)
         self._validate.grid(row=6, column=0, sticky="w", pady=8)
@@ -59,8 +48,6 @@ class ConfigStep(StepView):
         self._memory_text.configure(text=text("MEMORY_NOTICE"))
         self._allow.configure(text=text("ALLOW_MEMORY"))
         self._classes_label.configure(text=text("CLASSES"))
-        self._ratios_label.configure(text=text("RATIOS"))
-        self._seed_label.configure(text=text("SEED"))
         self._validate.configure(text=text("VALIDATE"))
         if self._check is None:
             self._result.configure(text="")
@@ -74,14 +61,19 @@ class ConfigStep(StepView):
             self.config_path.set(chosen)
 
     def _classes_edited(self, _event) -> None:
-        if self.classes.edit_modified():
-            self.classes.edit_modified(False)
+        """A <<Modified>> of the classes box. It can arrive late (text inserted by code or pasted is
+        reported on the next event loop), so it reopens the step only if the step is shown and the text
+        differs from the last validated one: a late event must never drop a finished run (E7-01)."""
+        if not self.classes.edit_modified():
+            return
+        self.classes.edit_modified(False)
+        if self.winfo_manager() == "pack" and self.classes.get("1.0", "end") != self._validated_classes:
             self._edited()
 
     def validate(self) -> None:
+        self._validated_classes = self.classes.get("1.0", "end")
         self._check = self.controller.set_config(
-            self.config_path.get(), self.allow_memory.get(), self.classes.get("1.0", "end"),
-            [variable.get() for variable in self.ratios], self.seed.get(),
+            self.config_path.get(), self.allow_memory.get(), self._validated_classes,
         )
         self.refresh_texts()
         self.on_change()

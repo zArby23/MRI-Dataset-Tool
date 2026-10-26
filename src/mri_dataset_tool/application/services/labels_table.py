@@ -135,6 +135,8 @@ def read_label_corrections(dataset_root: Path, corrections_path: Path) -> dict[L
         raise FileNotFoundError("Corrections file not found.") from None
     except ValueError:
         raise ValueError("Corrections file is invalid.") from None
+    except OSError:  # e.g. no permission or a folder: its message would name the file
+        raise OSError("Corrections file could not be read.") from None
     edits: dict[LabelKey, str] = {}
     for participant_cell, session_cell, label in rows:
         try:

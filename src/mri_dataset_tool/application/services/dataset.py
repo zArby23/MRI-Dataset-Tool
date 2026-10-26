@@ -1,6 +1,7 @@
 """Export processed studies as a BIDS dataset (RF10, RF13, RF15, RF16)."""
 
 import json
+import os
 from collections.abc import Callable, Iterable
 from dataclasses import dataclass, replace
 from pathlib import Path
@@ -96,7 +97,12 @@ def export_dataset(
 
 
 def write_ml_exports(
-    root: Path, ratios: Any = DEFAULT_RATIOS, seed: Any = DEFAULT_SEED, *, allow_unfinalized: bool = False
+    root: Path,
+    ratios: Any = DEFAULT_RATIOS,
+    seed: Any = DEFAULT_SEED,
+    *,
+    allow_unfinalized: bool = False,
+    output_dir: Path | None = None,
 ) -> list[Path]:
     """Write ``dataset_index.csv``, ``datalist.json``, ``splits.tsv`` and ``splits.json`` for the
     BIDS dataset at *root* (RF13). Splits are by participant, stratified when ``labels.tsv`` exists.
@@ -107,12 +113,19 @@ def write_ml_exports(
     (a missing file → ``FileNotFoundError``) and the labels must be closed (``labels_final.json`` whose ``sha256`` matches the
     current table) unless *allow_unfinalized* is true; otherwise
     ``ValueError("Labels are not finalized.")`` before writing anything. ``splits.json`` records it.
+
+    *output_dir*: write the four files into that folder instead of the root (a regenerated set, G7b), with
+    each ``image`` relative to it (``../dataset/...``). Before reading anything it must be new or empty
+    (``FileExistsError``), outside the dataset and on its drive (``ValueError``); it is created. The
+    files at the root are never touched. ``None`` = the root, exactly as before.
     """
     weights = check_split_params(ratios, seed)
     if not root.exists():
         raise FileNotFoundError("Dataset directory not found.")
     if not root.is_dir():
         raise NotADirectoryError("Dataset path is not a directory.")
+    if output_dir is not None:
+        _check_export_dir(root, output_dir)
     labels, finalized = None, None
     # any label file present means a labelled dataset: a lost labels.tsv must not export unlabelled
     if any((root / name).exists() for name in (LABELS_TSV, LABELS_JSON, FINAL_JSON)):
@@ -126,9 +139,24 @@ def write_ml_exports(
     )
     # every participant unlabeled: nothing to split, all are listed apart
     assignment, warnings = assign_splits(strata, weights, seed) if strata else ({}, [])
-    written = write_ml_files(root, entries, labels, assignment, unlabeled, warnings, weights, seed, finalized)
+    if output_dir is not None:
+        output_dir.mkdir(parents=True, exist_ok=True)
+        if next(output_dir.iterdir(), None) is not None:  # filled since the check: never mix with other files
+            raise FileExistsError("ML export directory is not empty.")
+    written = write_ml_files(
+        root, entries, labels, assignment, unlabeled, warnings, weights, seed, finalized, output_dir=output_dir
+    )
     logger.info("Wrote ML exports: %d images, %d participants split, %d unlabeled.", len(entries), len(assignment), len(unlabeled))
     return written
+
+
+def _check_export_dir(root: Path, output_dir: Path) -> None:
+    if output_dir.exists() and (not output_dir.is_dir() or next(output_dir.iterdir(), None) is not None):
+        raise FileExistsError("ML export directory is not empty.")
+    if output_dir.resolve().is_relative_to(root.resolve()):  # would add files to the BIDS tree
+        raise ValueError("ML export directory must be outside the dataset.")
+    if os.path.splitdrive(output_dir.resolve())[0].lower() != os.path.splitdrive(root.resolve())[0].lower():
+        raise ValueError("Output directory must be on the same drive as the dataset.")
 
 
 def _labels_finalized(root: Path, labels: LabelTable) -> bool:

@@ -95,7 +95,9 @@ CATALOG: dict[str, dict[str, str]] = {
         "MAPPING_HELP": (
             "Doble clic en una celda de sufijo, participante, sesión o etiqueta para editarla (vacía = automático). "
             "El sufijo se aplica a la serie; participante, sesión y etiqueta a todo el estudio. Después pulse "
-            "«Vista previa» para comprobar los cambios; sin vista previa válida no se puede seguir."
+            "«Vista previa» para comprobar los cambios; sin vista previa válida no se puede seguir. Si los nombres "
+            "de los archivos no indican el sufijo (p. ej. NIfTI con nombres neutros), cargue primero una tabla "
+            "(«Cargar tabla…») y luego pulse «Vista previa»."
         ),
         "COL_location": "Carpeta o archivo",
         "COL_suffix": "Sufijo",
@@ -191,6 +193,7 @@ CATALOG: dict[str, dict[str, str]] = {
             "El archivo de correcciones no es válido: columnas participant_id, session_id y label (como labels.tsv), "
             "sin pares repetidos."
         ),
+        "CORRECTIONS_UNREADABLE": "No se pudo leer el archivo de correcciones (permisos o no es un archivo).",
         "BATCH_CLASS": "Clase:",
         "ASSIGN_SELECTION": "Asignar a la selección",
         "ASSIGN_UNLABELED": "Asignar a todas las sin etiquetar",
@@ -212,6 +215,17 @@ CATALOG: dict[str, dict[str, str]] = {
         # step 6: exports and report
         "ML_EXPORTS": "Exportes para ML (índice, datalist, particiones por participante)",
         "WRITE_ML": "Escribir exportes para ML",
+        "REGENERATE_ML": "Regenerar exportes en una carpeta nueva",
+        "ML_WRITTEN_IN": "Exportes para ML escritos en «{folder}»: {files} archivos.",
+        "ML_REGENERATE_HELP": (
+            "El paso de ejecución escribe los exportes con los valores estándar (70/15/15, semilla 0) en el dataset. "
+            "Aquí puede escribir otro juego con otras proporciones o semilla: va a una carpeta nueva junto al "
+            "dataset (ml_exports_2, ml_exports_3…), con rutas relativas a esa carpeta (../dataset/…). Nunca se "
+            "sobrescribe ni se borra nada."
+        ),
+        "ML_DIR_NOT_EMPTY": "La carpeta de los exportes tiene contenido; no se usa.",
+        "ML_DIR_INSIDE_DATASET": "La carpeta de los exportes debe estar fuera del dataset.",
+        "ML_DIR_OTHER_DRIVE": "La carpeta de los exportes debe estar en el mismo disco que el dataset.",
         "REPORT": "Reporte del dataset (JSON, Markdown, XML y XLSX)",
         "REPORT_DIR": "Carpeta del reporte (nueva o vacía)",
         "WRITE_REPORT": "Generar reporte",
@@ -219,7 +233,6 @@ CATALOG: dict[str, dict[str, str]] = {
         "TASK_STARTED": "En curso…",
         "ML_PRESENT": "Los exportes para ML ya están en el dataset.",
         "ML_ABSENT": "Los exportes para ML aún no están escritos.",
-        "ML_WRITTEN": "Exportes para ML escritos: {files} archivos.",
         "REPORT_WRITTEN": "Reporte escrito: {files} archivos.",
         "FILE_NAME": "  {name}",
         "REPORT_WARNING": "Aviso del reporte {code}: {count}.",
@@ -259,7 +272,10 @@ CATALOG: dict[str, dict[str, str]] = {
         "MAPPING_PAIR_REPEATED": "La tabla da el mismo participante y sesión a más de un estudio.",
         "MAPPING_LABEL_UNKNOWN": "Una etiqueta de la tabla no es una de las clases.",
         "MAPPING_LABELS_NEED_CLASSES": "Las etiquetas de la tabla necesitan clases.",
-        "NO_MAPPED_SERIES": "Ninguna serie de la entrada tiene un sufijo BIDS.",
+        "NO_MAPPED_SERIES": (
+            "Ninguna serie de la entrada tiene un sufijo BIDS: cargue una tabla de mapeo con los sufijos y vuelva a "
+            "pulsar «Vista previa» (en la línea de comandos, --mapping)."
+        ),
         "NO_INPUT_STUDIES": "No hay estudios válidos en la entrada.",
         "OUTPUT_INSIDE_INPUT": "La carpeta de salida debe estar fuera de la entrada.",
         "PIPELINE_WITHOUT_ANONYMIZE": "El pipeline debe incluir el paso anonymize.",
@@ -349,7 +365,9 @@ CATALOG: dict[str, dict[str, str]] = {
         "MAPPING_HELP": (
             "Double-click a suffix, participant, session or label cell to edit it (empty = automatic). The suffix "
             "applies to the series; participant, session and label to the whole study. Then press \"Preview\" "
-            "to check the changes; without a valid preview you cannot go on."
+            "to check the changes; without a valid preview you cannot go on. If the file names do not give the "
+            "suffix (e.g. NIfTI with neutral names), load a table first (\"Load table…\") and then press "
+            "\"Preview\"."
         ),
         "COL_location": "Folder or file",
         "COL_suffix": "Suffix",
@@ -443,6 +461,7 @@ CATALOG: dict[str, dict[str, str]] = {
             "The corrections file is not valid: columns participant_id, session_id and label (as labels.tsv), "
             "no repeated pairs."
         ),
+        "CORRECTIONS_UNREADABLE": "The corrections file could not be read (permissions or not a file).",
         "BATCH_CLASS": "Class:",
         "ASSIGN_SELECTION": "Assign to the selection",
         "ASSIGN_UNLABELED": "Assign to all unlabeled",
@@ -464,6 +483,17 @@ CATALOG: dict[str, dict[str, str]] = {
         # step 6: exports and report
         "ML_EXPORTS": "ML exports (index, datalist, splits by participant)",
         "WRITE_ML": "Write ML exports",
+        "REGENERATE_ML": "Regenerate exports in a new folder",
+        "ML_WRITTEN_IN": "ML exports written in \"{folder}\": {files} files.",
+        "ML_REGENERATE_HELP": (
+            "The run step writes the exports with the standard values (70/15/15, seed 0) in the dataset. Here you "
+            "can write another set with other ratios or seed: it goes to a new folder next to the dataset "
+            "(ml_exports_2, ml_exports_3…), with paths relative to that folder (../dataset/…). Nothing is ever "
+            "overwritten or deleted."
+        ),
+        "ML_DIR_NOT_EMPTY": "The exports folder has content; it is not used.",
+        "ML_DIR_INSIDE_DATASET": "The exports folder must be outside the dataset.",
+        "ML_DIR_OTHER_DRIVE": "The exports folder must be on the same drive as the dataset.",
         "REPORT": "Dataset report (JSON, Markdown, XML and XLSX)",
         "REPORT_DIR": "Report folder (new or empty)",
         "WRITE_REPORT": "Write report",
@@ -471,7 +501,6 @@ CATALOG: dict[str, dict[str, str]] = {
         "TASK_STARTED": "Running…",
         "ML_PRESENT": "The ML exports are already in the dataset.",
         "ML_ABSENT": "The ML exports are not written yet.",
-        "ML_WRITTEN": "ML exports written: {files} files.",
         "REPORT_WRITTEN": "Report written: {files} files.",
         "FILE_NAME": "  {name}",
         "REPORT_WARNING": "Report warning {code}: {count}.",
@@ -511,7 +540,10 @@ CATALOG: dict[str, dict[str, str]] = {
         "MAPPING_PAIR_REPEATED": "The table gives the same participant and session to more than one study.",
         "MAPPING_LABEL_UNKNOWN": "A label of the table is not one of the classes.",
         "MAPPING_LABELS_NEED_CLASSES": "The table labels need classes.",
-        "NO_MAPPED_SERIES": "No input series has a BIDS suffix.",
+        "NO_MAPPED_SERIES": (
+            "No input series has a BIDS suffix: load a mapping table with the suffixes and press \"Preview\" "
+            "again (on the command line, --mapping)."
+        ),
         "NO_INPUT_STUDIES": "There are no valid studies in the input.",
         "OUTPUT_INSIDE_INPUT": "The output folder must be outside the input.",
         "PIPELINE_WITHOUT_ANONYMIZE": "The pipeline must include the anonymize step.",
@@ -597,6 +629,7 @@ LABEL_MESSAGES = {
     "Dataset path is not a directory.": "LABELS_NO_DATASET",
     "Corrections file not found.": "CORRECTIONS_NOT_FOUND",
     "Corrections file is invalid.": "LABEL_CORRECTIONS_INVALID",
+    "Corrections file could not be read.": "CORRECTIONS_UNREADABLE",
     "Corrections have a duplicate participant/session.": "LABEL_CORRECTIONS_INVALID",
 }
 # Fixed messages of the label services that the GUI never triggers (corrections files, templates).
@@ -627,6 +660,9 @@ EXPORT_MESSAGES = {
     "Split ratios must be three non-negative numbers that sum to 1.": "INVALID_RATIOS",
     "Split seed must be an integer.": "INVALID_SEED",
     "Dataset file already exists.": "ML_EXPORTS_EXIST",
+    "ML export directory is not empty.": "ML_DIR_NOT_EMPTY",
+    "ML export directory must be outside the dataset.": "ML_DIR_INSIDE_DATASET",
+    "Output directory must be on the same drive as the dataset.": "ML_DIR_OTHER_DRIVE",
 }
 # Fixed messages of those files that the exports step never triggers.
 EXPORT_MESSAGES_NOT_REACHABLE = ("Output directory must be outside the input directory.",)

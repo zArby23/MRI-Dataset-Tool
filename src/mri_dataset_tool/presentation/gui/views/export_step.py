@@ -41,6 +41,8 @@ class ExportStep(StepView):
         ttk.Entry(self._ml, textvariable=self.seed, width=8).grid(row=1, column=1, sticky="w", padx=6)
         self._write_ml = ttk.Button(self._ml, command=self.write_ml)
         self._write_ml.grid(row=3, column=0, sticky="w", pady=(6, 0))
+        self._ml_help = ttk.Label(self._ml, wraplength=640, justify="left")
+        self._ml_help.grid(row=4, column=0, columnspan=2, sticky="w", pady=(6, 0))
 
         self._report = ttk.LabelFrame(self, padding=8)
         self._report.grid(row=1, column=0, columnspan=3, sticky="ew", pady=8)
@@ -69,8 +71,9 @@ class ExportStep(StepView):
         self._ml.configure(text=text("ML_EXPORTS"))
         self._ratios_label.configure(text=text("RATIOS"))
         self._seed_label.configure(text=text("SEED"))
-        self._write_ml.configure(text=text("WRITE_ML"),
-                                 state="disabled" if self.controller.ml_exports_present() else busy)
+        present = state.dataset_root is not None and self.controller.ml_exports_present()
+        self._write_ml.configure(text=text("REGENERATE_ML" if present else "WRITE_ML"), state=busy)
+        self._ml_help.configure(text=text("ML_REGENERATE_HELP"))
         self._report.configure(text=text("REPORT"))
         self._report_label.configure(text=text("REPORT_DIR"))
         self._browse.configure(text=text("BROWSE"))

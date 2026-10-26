@@ -3,6 +3,7 @@ batch: controller with the real services, thousands of rows, PHI sweep and Tk sm
 a display)."""
 
 import logging
+import threading
 import time
 import tkinter as tk
 from pathlib import Path
@@ -190,5 +191,51 @@ def test_mapping_view_assigns_a_label_to_the_selection(ready):
         view.assign_selection()
         assert ready.text("MAPPING_ASSIGNED", count=3) in view._status.cget("text")
         assert {view.tree.set(i, "label") for i in view.tree.get_children()} == {"CN"}
+    finally:
+        app.destroy()
+
+
+def test_batch_edits_and_corrections_wait_for_a_running_task(project, tmp_path):
+    controller = _labeled(project)
+    controller.load_labels()
+    release = threading.Event()
+    assert controller.start_task(lambda reporter: release.wait(5) and None)
+    try:
+        assert controller.assign_labels([0], "AD").code == "TASK_RUNNING"
+        assert controller.corrections_task(str(tmp_path / "fix.tsv"))[0].code == "TASK_RUNNING"
+    finally:
+        release.set()
+        controller.worker.join(5)
+        controller.poll()
+    assert controller.state.label_edits == {}
+
+
+def test_an_unreadable_corrections_file_has_its_own_code(project, tmp_path):
+    controller = _labeled(project)
+    controller.load_labels()
+    (tmp_path / "folder.tsv").mkdir()  # not a file: open fails with an OSError other than "not found"
+    assert controller.load_label_corrections(str(tmp_path / "folder.tsv")).code == "CORRECTIONS_UNREADABLE"
+
+
+def test_corrections_load_in_the_worker_from_the_view(project, tmp_path):
+    _tk()
+    from mri_dataset_tool.presentation.gui.app import App
+
+    controller = _labeled(project)
+    app = App(controller)
+    app.withdraw()
+    try:
+        app.refresh()
+        settle(app)
+        row = controller.state.label_rows[0]
+        path = tmp_path / "fix.tsv"
+        path.write_text(f"participant_id\tsession_id\tlabel\nsub-{row.participant}\tses-{row.session}\tAD\n",
+                        encoding="utf-8")
+        view = app.views["labels"]
+        view.run_corrections(str(path))
+        assert str(view._apply.cget("state")) == "disabled"  # reading: the window keeps responding
+        settle(app)
+        assert controller.text("CORRECTIONS_LOADED", count=1) in view._status.cget("text")
+        assert controller.state.label_edits == {(row.participant, row.session): "AD"}
     finally:
         app.destroy()

@@ -1,7 +1,9 @@
 """ML/DL export files of a written BIDS dataset (RF13; no tensors, see docs/dataset/export.md): ``dataset_index.csv``, ``datalist.json``
-(MONAI style), ``splits.tsv`` and ``splits.json``, all at the dataset root.
+(MONAI style), ``splits.tsv`` and ``splits.json``, at the dataset root or, with ``output_dir``, in a folder
+of their own (G7b: a regenerated set, e.g. ``ml_exports_2`` next to the dataset).
 
-Paths are POSIX and relative to the dataset root. Ids carry the BIDS prefix in the files. Cells are
+Paths are POSIX and relative to the folder of the files: the dataset root (``sub-01/anat/...``) or, with
+``output_dir``, that folder (``../dataset/sub-01/anat/...``). Ids carry the BIDS prefix in the files. Cells are
 ids (alphanumeric), BIDS suffixes, relative paths, split names and class names (validated by
 ``labels.py`` against formula prefixes), so no cell can start a spreadsheet formula.
 """
@@ -9,7 +11,8 @@ ids (alphanumeric), BIDS suffixes, relative paths, split names and class names (
 import csv
 import io
 import json
-from dataclasses import dataclass
+import os
+from dataclasses import dataclass, replace
 from pathlib import Path
 
 from mri_dataset_tool.infrastructure.bids.entities import parse_bids_filename
@@ -71,11 +74,17 @@ def write_ml_files(
     ratios: tuple[float, ...],
     seed: int,
     labels_finalized: bool | None = None,
+    output_dir: Path | None = None,
 ) -> list[Path]:
     """Write the four export files (all or none; existing → ``FileExistsError``).
 
-    *labels_finalized* goes to ``splits.json`` (``None`` = dataset without labels).
+    *labels_finalized* goes to ``splits.json`` (``None`` = dataset without labels). *output_dir* (an
+    existing folder): write there, with each ``image`` relative to it; ``None`` = the dataset root (as
+    always). A folder on another drive than the dataset (Windows) → ``ValueError`` before writing.
     """
+    folder = root if output_dir is None else output_dir
+    if output_dir is not None:
+        entries = [replace(entry, image=_relative_to(root, entry.image, output_dir)) for entry in entries]
     rows = []
     datalist: dict[str, list[dict[str, str]]] = {name: [] for name in SPLITS}
     datalist_unlabeled: list[dict[str, str]] = []
@@ -113,11 +122,20 @@ def write_ml_files(
     }
     split_lines = ["participant_id\tsplit", *(f"sub-{p}\t{s}" for p, s in assignment.items())]
     return write_all({
-        root / INDEX_CSV: _csv(INDEX_COLUMNS, rows),
-        root / DATALIST_JSON: _json(document),
-        root / SPLITS_TSV: "".join(f"{line}\n" for line in split_lines).encode("utf-8"),
-        root / SPLITS_JSON: _json(summary),
+        folder / INDEX_CSV: _csv(INDEX_COLUMNS, rows),
+        folder / DATALIST_JSON: _json(document),
+        folder / SPLITS_TSV: "".join(f"{line}\n" for line in split_lines).encode("utf-8"),
+        folder / SPLITS_JSON: _json(summary),
     })
+
+
+def _relative_to(root: Path, image: str, output_dir: Path) -> str:
+    """*image* (relative to *root*) as a POSIX path relative to *output_dir*, e.g. ``../dataset/sub-01/...``."""
+    try:
+        relative = os.path.relpath(root.resolve() / image, output_dir.resolve())
+    except ValueError:  # Windows: another drive has no relative path
+        raise ValueError("Output directory must be on the same drive as the dataset.") from None
+    return Path(relative).as_posix()
 
 
 def _csv(header: tuple[str, ...], rows: list[tuple[str, ...]]) -> bytes:

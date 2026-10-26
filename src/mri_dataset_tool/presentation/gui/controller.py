@@ -77,7 +77,7 @@ class WizardState:
     label_filter: str = "all"  # all | unlabeled | defect
     label_version: int = 0  # bumped on every change of the rows, edits or filter: the table redraws only then
     # Step 6: what this session wrote (file names are fixed by the tool, never read from the data).
-    ml_files: list[str] = field(default_factory=list)
+    ml_dirs: list[Path] = field(default_factory=list)  # where this session wrote ML exports (dataset or ml_exports_N)
     report_dirs: list[Path] = field(default_factory=list)
 
 
@@ -113,8 +113,9 @@ class Controller:
         self._complete: set[str] = set()
         self._new_preview: list[PreviewRow] = []  # set by the preview task (worker thread), read on its Done
         self._new_sheet = None  # set by a labels task, read on its Done
+        self._new_corrections: dict = {}  # set by a corrections task, read on its Done
         self._export_kind = ""  # "ml" or "report": which exports task runs
-        self._new_ml: list[str] = []
+        self._new_ml: tuple[Path, list[str]] | None = None
         self._new_report: tuple[Path, list[str], dict[str, int]] | None = None
 
     # --- texts ------------------------------------------------------------------------------------
@@ -200,9 +201,16 @@ class Controller:
     # --- step 2: configuration --------------------------------------------------------------------
 
     def set_config(
-        self, config_path: str, allow_insufficient_memory: bool, classes_text: str, ratios: Sequence[str], seed: str
+        self,
+        config_path: str,
+        allow_insufficient_memory: bool,
+        classes_text: str,
+        ratios: Sequence[str] = tuple(str(r) for r in DEFAULT_RATIOS),
+        seed: str = str(DEFAULT_SEED),
     ) -> Check:
-        """Validate the run config (with ``anonymize``), the classes, ratios and seed (as the CLI)."""
+        """Validate the run config (with ``anonymize``) and the classes (as the CLI). The window does not ask for
+        ratios and seed: the build writes the ML exports with the standard ones (70/15/15, seed 0; other values
+        are regenerated in step 6). Tests may still pass them."""
         self.reopen("config")
         if "input" not in self._complete:
             return Check("INPUT_REQUIRED")
@@ -433,6 +441,8 @@ class Controller:
 
     def assign_labels(self, indices: Sequence[int], value: str) -> Check:
         """The same class (``""`` = unlabeled) for every row in *indices*, kept until ``apply_labels``."""
+        if self.worker.busy:  # a labels task is reading or writing the table
+            return Check("TASK_RUNNING")
         if self.state.labels_closed:
             return Check("LABELS_FINALIZED")
         if not indices:
@@ -472,16 +482,38 @@ class Controller:
         self.state.label_filter = name
         self.state.label_version += 1
 
-    def load_label_corrections(self, path: str) -> Check:
-        """A ``--corrections`` TSV chosen by the user, as pending edits (validated; applied by «Apply»)."""
+    def corrections_task(self, path: str) -> tuple[Check, Callable[[Reporter], dict[str, int]] | None]:
+        """The worker task reading a ``--corrections`` TSV chosen by the user as pending edits (validated;
+        applied by «Apply»). It walks the dataset tree (seconds with thousands of pairs)."""
+        if self.worker.busy:
+            return Check("TASK_RUNNING"), None
         if self.state.labels_closed:
-            return Check("LABELS_FINALIZED")
-        check, edits = self._labels(lambda: read_label_corrections(self.state.dataset_root, Path(path)))
+            return Check("LABELS_FINALIZED"), None
+        root = self.state.dataset_root
+
+        def task(reporter: Reporter | None) -> dict[str, int]:
+            self._new_corrections = read_label_corrections(root, Path(path))
+            return {"count": len(self._new_corrections)}
+
+        return Check(), task
+
+    def corrections_finished(self, event: Done) -> Check:
+        """Main thread, on the ``Done`` of ``corrections_task``: the corrections join the pending edits."""
+        self.state.label_edits.update(self._new_corrections)
+        self.state.label_version += 1
+        return Check(values=event.summary)
+
+    def load_label_corrections(self, path: str) -> Check:
+        """``corrections_task`` run in the calling thread (tests and scripts; the view uses the worker)."""
+        check, task = self.corrections_task(path)
         if not check.ok:
             return check
-        self.state.label_edits.update(edits)
-        self.state.label_version += 1
-        return Check(values={"count": len(edits)})
+        try:
+            summary = task(None)
+        except Exception as error:
+            failed = self.labels_failure(error)
+            return Check(failed.code, failed.values)
+        return self.corrections_finished(Done(summary))
 
     def apply_labels(self) -> Check:
         """Apply the pending edits (all or nothing, logged); ``values["count"]`` = changes."""
@@ -510,6 +542,12 @@ class Controller:
     def ml_exports_present(self) -> bool:
         return self.state.dataset_root is not None and ml_exports_exist(self.state.dataset_root)
 
+    def next_ml_exports_dir(self) -> Path:
+        """The next free (new or empty) ``<output>/ml_exports_N`` for a regenerated set, from 2 (the set in the
+        dataset is the first)."""
+        output = self.state.output_dir
+        return next(output / f"ml_exports_{n}" for n in range(2, 10_000) if is_new_or_empty_dir(output / f"ml_exports_{n}"))
+
     def default_report_dir(self) -> Path:
         """``<output>/report`` while it is new or empty (build_dataset fills it), else ``report_2``, ``_3``..."""
         output = self.state.output_dir
@@ -519,8 +557,9 @@ class Controller:
     def ml_exports_task(
         self, ratios: Sequence[str], seed: str
     ) -> tuple[Check, Callable[[Reporter], dict[str, int]] | None]:
-        """Validate the split parameters (as ``dataset export-ml``) and return the task writing the ML exports,
-        only if they are not in the dataset yet (never overwritten). The labels must be finalized: unlike the
+        """Validate the split parameters (as ``dataset export-ml``) and return the task writing the ML exports:
+        into the dataset if it has none yet (as ``dataset export-ml``), else a regenerated set into the next free
+        ``<output>/ml_exports_N`` (G7b); nothing is ever overwritten. The labels must be finalized: unlike the
         CLI (``--allow-unfinalized``), the GUI never exports open labels (decision of the human)."""
         try:
             ratio_values = [float(value) for value in ratios]
@@ -534,14 +573,13 @@ class Controller:
             check_split_params(ratio_values, seed_value)
         except ValueError:
             return Check("INVALID_RATIOS"), None
-        if self.ml_exports_present():
-            return Check("ML_EXPORTS_EXIST"), None
         root = self.state.dataset_root
+        folder = self.next_ml_exports_dir() if self.ml_exports_present() else None  # None = the dataset root
 
         def task(reporter: Reporter) -> dict[str, int]:
             self._export_kind = "ml"  # set by the task that started, read on its Done
-            written = write_ml_exports(root, ratio_values, seed_value)
-            self._new_ml = [path.name for path in written]
+            written = write_ml_exports(root, ratio_values, seed_value, output_dir=folder)
+            self._new_ml = (folder or root, [path.name for path in written])
             return {"files": len(written)}
 
         return Check(), task
@@ -574,8 +612,10 @@ class Controller:
     def export_finished(self, event: Done) -> list[tuple[str, dict]]:
         """Main thread, on the ``Done`` of an exports task: the lines to show (codes and values)."""
         if self._export_kind == "ml":
-            self.state.ml_files = self._new_ml
-            return [("ML_WRITTEN", event.summary), *(("FILE_NAME", {"name": name}) for name in self._new_ml)]
+            folder, names = self._new_ml
+            self.state.ml_dirs.append(folder)
+            return [("ML_WRITTEN_IN", {"folder": folder.name, **event.summary}),
+                    *(("FILE_NAME", {"name": name}) for name in names)]
         folder, names, warnings = self._new_report
         self.state.report_dirs.append(folder)
         lines = [("REPORT_WRITTEN", event.summary), *(("FILE_NAME", {"name": name}) for name in names)]

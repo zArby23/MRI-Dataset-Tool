@@ -1,6 +1,7 @@
 """GUI step 6 (exports and report): controller with the real services, equivalence with the CLI, PHI
 sweep and a Tk smoke test (skipped without a display)."""
 
+import json
 import logging
 import shutil
 import tkinter as tk
@@ -50,9 +51,8 @@ def test_ml_exports_match_the_cli_export_ml(project, caplog):
     events = _do(controller, controller.ml_exports_task(["0.5", "0.5", "0"], "3"))
     assert events[-1] == Done({"files": 4})
     lines = controller.export_finished(events[-1])
-    assert lines[0] == ("ML_WRITTEN", {"files": 4}) and [v["name"] for _, v in lines[1:]] == ML_FILES
-    assert controller.ml_exports_present() and controller.ml_exports_task(["1", "0", "0"], "0")[0].code == (
-        "ML_EXPORTS_EXIST")
+    assert lines[0] == ("ML_WRITTEN_IN", {"folder": "dataset", "files": 4})
+    assert [v["name"] for _, v in lines[1:]] == ML_FILES and controller.ml_exports_present()
 
     assert main(["--quiet", "dataset", "export-ml", "cli_dataset", "--ratios", "0.5", "0.5", "0", "--seed", "3"]) == 0
     for name in ML_FILES:
@@ -125,13 +125,19 @@ def test_export_view_writes_ml_exports_and_a_report_and_opens_the_output(project
         window.refresh()
         view = window.views["export"]
         assert view.report_dir.get() == str(controller.state.output_dir / "report_2")
+        assert view._write_ml.cget("text") == controller.text("WRITE_ML")
         view.write_ml()
-        assert str(view._write_ml.cget("state")) == "disabled"
+        assert str(view._write_ml.cget("state")) == "disabled"  # running
         controller.worker.join(60)
         window._poll()
         log = view.log.get(0, "end")
-        assert controller.text("ML_WRITTEN", files=4) in log and "  datalist.json" in log
-        assert str(view._write_ml.cget("state")) == "disabled"  # written: never twice
+        assert controller.text("ML_WRITTEN_IN", folder="dataset", files=4) in log and "  datalist.json" in log
+        assert view._write_ml.cget("text") == controller.text("REGENERATE_ML")  # the next set goes to a new folder
+        view.seed.set("7")
+        view.write_ml()
+        controller.worker.join(60)
+        window._poll()
+        assert controller.text("ML_WRITTEN_IN", folder="ml_exports_2", files=4) in view.log.get(0, "end")
         view.write_report()
         controller.worker.join(60)
         window._poll()
@@ -141,3 +147,26 @@ def test_export_view_writes_ml_exports_and_a_report_and_opens_the_output(project
         assert opened == [controller.state.output_dir]
     finally:
         window.destroy()
+
+
+def test_regenerated_exports_go_to_new_folders_with_paths_to_the_dataset(project):
+    controller = _finalized(project)
+    dataset, output = controller.state.dataset_root, controller.state.output_dir
+    events = _do(controller, controller.ml_exports_task(["0.7", "0.15", "0.15"], "0"))  # the standard set
+    controller.export_finished(events[-1])
+    standard = {name: (dataset / name).read_bytes() for name in ML_FILES}
+    assert controller.next_ml_exports_dir() == output / "ml_exports_2"
+    events = _do(controller, controller.ml_exports_task(["0.5", "0.5", "0"], "3"))
+    assert events[-1] == Done({"files": 4})
+    assert controller.export_finished(events[-1])[0] == ("ML_WRITTEN_IN", {"folder": "ml_exports_2", "files": 4})
+    assert {name: (dataset / name).read_bytes() for name in ML_FILES} == standard  # never touched
+    regenerated = output / "ml_exports_2"
+    datalist = json.loads((regenerated / "datalist.json").read_text(encoding="utf-8"))
+    images = [item["image"] for split in ("training", "validation", "testing") for item in datalist[split]]
+    assert images and all(image.startswith("../dataset/sub-") for image in images)
+    # how MONAI's load_decathlon_datalist resolves them: base_dir = the folder of datalist.json
+    assert all((regenerated / image).resolve().is_file() for image in images)
+    splits = json.loads((regenerated / "splits.json").read_text(encoding="utf-8"))
+    assert (splits["seed"], splits["labels_finalized"]) == (3, True)
+    assert controller.next_ml_exports_dir() == output / "ml_exports_3"
+    assert controller.state.ml_dirs == [dataset, regenerated]
