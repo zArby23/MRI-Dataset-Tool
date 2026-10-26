@@ -22,6 +22,9 @@ from mri_dataset_tool.application.services.dataset_build import (
 from mri_dataset_tool.application.services.dataset_ingest import MappingRow, load_mapping, plan_ingest
 from mri_dataset_tool.application.services.disk_space import check_free_space, estimate_input_bytes
 from mri_dataset_tool.application.services import labels as label_service
+from mri_dataset_tool.application.services.dataset import write_ml_exports
+from mri_dataset_tool.application.services.dataset_build import is_new_or_empty_dir
+from mri_dataset_tool.application.services.dataset_outputs import ml_exports_exist, write_report
 from mri_dataset_tool.application.services.ingest_preview import PreviewRow, apply_edit, preview_ingest, write_mapping
 from mri_dataset_tool.application.services.labels_table import (
     LabelRow,
@@ -34,12 +37,13 @@ from mri_dataset_tool.application.services.inputs import (
     DEFAULT_RATIOS,
     DEFAULT_SEED,
     check_input_paths,
+    check_split_params,
     is_valid_folder_name,
     project_config_dir,
     with_memory_consent,
 )
 from mri_dataset_tool.presentation.gui import messages
-from mri_dataset_tool.presentation.gui.worker import Event, Failed, Reporter, Status, Worker
+from mri_dataset_tool.presentation.gui.worker import Done, Event, Failed, Reporter, Status, Worker, failure
 
 STEPS = ("input", "config", "mapping", "run", "labels", "export")
 FORMATS = ("bids", "dicom", "nifti")
@@ -71,6 +75,9 @@ class WizardState:
     labels_closed: bool = False
     labels_available: bool = False  # False: no classes were given (no label files)
     label_counts: dict[str, int] = field(default_factory=dict)  # pairs, labeled, foreign, invalid
+    # Step 6: what this session wrote (file names are fixed by the tool, never read from the data).
+    ml_files: list[str] = field(default_factory=list)
+    report_dirs: list[Path] = field(default_factory=list)
 
 
 @dataclass(frozen=True)
@@ -104,6 +111,9 @@ class Controller:
         self.step = STEPS[0]
         self._complete: set[str] = set()
         self._new_preview: list[PreviewRow] = []  # set by the preview task (worker thread), read on its Done
+        self._export_kind = ""  # "ml" or "report": which exports task runs
+        self._new_ml: list[str] = []
+        self._new_report: tuple[Path, list[str], dict[str, int]] | None = None
 
     # --- texts ------------------------------------------------------------------------------------
 
@@ -159,11 +169,13 @@ class Controller:
             self.complete("input")
         return check
 
-    def start_task(self, task: Callable[[Reporter], dict[str, int] | None]) -> bool:
+    def start_task(
+        self, task: Callable[[Reporter], dict[str, int] | None], classify: Callable[[Exception], Failed] = failure
+    ) -> bool:
         """Start *task* in the worker; ``False`` (nothing started) while another task runs."""
         if self.worker.busy:
             return False
-        self.worker.start(task)
+        self.worker.start(task, classify)
         return True
 
     def disk_space_task(self) -> Callable[[Reporter], dict[str, int]]:
@@ -394,6 +406,90 @@ class Controller:
         if state.label_edits:
             lines.append(self.text("LABELS_PENDING", count=len(state.label_edits)))
         return lines
+
+    # --- step 6: exports and report --------------------------------------------------------------
+
+    def ml_exports_present(self) -> bool:
+        return self.state.dataset_root is not None and ml_exports_exist(self.state.dataset_root)
+
+    def default_report_dir(self) -> Path:
+        """``<output>/report`` while it is new or empty (build_dataset fills it), else ``report_2``, ``_3``..."""
+        output = self.state.output_dir
+        names = ("report", *(f"report_{n}" for n in range(2, 1000)))
+        return next((output / name for name in names if is_new_or_empty_dir(output / name)), output / "report")
+
+    def ml_exports_task(
+        self, ratios: Sequence[str], seed: str, allow_unfinalized: bool
+    ) -> tuple[Check, Callable[[Reporter], dict[str, int]] | None]:
+        """Validate the split parameters (as ``dataset export-ml``) and return the task writing the ML exports,
+        only if they are not in the dataset yet (never overwritten)."""
+        try:
+            ratio_values = [float(value) for value in ratios]
+        except ValueError:
+            return Check("INVALID_RATIOS"), None
+        try:
+            seed_value = int(seed.strip())
+        except ValueError:
+            return Check("INVALID_SEED"), None
+        try:
+            check_split_params(ratio_values, seed_value)
+        except ValueError:
+            return Check("INVALID_RATIOS"), None
+        if self.ml_exports_present():
+            return Check("ML_EXPORTS_EXIST"), None
+        root = self.state.dataset_root
+
+        def task(reporter: Reporter) -> dict[str, int]:
+            written = write_ml_exports(root, ratio_values, seed_value, allow_unfinalized=allow_unfinalized)
+            self._new_ml = [path.name for path in written]
+            return {"files": len(written)}
+
+        self._export_kind = "ml"
+        return Check(), task
+
+    def report_task(self, report_dir: str) -> tuple[Check, Callable[[Reporter], dict[str, int]] | None]:
+        """The task writing the four report files into a new or empty folder outside the dataset."""
+        if not report_dir.strip():
+            return Check("REPORT_DIR_REQUIRED"), None
+        folder, root = Path(report_dir), self.state.dataset_root
+        if not is_new_or_empty_dir(folder):
+            return Check("REPORT_DIR_NOT_EMPTY"), None
+        if folder.resolve().is_relative_to(root.resolve()):
+            return Check("REPORT_INSIDE_DATASET"), None
+
+        def task(reporter: Reporter) -> dict[str, int]:
+            names, warnings = write_report(root, folder, reporter.on_report_error)
+            self._new_report = (folder, names, warnings)
+            return {"files": len(names)}
+
+        self._export_kind = "report"
+        return Check(), task
+
+    @staticmethod
+    def export_failure(error: Exception) -> Failed:
+        """The ``Failed`` of an exports task: its fixed message looked up (``FileExistsError`` here means
+        an export or report file, not the build output)."""
+        code, values = messages.export_error(error)
+        return Failed(code, type(error).__name__, values=values)
+
+    def export_finished(self, event: Done) -> list[tuple[str, dict]]:
+        """Main thread, on the ``Done`` of an exports task: the lines to show (codes and values)."""
+        if self._export_kind == "ml":
+            self.state.ml_files = self._new_ml
+            return [("ML_WRITTEN", event.summary), *(("FILE_NAME", {"name": name}) for name in self._new_ml)]
+        folder, names, warnings = self._new_report
+        self.state.report_dirs.append(folder)
+        lines = [("REPORT_WRITTEN", event.summary), *(("FILE_NAME", {"name": name}) for name in names)]
+        for code, count in sorted(warnings.items()):
+            specific = f"REPORT_WARNING_{code}"
+            lines.append((specific, {"count": count}) if specific in messages.CATALOG[self.language]
+                         else ("REPORT_WARNING", {"code": code, "count": count}))
+        return lines
+
+    def export_status_lines(self) -> list[str]:
+        if self.state.dataset_root is None:
+            return []
+        return [self.text("ML_PRESENT" if self.ml_exports_present() else "ML_ABSENT")]
 
     # --- navigation -------------------------------------------------------------------------------
 

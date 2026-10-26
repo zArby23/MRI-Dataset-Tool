@@ -189,6 +189,40 @@ CATALOG: dict[str, dict[str, str]] = {
         "LABELS_DISCARDED": "Se descartaron {count} cambios sin aplicar.",
         "LABELS_EDITS_PENDING": "Aplique o descarte los cambios antes de cerrar.",
         "LABELS_ERROR": "Error en las etiquetas ({error_type}).",
+        # step 6: exports and report
+        "ML_EXPORTS": "Exportes para ML (índice, datalist, particiones por participante)",
+        "ALLOW_UNFINALIZED": (
+            "Exportar aunque las etiquetas no estén cerradas (no recomendado: las particiones pueden cambiar al "
+            "cerrarlas y splits.json lo registra como no cerradas)"
+        ),
+        "WRITE_ML": "Escribir exportes para ML",
+        "REPORT": "Reporte del dataset (JSON, Markdown, XML y XLSX)",
+        "REPORT_DIR": "Carpeta del reporte (nueva o vacía)",
+        "WRITE_REPORT": "Generar reporte",
+        "OPEN_FOLDER": "Abrir la carpeta de salida",
+        "TASK_STARTED": "En curso…",
+        "ML_PRESENT": "Los exportes para ML ya están en el dataset.",
+        "ML_ABSENT": "Los exportes para ML aún no están escritos.",
+        "ML_WRITTEN": "Exportes para ML escritos: {files} archivos.",
+        "REPORT_WRITTEN": "Reporte escrito: {files} archivos.",
+        "FILE_NAME": "  {name}",
+        "REPORT_WARNING": "Aviso del reporte {code}: {count}.",
+        "REPORT_WARNING_UNREADABLE_FILES": "Aviso UNREADABLE_FILES: {count} archivos del dataset no se pudieron leer.",
+        "REPORT_WARNING_LABELS_UNREADABLE": "Aviso LABELS_UNREADABLE: las etiquetas no se pudieron leer.",
+        "REPORT_WARNING_MANIFEST_UNREADABLE": "Aviso MANIFEST_UNREADABLE: el manifiesto de la corrida no se pudo leer.",
+        "REPORT_DIR_REQUIRED": "Elija la carpeta del reporte.",
+        "REPORT_DIR_NOT_EMPTY": "La carpeta del reporte tiene contenido; elija una nueva o vacía.",
+        "REPORT_INSIDE_DATASET": "La carpeta del reporte debe estar fuera del dataset.",
+        "REPORT_IO": "No se pudo escribir el reporte.",
+        "REPORT_NO_STUDIES": "El dataset no tiene estudios legibles: no hay reporte.",
+        "ML_EXPORTS_EXIST": "Los exportes para ML ya existen en el dataset; no se sobrescriben.",
+        "ML_LABELS_NOT_FINALIZED": (
+            "Las etiquetas no están cerradas: ciérrelas en el paso anterior o marque la casilla para exportar sin cerrar."
+        ),
+        "DATASET_NOT_FOUND": "No se encuentra el dataset.",
+        "DATASET_LAYOUT_INVALID": "El dataset tiene archivos fuera de la estructura BIDS.",
+        "DATASET_NO_IMAGES": "El dataset no tiene imágenes o participantes que repartir.",
+        "EXPORT_ERROR": "Error en los exportes o el reporte ({error_type}).",
         # fixed service messages (``FIXED_MESSAGES``)
         "INPUT_NOT_FOUND": "No se encuentra la carpeta de entrada.",
         "CONFIG_NOT_FOUND": "No se encuentra el archivo de configuración.",
@@ -391,6 +425,40 @@ CATALOG: dict[str, dict[str, str]] = {
         "LABELS_DISCARDED": "{count} changes not applied were discarded.",
         "LABELS_EDITS_PENDING": "Apply or discard the changes before finalizing.",
         "LABELS_ERROR": "Label error ({error_type}).",
+        # step 6: exports and report
+        "ML_EXPORTS": "ML exports (index, datalist, splits by participant)",
+        "ALLOW_UNFINALIZED": (
+            "Export even if the labels are not finalized (not recommended: the splits may change once they are "
+            "finalized and splits.json records them as not finalized)"
+        ),
+        "WRITE_ML": "Write ML exports",
+        "REPORT": "Dataset report (JSON, Markdown, XML and XLSX)",
+        "REPORT_DIR": "Report folder (new or empty)",
+        "WRITE_REPORT": "Write report",
+        "OPEN_FOLDER": "Open the output folder",
+        "TASK_STARTED": "Running…",
+        "ML_PRESENT": "The ML exports are already in the dataset.",
+        "ML_ABSENT": "The ML exports are not written yet.",
+        "ML_WRITTEN": "ML exports written: {files} files.",
+        "REPORT_WRITTEN": "Report written: {files} files.",
+        "FILE_NAME": "  {name}",
+        "REPORT_WARNING": "Report warning {code}: {count}.",
+        "REPORT_WARNING_UNREADABLE_FILES": "Warning UNREADABLE_FILES: {count} dataset files could not be read.",
+        "REPORT_WARNING_LABELS_UNREADABLE": "Warning LABELS_UNREADABLE: the labels could not be read.",
+        "REPORT_WARNING_MANIFEST_UNREADABLE": "Warning MANIFEST_UNREADABLE: the run manifest could not be read.",
+        "REPORT_DIR_REQUIRED": "Choose the report folder.",
+        "REPORT_DIR_NOT_EMPTY": "The report folder has content; choose a new or empty one.",
+        "REPORT_INSIDE_DATASET": "The report folder must be outside the dataset.",
+        "REPORT_IO": "The report could not be written.",
+        "REPORT_NO_STUDIES": "The dataset has no readable studies: no report.",
+        "ML_EXPORTS_EXIST": "The ML exports already exist in the dataset; they are not overwritten.",
+        "ML_LABELS_NOT_FINALIZED": (
+            "The labels are not finalized: finalize them in the previous step or tick the box to export anyway."
+        ),
+        "DATASET_NOT_FOUND": "The dataset was not found.",
+        "DATASET_LAYOUT_INVALID": "The dataset has files outside the BIDS layout.",
+        "DATASET_NO_IMAGES": "The dataset has no images or participants to split.",
+        "EXPORT_ERROR": "Export or report error ({error_type}).",
         # fixed service messages (``FIXED_MESSAGES``)
         "INPUT_NOT_FOUND": "The input folder was not found.",
         "CONFIG_NOT_FOUND": "The configuration file was not found.",
@@ -506,3 +574,34 @@ def label_error(error: Exception) -> tuple[str, dict[str, object]]:
     """The code and values of an error of the label services (only its type name besides the code)."""
     code = LABEL_MESSAGES.get(str(error)) if isinstance(error, (ValueError, OSError)) else None
     return (code, {}) if code else ("LABELS_ERROR", {"error_type": type(error).__name__})
+
+
+# Fixed messages of the exports step (``write_ml_exports``, ``report_dataset``, ``dataset_outputs`` and the
+# files they call) -> code. Label errors of ``write_ml_exports`` fall back to ``LABEL_MESSAGES``.
+EXPORT_MESSAGES = {
+    "Dataset directory not found.": "DATASET_NOT_FOUND",
+    "Dataset directory does not exist.": "DATASET_NOT_FOUND",
+    "Dataset path is not a directory.": "DATASET_NOT_FOUND",
+    "Labels are not finalized.": "ML_LABELS_NOT_FINALIZED",
+    "Report file already exists.": "REPORT_DIR_NOT_EMPTY",
+    "Report directory is not empty.": "REPORT_DIR_NOT_EMPTY",
+    "Report directory must be outside the dataset.": "REPORT_INSIDE_DATASET",
+    "Report file could not be written.": "REPORT_IO",
+    "No valid BIDS studies were found.": "REPORT_NO_STUDIES",
+    "Dataset contains a file outside the BIDS layout.": "DATASET_LAYOUT_INVALID",
+    "No dataset images were found.": "DATASET_NO_IMAGES",
+    "No participants to split.": "DATASET_NO_IMAGES",
+    "Split ratios must be three non-negative numbers that sum to 1.": "INVALID_RATIOS",
+    "Split seed must be an integer.": "INVALID_SEED",
+    "Dataset file already exists.": "ML_EXPORTS_EXIST",
+}
+# Fixed messages of those files that the exports step never triggers.
+EXPORT_MESSAGES_NOT_REACHABLE = ("Output directory must be outside the input directory.",)
+
+
+def export_error(error: Exception) -> tuple[str, dict[str, object]]:
+    """The code and values of an error of the exports step (only its type name besides the code)."""
+    if isinstance(error, (ValueError, OSError)):
+        if code := EXPORT_MESSAGES.get(str(error)) or LABEL_MESSAGES.get(str(error)):
+            return code, {}
+    return "EXPORT_ERROR", {"error_type": type(error).__name__}

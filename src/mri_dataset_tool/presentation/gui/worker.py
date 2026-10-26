@@ -99,24 +99,30 @@ class Worker:
     def busy(self) -> bool:
         return self._running
 
-    def start(self, task: Callable[[Reporter], dict[str, int] | None]) -> None:
-        """Run ``task(reporter)`` in a thread; it ends with ``Done(summary)`` or ``Failed`` (see ``drain``)."""
+    def start(
+        self, task: Callable[[Reporter], dict[str, int] | None], classify: Callable[[Exception], Failed] = failure
+    ) -> None:
+        """Run ``task(reporter)`` in a thread; it ends with ``Done(summary)`` or ``Failed`` (see ``drain``).
+        *classify* turns an exception into its ``Failed`` (by type and fixed message, never shown)."""
         if self.busy:
             raise RuntimeError("A task is already running.")
         self._running = True
-        self._thread = threading.Thread(target=self._run, args=(task,), daemon=True)
+        self._thread = threading.Thread(target=self._run, args=(task, classify), daemon=True)
         self._thread.start()
 
     def join(self, timeout: float | None = None) -> None:
         if self._thread is not None:
             self._thread.join(timeout)
 
-    def _run(self, task: Callable[[Reporter], dict[str, int] | None]) -> None:
+    def _run(self, task: Callable[[Reporter], dict[str, int] | None], classify: Callable[[Exception], Failed]) -> None:
         try:
             summary = task(Reporter(self.events)) or {}
             event: Event = Done({name: n for name, n in summary.items() if type(n) is int})
         except Exception as error:  # the window must never crash; only the type is shown or logged
-            event = failure(error)
+            try:
+                event = classify(error)
+            except Exception:  # a broken classifier must not lose the last event
+                event = failure(error)
             logger.warning("GUI task failed: %s (%s)", event.code, event.error_type)
         self.events.put(event)
 

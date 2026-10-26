@@ -70,3 +70,20 @@ def test_every_fixed_label_message_has_a_code_or_is_listed_as_not_reachable():
     assert found and found <= set(messages.LABEL_MESSAGES) | set(messages.LABEL_MESSAGES_NOT_REACHABLE)
     for code in set(messages.LABEL_MESSAGES.values()) | {"LABELS_ERROR"}:
         assert code in messages.CATALOG["es"] and code in messages.CATALOG["en"]
+
+
+EXPORT_SOURCES = [
+    SERVICES / "dataset.py", SERVICES / "dataset_report.py", SERVICES / "dataset_outputs.py",
+    *(SERVICES.parents[1] / "infrastructure" / "dataset" / name for name in ("index.py", "splits.py", "exporters.py")),
+]
+
+
+def test_every_fixed_export_message_has_a_code_or_is_listed_as_not_reachable():
+    found = set()
+    for path in EXPORT_SOURCES:
+        text = path.read_text(encoding="utf-8")
+        found |= set(re.findall(r'raise \w+\("([^"]+)"\)', text)) | set(re.findall(r'= ValueError\("([^"]+)"\)', text))
+    known = set(messages.EXPORT_MESSAGES) | set(messages.LABEL_MESSAGES) | set(messages.EXPORT_MESSAGES_NOT_REACHABLE)
+    assert found and found <= known
+    for code in set(messages.EXPORT_MESSAGES.values()) | {"EXPORT_ERROR"}:
+        assert code in messages.CATALOG["es"] and code in messages.CATALOG["en"]
