@@ -152,6 +152,43 @@ CATALOG: dict[str, dict[str, str]] = {
             "en varios participantes (corríjalo en la tabla)."
         ),
         "WARN_LABELS_INCOMPLETE": "Aviso LABELS_INCOMPLETE: etiquetas incompletas ({codes}).",
+        # step 5: labels
+        "LABELS_HELP": (
+            "Doble clic en la clase de un par para cambiarla (vacía = sin etiqueta). «Aplicar» guarda los cambios "
+            "(se registran en labels_changes.tsv); «Cerrar» exige todos los pares etiquetados y habilita los "
+            "exportes; «Reabrir» permite volver a editar."
+        ),
+        "APPLY": "Aplicar",
+        "FINALIZE": "Cerrar",
+        "REOPEN": "Reabrir",
+        "RELOAD": "Recargar",
+        "COL_defect": "Defecto",
+        "DEFECT_UNLABELED": "sin etiqueta",
+        "DEFECT_UNKNOWN_CLASS": "clase desconocida",
+        "DEFECT_DUPLICATED": "repetida en la tabla",
+        "DEFECT_MISSING": "falta en la tabla",
+        "LABELS_OPEN": "Etiquetas abiertas: {labeled} de {pairs} pares etiquetados.",
+        "LABELS_CLOSED": "Etiquetas cerradas: {labeled} de {pairs} pares etiquetados.",
+        "LABELS_FOREIGN": "Filas de labels.tsv ajenas al dataset: {foreign}; con ids no válidos: {invalid}.",
+        "LABELS_PENDING": "Cambios sin aplicar: {count}.",
+        "LABELS_APPLIED": "Cambios aplicados: {count}.",
+        "NO_LABELS": "Este dataset no tiene etiquetas (no se dieron clases en el paso 2); puede seguir.",
+        "LABEL_TABLE_NOT_FOUND": "No se encuentra labels.tsv en el dataset.",
+        "LABELS_FINALIZED": "Las etiquetas están cerradas: reábralas para editarlas.",
+        "LABELS_NOT_FINALIZED": "Las etiquetas no están cerradas.",
+        "LABELS_INCOMPLETE": "No se puede cerrar: hay pares sin etiqueta o con defectos.",
+        "LABELS_FIX_BY_HAND": (
+            "labels.tsv tiene filas repetidas, ajenas o no válidas (editado a mano): corríjalo a mano antes de editar."
+        ),
+        "LABEL_UNKNOWN_CLASS": "Una clase no está en labels.json.",
+        "LABEL_PAIR_UNKNOWN": "Un participante o sesión no está en el dataset.",
+        "LABEL_EDIT_INVALID": "Cambio de etiqueta no válido.",
+        "LABEL_FILES_INVALID": "labels.tsv o labels.json no son válidos.",
+        "LABEL_FILES_IO": "No se pudieron leer o escribir los archivos de etiquetas del dataset.",
+        "LABELS_NO_DATASET": "No se encuentra el dataset o no tiene participantes.",
+        "LABELS_DISCARDED": "Se descartaron {count} cambios sin aplicar.",
+        "LABELS_EDITS_PENDING": "Aplique o descarte los cambios antes de cerrar.",
+        "LABELS_ERROR": "Error en las etiquetas ({error_type}).",
         # fixed service messages (``FIXED_MESSAGES``)
         "INPUT_NOT_FOUND": "No se encuentra la carpeta de entrada.",
         "CONFIG_NOT_FOUND": "No se encuentra el archivo de configuración.",
@@ -317,6 +354,43 @@ CATALOG: dict[str, dict[str, str]] = {
             "into several participants (fix it in the table)."
         ),
         "WARN_LABELS_INCOMPLETE": "Warning LABELS_INCOMPLETE: incomplete labels ({codes}).",
+        # step 5: labels
+        "LABELS_HELP": (
+            "Double-click the class of a pair to change it (empty = unlabeled). \"Apply\" saves the changes (logged "
+            "in labels_changes.tsv); \"Finalize\" needs every pair labeled and enables the exports; \"Reopen\" "
+            "allows editing again."
+        ),
+        "APPLY": "Apply",
+        "FINALIZE": "Finalize",
+        "REOPEN": "Reopen",
+        "RELOAD": "Reload",
+        "COL_defect": "Defect",
+        "DEFECT_UNLABELED": "unlabeled",
+        "DEFECT_UNKNOWN_CLASS": "unknown class",
+        "DEFECT_DUPLICATED": "repeated in the table",
+        "DEFECT_MISSING": "missing from the table",
+        "LABELS_OPEN": "Labels open: {labeled} of {pairs} pairs labeled.",
+        "LABELS_CLOSED": "Labels finalized: {labeled} of {pairs} pairs labeled.",
+        "LABELS_FOREIGN": "labels.tsv rows foreign to the dataset: {foreign}; with invalid ids: {invalid}.",
+        "LABELS_PENDING": "Changes not applied: {count}.",
+        "LABELS_APPLIED": "Changes applied: {count}.",
+        "NO_LABELS": "This dataset has no labels (no classes were given in step 2); you can go on.",
+        "LABEL_TABLE_NOT_FOUND": "labels.tsv was not found in the dataset.",
+        "LABELS_FINALIZED": "The labels are finalized: reopen them to edit.",
+        "LABELS_NOT_FINALIZED": "The labels are not finalized.",
+        "LABELS_INCOMPLETE": "Cannot finalize: some pairs are unlabeled or have defects.",
+        "LABELS_FIX_BY_HAND": (
+            "labels.tsv has repeated, foreign or invalid rows (hand edited): fix it by hand before editing."
+        ),
+        "LABEL_UNKNOWN_CLASS": "A class is not in labels.json.",
+        "LABEL_PAIR_UNKNOWN": "A participant or session is not in the dataset.",
+        "LABEL_EDIT_INVALID": "Invalid label change.",
+        "LABEL_FILES_INVALID": "labels.tsv or labels.json are not valid.",
+        "LABEL_FILES_IO": "The label files of the dataset could not be read or written.",
+        "LABELS_NO_DATASET": "The dataset was not found or has no participants.",
+        "LABELS_DISCARDED": "{count} changes not applied were discarded.",
+        "LABELS_EDITS_PENDING": "Apply or discard the changes before finalizing.",
+        "LABELS_ERROR": "Label error ({error_type}).",
         # fixed service messages (``FIXED_MESSAGES``)
         "INPUT_NOT_FOUND": "The input folder was not found.",
         "CONFIG_NOT_FOUND": "The configuration file was not found.",
@@ -389,3 +463,46 @@ def invalid_input(error: Exception) -> tuple[str, dict[str, object]]:
     if match := _MAPPING_PATHS.fullmatch(message):
         return "MAPPING_PATHS_NOT_FOUND", {"count": int(match[1])}
     return "INVALID_INPUT", {"error_type": type(error).__name__}
+
+
+# Fixed messages of the label services (``labels``, ``labels_table`` and the label files) -> code.
+LABEL_MESSAGES = {
+    "Label classes file not found.": "NO_LABELS",
+    "Label table not found.": "LABEL_TABLE_NOT_FOUND",
+    "Labels are finalized.": "LABELS_FINALIZED",
+    "Labels are already finalized.": "LABELS_FINALIZED",
+    "Labels are not finalized.": "LABELS_NOT_FINALIZED",
+    "Labels are incomplete or invalid.": "LABELS_INCOMPLETE",
+    "Label table must be fixed by hand before corrections.": "LABELS_FIX_BY_HAND",
+    "Label table has an unknown class.": "LABEL_UNKNOWN_CLASS",
+    "Correction targets a participant/session not in the dataset.": "LABEL_PAIR_UNKNOWN",
+    "Label edits have an invalid participant or session id.": "LABEL_EDIT_INVALID",
+    "Label edits have an invalid class.": "LABEL_EDIT_INVALID",
+    "Label table is missing required columns.": "LABEL_FILES_INVALID",
+    "Label table has a malformed row.": "LABEL_FILES_INVALID",
+    "Label table is empty.": "LABEL_FILES_INVALID",
+    "Label table is not valid UTF-8.": "LABEL_FILES_INVALID",
+    "Label classes file is invalid.": "LABEL_FILES_INVALID",
+    "Label classes are invalid.": "LABEL_FILES_INVALID",
+    "Label table has a duplicate participant/session.": "LABEL_FILES_INVALID",
+    "Label table has an invalid participant or session id.": "LABEL_FILES_INVALID",
+    "Label table could not be read.": "LABEL_FILES_IO",
+    "Label table could not be written.": "LABEL_FILES_IO",
+    "Label classes file could not be read.": "LABEL_FILES_IO",
+    "Final labels file could not be written.": "LABEL_FILES_IO",
+    "Final labels file could not be removed.": "LABEL_FILES_IO",
+    "Label changes could not be written.": "LABEL_FILES_IO",
+    "Dataset has no participants.": "LABELS_NO_DATASET",
+    "Dataset directory not found.": "LABELS_NO_DATASET",
+    "Dataset path is not a directory.": "LABELS_NO_DATASET",
+}
+# Fixed messages of the label services that the GUI never triggers (corrections files, templates).
+LABEL_MESSAGES_NOT_REACHABLE = (
+    "Corrections file not found.", "Corrections have a duplicate participant/session.", "Label table already exists.",
+)
+
+
+def label_error(error: Exception) -> tuple[str, dict[str, object]]:
+    """The code and values of an error of the label services (only its type name besides the code)."""
+    code = LABEL_MESSAGES.get(str(error)) if isinstance(error, (ValueError, OSError)) else None
+    return (code, {}) if code else ("LABELS_ERROR", {"error_type": type(error).__name__})

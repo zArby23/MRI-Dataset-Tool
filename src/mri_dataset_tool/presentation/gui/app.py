@@ -10,10 +10,12 @@ from mri_dataset_tool.presentation.gui.controller import STEPS, Controller
 from mri_dataset_tool.presentation.gui.views import StepView
 from mri_dataset_tool.presentation.gui.views.config_step import ConfigStep
 from mri_dataset_tool.presentation.gui.views.input_step import InputStep
+from mri_dataset_tool.presentation.gui.views.labels_step import LabelsStep
 from mri_dataset_tool.presentation.gui.views.mapping_step import MappingStep
 from mri_dataset_tool.presentation.gui.views.run_step import RunStep
 
-VIEWS = {"input": InputStep, "config": ConfigStep, "mapping": MappingStep, "run": RunStep}  # the other steps: placeholders until built
+VIEWS = {"input": InputStep, "config": ConfigStep, "mapping": MappingStep, "run": RunStep,
+         "labels": LabelsStep}  # the other steps: placeholders until built
 
 POLL_MS = 100
 
@@ -65,12 +67,12 @@ class App(tk.Tk):
             text="" if self._callback_error is None else text("UNEXPECTED", error_type=self._callback_error))
         self._back.configure(text=text("BACK"), state="normal" if self.controller.can_go_back() else "disabled")
         self._next.configure(text=text("NEXT"), state="normal" if self.controller.can_go_next() else "disabled")
-        for step, view in self.views.items():
-            view.refresh_texts()
+        for step, view in self.views.items():  # shown first: a view may load its data when shown
             if step == self.controller.step:
                 view.pack(fill="both", expand=True)
             else:
                 view.pack_forget()
+            view.refresh_texts()
 
     def _set_language(self) -> None:
         self.controller.set_language(self._language.get())

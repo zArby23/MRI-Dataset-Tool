@@ -55,3 +55,18 @@ def test_every_fixed_build_input_message_has_a_code_in_both_languages():
 )
 def test_invalid_input_codes_never_carry_the_message(message, expected):
     assert messages.invalid_input(ValueError(message)) == expected
+
+
+LABEL_SOURCES = [
+    SERVICES / "labels.py", SERVICES / "labels_table.py",
+    SERVICES.parents[1] / "infrastructure" / "dataset" / "labels.py",
+]
+
+
+def test_every_fixed_label_message_has_a_code_or_is_listed_as_not_reachable():
+    found = set()
+    for path in LABEL_SOURCES:
+        found |= set(re.findall(r'raise \w+\("([^"]+)"\)', path.read_text(encoding="utf-8")))
+    assert found and found <= set(messages.LABEL_MESSAGES) | set(messages.LABEL_MESSAGES_NOT_REACHABLE)
+    for code in set(messages.LABEL_MESSAGES.values()) | {"LABELS_ERROR"}:
+        assert code in messages.CATALOG["es"] and code in messages.CATALOG["en"]

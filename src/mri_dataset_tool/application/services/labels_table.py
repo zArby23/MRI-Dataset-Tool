@@ -13,7 +13,14 @@ from pathlib import Path
 
 from mri_dataset_tool.application.services.labels import apply_label_corrections, dataset_pairs, review_labels
 from mri_dataset_tool.infrastructure.dataset.bids_layout import validate_label
-from mri_dataset_tool.infrastructure.dataset.labels import LABELS_TSV, LabelKey, parse_label_key, parse_label_rows
+from mri_dataset_tool.infrastructure.dataset.labels import (
+    FINAL_JSON,
+    LABELS_TSV,
+    LabelKey,
+    parse_label_key,
+    parse_label_rows,
+    read_classes,
+)
 
 UNLABELED, UNKNOWN_CLASS, DUPLICATED, MISSING = "UNLABELED", "UNKNOWN_CLASS", "DUPLICATED", "MISSING"
 
@@ -24,6 +31,15 @@ class LabelRow:
     session: str | None
     label: str | None  # a class; None when unlabeled or defective (a defective cell is never shown)
     defect: str | None  # UNLABELED | UNKNOWN_CLASS | DUPLICATED | MISSING; None = labeled with a class
+
+
+def label_classes(dataset_root: Path) -> list[str]:
+    """The class names of ``labels.json``, in its order (fixed errors of ``read_classes``)."""
+    return list(read_classes(dataset_root)[0])
+
+
+def labels_finalized(dataset_root: Path) -> bool:
+    return (dataset_root / FINAL_JSON).exists()
 
 
 def read_label_rows(dataset_root: Path) -> list[LabelRow]:
@@ -70,7 +86,12 @@ def apply_label_edits(dataset_root: Path, edits: dict[LabelKey, str]) -> int:
         lines.append(f"sub-{subject}\t{'' if session is None else 'ses-' + session}\t{label}")
     handle, name = tempfile.mkstemp(prefix=".label_edits_", suffix=".tsv", dir=dataset_root.parent)
     try:
-        with os.fdopen(handle, "w", encoding="utf-8", newline="\n") as table:
+        try:
+            table = os.fdopen(handle, "w", encoding="utf-8", newline="\n")
+        except BaseException:
+            os.close(handle)  # fdopen did not take it: never leak the descriptor
+            raise
+        with table:
             table.write("\n".join(lines) + "\n")
         return apply_label_corrections(dataset_root, Path(name))
     finally:

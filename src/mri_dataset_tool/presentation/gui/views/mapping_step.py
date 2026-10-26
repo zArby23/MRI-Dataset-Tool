@@ -107,7 +107,7 @@ class MappingStep(StepView):
             return
         self.start_edit(int(item), column)
 
-    def start_edit(self, index: int, column: str) -> tk.Widget:
+    def start_edit(self, index: int, column: str) -> tk.Widget | None:
         """Open the editor of a cell (a closed list for suffix and label, free text otherwise)."""
         self._close_editor()
         current = self.tree.set(str(index), column)
@@ -121,7 +121,11 @@ class MappingStep(StepView):
             editor.set(current)
         else:
             editor.insert(0, current)
-        x, y, width, height = self.tree.bbox(str(index), column)
+        box = self.tree.bbox(str(index), column)
+        if not box:  # the cell is not visible (scrolled out)
+            editor.destroy()
+            return None
+        x, y, width, height = box
         editor.place(x=x, y=y, width=width, height=height)
         editor.focus_set()
         editor.bind("<Return>", lambda _: self.commit_edit(index, column, editor.get()))

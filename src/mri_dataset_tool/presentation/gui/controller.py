@@ -21,7 +21,15 @@ from mri_dataset_tool.application.services.dataset_build import (
 )
 from mri_dataset_tool.application.services.dataset_ingest import MappingRow, load_mapping, plan_ingest
 from mri_dataset_tool.application.services.disk_space import check_free_space, estimate_input_bytes
+from mri_dataset_tool.application.services import labels as label_service
 from mri_dataset_tool.application.services.ingest_preview import PreviewRow, apply_edit, preview_ingest, write_mapping
+from mri_dataset_tool.application.services.labels_table import (
+    LabelRow,
+    apply_label_edits,
+    label_classes,
+    labels_finalized,
+    read_label_rows,
+)
 from mri_dataset_tool.application.services.inputs import (
     DEFAULT_RATIOS,
     DEFAULT_SEED,
@@ -56,6 +64,13 @@ class WizardState:
     mapping: list[MappingRow] = field(default_factory=list, repr=False)
     # Step 4.
     dataset_root: Path | None = None  # <output>/dataset once the run succeeded
+    # Step 5. Dataset ids are pseudonyms; still kept out of repr (shown only in the table).
+    label_rows: list[LabelRow] = field(default_factory=list, repr=False)
+    label_edits: dict[tuple[str, str | None], str] = field(default_factory=dict, repr=False)
+    label_classes: list[str] = field(default_factory=list)
+    labels_closed: bool = False
+    labels_available: bool = False  # False: no classes were given (no label files)
+    label_counts: dict[str, int] = field(default_factory=dict)  # pairs, labeled, foreign, invalid
 
 
 @dataclass(frozen=True)
@@ -306,6 +321,79 @@ class Controller:
     def counts_text(self, counts: dict[str, int]) -> str:
         """``CODE n, CODE n`` (codes or exception type names and counts only), or "none"."""
         return ", ".join(f"{name} {n}" for name, n in sorted(counts.items())) or self.text("NONE")
+
+    # --- step 5: labels ---------------------------------------------------------------------------
+
+    def _labels(self, call: Callable[[], object]) -> tuple[Check, object]:
+        try:
+            return Check(), call()
+        except (ValueError, OSError) as error:  # fixed texts of the label services
+            code, values = messages.label_error(error)
+            return Check(code, values), None
+
+    def load_labels(self) -> Check:
+        """Read the label table of the dataset (cheap: run in the main thread). The step is valid once the
+        labels are finalized, or when the dataset has no labels."""
+        root, state = self.state.dataset_root, self.state
+        state.label_edits = {}
+        check, classes = self._labels(lambda: label_classes(root))
+        if check.code == "NO_LABELS":
+            state.labels_available, state.label_rows, state.label_classes = False, [], []
+            self.complete("labels")
+            return check
+        if check.ok:
+            check, rows = self._labels(lambda: read_label_rows(root))
+        if check.ok:
+            review = label_service.review_labels(root)
+            state.labels_available, state.label_rows, state.label_classes = True, rows, classes
+            state.labels_closed = labels_finalized(root)
+            state.label_counts = {"pairs": review.dataset_pairs, "labeled": review.labeled,
+                                  "foreign": review.not_in_dataset, "invalid": review.invalid_ids}
+        if check.ok and state.labels_closed:
+            self.complete("labels")
+        else:
+            self.reopen("labels")
+        return check
+
+    def edit_label(self, index: int, value: str) -> Check:
+        """Keep an edit of the class of row *index* (``""`` = unlabeled) until ``apply_labels``."""
+        if self.state.labels_closed:
+            return Check("LABELS_FINALIZED")
+        if value and value not in self.state.label_classes:
+            return Check("LABEL_UNKNOWN_CLASS")
+        row = self.state.label_rows[index]
+        self.state.label_edits[(row.participant, row.session)] = value
+        return Check()
+
+    def apply_labels(self) -> Check:
+        """Apply the pending edits (all or nothing, logged); ``values["count"]`` = changes."""
+        check, count = self._labels(lambda: apply_label_edits(self.state.dataset_root, self.state.label_edits))
+        if not check.ok:
+            return check
+        reloaded = self.load_labels()
+        return Check(values={"count": count}) if reloaded.ok else reloaded
+
+    def finalize_labels(self) -> Check:
+        if self.state.label_edits:
+            return Check("LABELS_EDITS_PENDING")
+        check, _ = self._labels(lambda: label_service.finalize_labels(self.state.dataset_root))
+        return self.load_labels() if check.ok else check
+
+    def reopen_labels(self) -> Check:
+        check, _ = self._labels(lambda: label_service.reopen_labels(self.state.dataset_root))
+        return self.load_labels() if check.ok else check
+
+    def labels_status_lines(self) -> list[str]:
+        state = self.state
+        if not state.labels_available:
+            return []
+        counts = state.label_counts
+        lines = [self.text("LABELS_CLOSED" if state.labels_closed else "LABELS_OPEN", **counts)]
+        if counts.get("foreign") or counts.get("invalid"):
+            lines.append(self.text("LABELS_FOREIGN", **counts))
+        if state.label_edits:
+            lines.append(self.text("LABELS_PENDING", count=len(state.label_edits)))
+        return lines
 
     # --- navigation -------------------------------------------------------------------------------
 

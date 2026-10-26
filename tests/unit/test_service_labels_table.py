@@ -10,7 +10,13 @@ from mri_dataset_tool.application.services.labels import (
     review_labels,
     write_label_template,
 )
-from mri_dataset_tool.application.services.labels_table import LabelRow, apply_label_edits, read_label_rows
+from mri_dataset_tool.application.services.labels_table import (
+    LabelRow,
+    apply_label_edits,
+    label_classes,
+    labels_finalized,
+    read_label_rows,
+)
 
 CLASSES = {"AD": "Alzheimer", "CN": ""}
 PAIRS = [("a1", "v1"), ("a1", "v2"), ("b2", "v1"), ("c3", "v1")]
@@ -76,7 +82,9 @@ def test_invalid_edits_change_nothing(tmp_path, edits, error):
 def test_finalized_labels_reject_edits_until_reopened(tmp_path):
     root = _dataset(tmp_path / "dataset")
     apply_label_edits(root, {pair: "AD" for pair in PAIRS})
+    assert label_classes(root) == ["AD", "CN"] and not labels_finalized(root)
     finalize_labels(root)
+    assert labels_finalized(root)
     with pytest.raises(ValueError, match="Labels are finalized."):
         apply_label_edits(root, {("a1", "v1"): "CN"})
     reopen_labels(root)
