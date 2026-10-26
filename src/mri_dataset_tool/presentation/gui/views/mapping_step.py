@@ -21,11 +21,16 @@ class MappingStep(StepView):
         self._save = ttk.Button(buttons, command=self._save_file)
         for button in (self._preview, self._load, self._save):
             button.pack(side="left", padx=(0, 6))
+        self.batch_label = tk.StringVar()
+        self._batch_combo = ttk.Combobox(buttons, textvariable=self.batch_label, state="readonly", width=14)
+        self._batch_combo.pack(side="left", padx=(18, 6))
+        self._assign = ttk.Button(buttons, command=self.assign_selection)
+        self._assign.pack(side="left")
         self._help = ttk.Label(self, wraplength=680, justify="left")
         self._help.pack(fill="x", pady=6)
         table = ttk.Frame(self)
         table.pack(fill="both", expand=True)
-        self.tree = ttk.Treeview(table, columns=COLUMNS, show="headings", height=12, selectmode="browse")
+        self.tree = ttk.Treeview(table, columns=COLUMNS, show="headings", height=12, selectmode="extended")
         scroll = ttk.Scrollbar(table, orient="vertical", command=self.tree.yview)
         self.tree.configure(yscrollcommand=scroll.set)
         self.tree.pack(side="left", fill="both", expand=True)
@@ -46,6 +51,9 @@ class MappingStep(StepView):
         self._preview.configure(text=text("PREVIEW"), state=busy)
         self._load.configure(text=text("LOAD_MAPPING"), state=busy)
         self._save.configure(text=text("SAVE_MAPPING"), state=busy)
+        classes = self.controller.state.classes or {}
+        self._batch_combo.configure(values=("", *classes), state="readonly" if classes and busy == "normal" else "disabled")
+        self._assign.configure(text=text("ASSIGN_LABEL_SELECTION"), state=busy if classes else "disabled")
         self._help.configure(text=text("MAPPING_HELP"))
         for column in COLUMNS:
             self.tree.heading(column, text=text(f"COL_{column}"))
@@ -95,6 +103,18 @@ class MappingStep(StepView):
                                                 confirmoverwrite=False):
             check = self.controller.save_mapping_file(path)
             self._say("MAPPING_SAVED" if check.ok else check.code, **check.values)
+
+    def assign_selection(self) -> None:
+        indices = [int(item) for item in self.tree.selection()]
+        check = self.controller.assign_mapping_label(indices, self.batch_label.get())
+        if check.ok:
+            for index in indices:  # shown until the next preview recomputes the table
+                self.tree.set(str(index), "label", self.batch_label.get())
+            self._message = ("MAPPING_ASSIGNED", check.values)
+        else:
+            self._message = (check.code, check.values)
+        self._status.configure(text=self.controller.text(self._message[0], **self._message[1]))
+        self.on_change()
 
     # --- cell editing -----------------------------------------------------------------------------
 

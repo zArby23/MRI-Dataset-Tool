@@ -15,6 +15,7 @@ from mri_dataset_tool.application.services.labels_table import (
     apply_label_edits,
     label_classes,
     labels_finalized,
+    read_label_corrections,
     read_label_rows,
 )
 
@@ -89,3 +90,27 @@ def test_finalized_labels_reject_edits_until_reopened(tmp_path):
         apply_label_edits(root, {("a1", "v1"): "CN"})
     reopen_labels(root)
     assert apply_label_edits(root, {("a1", "v1"): "CN"}) == 1
+
+
+def test_corrections_are_read_as_edits_with_the_cli_rules(tmp_path):
+    root = _dataset(tmp_path / "dataset")
+    path = tmp_path / "fix.tsv"
+    path.write_text("participant_id\tsession_id\tlabel\nsub-a1\tses-v1\tAD\nsub-b2\tses-v1\t\n", encoding="utf-8")
+    assert read_label_corrections(root, path) == {("a1", "v1"): "AD", ("b2", "v1"): ""}
+    assert (root / "labels.tsv").read_text(encoding="utf-8").count("\tAD") == 0  # nothing written
+    cases = {
+        "sub-zz\tses-v1\tAD": "Correction targets a participant/session not in the dataset.",
+        "sub-a1\tses-v1\tAD\nsub-a1\tses-v1\tCN": "Corrections have a duplicate participant/session.",
+        "sub-a1\tses-v1\tMCI": "Label table has an unknown class.",
+        "bad id\t\tAD": "Corrections file is invalid.",
+    }
+    for rows, message in cases.items():
+        path.write_text(f"participant_id\tsession_id\tlabel\n{rows}\n", encoding="utf-8")
+        with pytest.raises(ValueError) as raised:
+            read_label_corrections(root, path)
+        assert str(raised.value) == message
+    path.write_text("not a table\n", encoding="utf-8")
+    with pytest.raises(ValueError, match="Corrections file is invalid."):
+        read_label_corrections(root, path)
+    with pytest.raises(FileNotFoundError, match="Corrections file not found."):
+        read_label_corrections(root, tmp_path / "none.tsv")

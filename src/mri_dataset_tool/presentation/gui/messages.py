@@ -187,14 +187,30 @@ CATALOG: dict[str, dict[str, str]] = {
         "LABEL_FILES_IO": "No se pudieron leer o escribir los archivos de etiquetas del dataset.",
         "LABELS_NO_DATASET": "No se encuentra el dataset o no tiene participantes.",
         "LABELS_DISCARDED": "Se descartaron {count} cambios sin aplicar.",
+        "LABEL_CORRECTIONS_INVALID": (
+            "El archivo de correcciones no es válido: columnas participant_id, session_id y label (como labels.tsv), "
+            "sin pares repetidos."
+        ),
+        "BATCH_CLASS": "Clase:",
+        "ASSIGN_SELECTION": "Asignar a la selección",
+        "ASSIGN_UNLABELED": "Asignar a todas las sin etiquetar",
+        "LOAD_CORRECTIONS": "Cargar correcciones desde TSV…",
+        "FILTER": "Mostrar:",
+        "FILTER_all": "todas",
+        "FILTER_unlabeled": "sin etiquetar",
+        "FILTER_defect": "con defecto",
+        "NOTHING_SELECTED": "Seleccione una o más filas (Ctrl o Mayús para varias).",
+        "NOTHING_UNLABELED": "No hay pares sin etiquetar.",
+        "CONFIRM_TITLE": "Confirmar",
+        "CONFIRM_ASSIGN_UNLABELED": "¿Asignar la clase «{label}» a {count} pares sin etiquetar?",
+        "ASSIGNED": "Asignado a {count} pares (pendiente de aplicar).",
+        "CORRECTIONS_LOADED": "Correcciones cargadas como cambios pendientes: {count}. Pulse «Aplicar».",
+        "ASSIGN_LABEL_SELECTION": "Asignar etiqueta a la selección",
+        "MAPPING_ASSIGNED": "Etiqueta asignada a {count} series (sus estudios); pulse «Vista previa».",
         "LABELS_EDITS_PENDING": "Aplique o descarte los cambios antes de cerrar.",
         "LABELS_ERROR": "Error en las etiquetas ({error_type}).",
         # step 6: exports and report
         "ML_EXPORTS": "Exportes para ML (índice, datalist, particiones por participante)",
-        "ALLOW_UNFINALIZED": (
-            "Exportar aunque las etiquetas no estén cerradas (no recomendado: las particiones pueden cambiar al "
-            "cerrarlas y splits.json lo registra como no cerradas)"
-        ),
         "WRITE_ML": "Escribir exportes para ML",
         "REPORT": "Reporte del dataset (JSON, Markdown, XML y XLSX)",
         "REPORT_DIR": "Carpeta del reporte (nueva o vacía)",
@@ -217,7 +233,7 @@ CATALOG: dict[str, dict[str, str]] = {
         "REPORT_NO_STUDIES": "El dataset no tiene estudios legibles: no hay reporte.",
         "ML_EXPORTS_EXIST": "Los exportes para ML ya existen en el dataset; no se sobrescriben.",
         "ML_LABELS_NOT_FINALIZED": (
-            "Las etiquetas no están cerradas: ciérrelas en el paso anterior o marque la casilla para exportar sin cerrar."
+            "Las etiquetas no están cerradas: ciérrelas en el paso anterior antes de escribir los exportes."
         ),
         "DATASET_NOT_FOUND": "No se encuentra el dataset.",
         "DATASET_LAYOUT_INVALID": "El dataset tiene archivos fuera de la estructura BIDS.",
@@ -423,14 +439,30 @@ CATALOG: dict[str, dict[str, str]] = {
         "LABEL_FILES_IO": "The label files of the dataset could not be read or written.",
         "LABELS_NO_DATASET": "The dataset was not found or has no participants.",
         "LABELS_DISCARDED": "{count} changes not applied were discarded.",
+        "LABEL_CORRECTIONS_INVALID": (
+            "The corrections file is not valid: columns participant_id, session_id and label (as labels.tsv), "
+            "no repeated pairs."
+        ),
+        "BATCH_CLASS": "Class:",
+        "ASSIGN_SELECTION": "Assign to the selection",
+        "ASSIGN_UNLABELED": "Assign to all unlabeled",
+        "LOAD_CORRECTIONS": "Load corrections from TSV…",
+        "FILTER": "Show:",
+        "FILTER_all": "all",
+        "FILTER_unlabeled": "unlabeled",
+        "FILTER_defect": "with a defect",
+        "NOTHING_SELECTED": "Select one or more rows (Ctrl or Shift for several).",
+        "NOTHING_UNLABELED": "There are no unlabeled pairs.",
+        "CONFIRM_TITLE": "Confirm",
+        "CONFIRM_ASSIGN_UNLABELED": "Assign the class \"{label}\" to {count} unlabeled pairs?",
+        "ASSIGNED": "Assigned to {count} pairs (not applied yet).",
+        "CORRECTIONS_LOADED": "Corrections loaded as pending changes: {count}. Press \"Apply\".",
+        "ASSIGN_LABEL_SELECTION": "Assign label to the selection",
+        "MAPPING_ASSIGNED": "Label assigned to {count} series (their studies); press \"Preview\".",
         "LABELS_EDITS_PENDING": "Apply or discard the changes before finalizing.",
         "LABELS_ERROR": "Label error ({error_type}).",
         # step 6: exports and report
         "ML_EXPORTS": "ML exports (index, datalist, splits by participant)",
-        "ALLOW_UNFINALIZED": (
-            "Export even if the labels are not finalized (not recommended: the splits may change once they are "
-            "finalized and splits.json records them as not finalized)"
-        ),
         "WRITE_ML": "Write ML exports",
         "REPORT": "Dataset report (JSON, Markdown, XML and XLSX)",
         "REPORT_DIR": "Report folder (new or empty)",
@@ -453,7 +485,7 @@ CATALOG: dict[str, dict[str, str]] = {
         "REPORT_NO_STUDIES": "The dataset has no readable studies: no report.",
         "ML_EXPORTS_EXIST": "The ML exports already exist in the dataset; they are not overwritten.",
         "ML_LABELS_NOT_FINALIZED": (
-            "The labels are not finalized: finalize them in the previous step or tick the box to export anyway."
+            "The labels are not finalized: finalize them in the previous step before writing the exports."
         ),
         "DATASET_NOT_FOUND": "The dataset was not found.",
         "DATASET_LAYOUT_INVALID": "The dataset has files outside the BIDS layout.",
@@ -563,11 +595,12 @@ LABEL_MESSAGES = {
     "Dataset has no participants.": "LABELS_NO_DATASET",
     "Dataset directory not found.": "LABELS_NO_DATASET",
     "Dataset path is not a directory.": "LABELS_NO_DATASET",
+    "Corrections file not found.": "CORRECTIONS_NOT_FOUND",
+    "Corrections file is invalid.": "LABEL_CORRECTIONS_INVALID",
+    "Corrections have a duplicate participant/session.": "LABEL_CORRECTIONS_INVALID",
 }
 # Fixed messages of the label services that the GUI never triggers (corrections files, templates).
-LABEL_MESSAGES_NOT_REACHABLE = (
-    "Corrections file not found.", "Corrections have a duplicate participant/session.", "Label table already exists.",
-)
+LABEL_MESSAGES_NOT_REACHABLE = ("Label table already exists.",)
 
 
 def label_error(error: Exception) -> tuple[str, dict[str, object]]:

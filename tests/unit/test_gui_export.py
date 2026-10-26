@@ -47,11 +47,11 @@ def test_ml_exports_match_the_cli_export_ml(project, caplog):
     dataset = controller.state.dataset_root
     assert not controller.ml_exports_present()
     shutil.copytree(dataset, project / "cli_dataset")
-    events = _do(controller, controller.ml_exports_task(["0.5", "0.5", "0"], "3", False))
+    events = _do(controller, controller.ml_exports_task(["0.5", "0.5", "0"], "3"))
     assert events[-1] == Done({"files": 4})
     lines = controller.export_finished(events[-1])
     assert lines[0] == ("ML_WRITTEN", {"files": 4}) and [v["name"] for _, v in lines[1:]] == ML_FILES
-    assert controller.ml_exports_present() and controller.ml_exports_task(["1", "0", "0"], "0", False)[0].code == (
+    assert controller.ml_exports_present() and controller.ml_exports_task(["1", "0", "0"], "0")[0].code == (
         "ML_EXPORTS_EXIST")
 
     assert main(["--quiet", "dataset", "export-ml", "cli_dataset", "--ratios", "0.5", "0.5", "0", "--seed", "3"]) == 0
@@ -61,14 +61,11 @@ def test_ml_exports_match_the_cli_export_ml(project, caplog):
     assert not [s for s in [*SECRETS, str(project)] for text in texts if s in text]
 
 
-def test_ml_exports_need_finalized_labels_unless_allowed(project):
-    controller = _finalized(project, finalize=False)
-    events = _do(controller, controller.ml_exports_task(["1", "0", "0"], "0", False))
+def test_ml_exports_need_finalized_labels(project):
+    controller = _finalized(project, finalize=False)  # the GUI has no --allow-unfinalized (decision of the human)
+    events = _do(controller, controller.ml_exports_task(["1", "0", "0"], "0"))
     assert events[-1] == Failed("ML_LABELS_NOT_FINALIZED", "ValueError")
     assert not controller.ml_exports_present()
-    events = _do(controller, controller.ml_exports_task(["1", "0", "0"], "0", True))
-    assert events[-1] == Done({"files": 4})
-    assert '"labels_finalized": false' in (controller.state.dataset_root / "splits.json").read_text(encoding="utf-8")
 
 
 @pytest.mark.parametrize(("ratios", "seed", "code"), [
@@ -77,7 +74,7 @@ def test_ml_exports_need_finalized_labels_unless_allowed(project):
 ])
 def test_invalid_split_parameters(project, ratios, seed, code):
     controller = _finalized(project)
-    check, task = controller.ml_exports_task(ratios, seed, False)
+    check, task = controller.ml_exports_task(ratios, seed)
     assert check.code == code and task is None
 
 

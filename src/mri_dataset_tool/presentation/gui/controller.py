@@ -29,9 +29,8 @@ from mri_dataset_tool.application.services.ingest_preview import PreviewRow, app
 from mri_dataset_tool.application.services.labels_table import (
     LabelRow,
     apply_label_edits,
-    label_classes,
-    labels_finalized,
-    read_label_rows,
+    read_label_corrections,
+    read_label_sheet,
 )
 from mri_dataset_tool.application.services.inputs import (
     DEFAULT_RATIOS,
@@ -75,6 +74,8 @@ class WizardState:
     labels_closed: bool = False
     labels_available: bool = False  # False: no classes were given (no label files)
     label_counts: dict[str, int] = field(default_factory=dict)  # pairs, labeled, foreign, invalid
+    label_filter: str = "all"  # all | unlabeled | defect
+    label_version: int = 0  # bumped on every change of the rows, edits or filter: the table redraws only then
     # Step 6: what this session wrote (file names are fixed by the tool, never read from the data).
     ml_files: list[str] = field(default_factory=list)
     report_dirs: list[Path] = field(default_factory=list)
@@ -111,6 +112,7 @@ class Controller:
         self.step = STEPS[0]
         self._complete: set[str] = set()
         self._new_preview: list[PreviewRow] = []  # set by the preview task (worker thread), read on its Done
+        self._new_sheet = None  # set by a labels task, read on its Done
         self._export_kind = ""  # "ml" or "report": which exports task runs
         self._new_ml: list[str] = []
         self._new_report: tuple[Path, list[str], dict[str, int]] | None = None
@@ -266,6 +268,21 @@ class Controller:
             self.reopen("mapping")
         return check
 
+    def assign_mapping_label(self, indices: Sequence[int], value: str) -> Check:
+        """The same label for the studies of every selected row (``""`` clears it); all or nothing."""
+        if not indices:
+            return Check("NOTHING_SELECTED")
+        mapping = list(self.state.mapping)
+        for index in indices:
+            check, mapping = _check(lambda: apply_edit(
+                mapping, self.state.preview, self.state.input_format, index, "label", value, self.state.classes
+            ))
+            if not check.ok:
+                return check
+        self.state.mapping = mapping
+        self.reopen("mapping")
+        return Check(values={"count": len(indices)})
+
     def load_mapping_file(self, path: str) -> Check:
         check, mapping = _check(lambda: load_mapping(Path(path), self.state.input_dir, self.state.classes))
         if check.ok:
@@ -343,57 +360,138 @@ class Controller:
             code, values = messages.label_error(error)
             return Check(code, values), None
 
-    def load_labels(self) -> Check:
-        """Read the label table of the dataset (cheap: run in the main thread). The step is valid once the
-        labels are finalized, or when the dataset has no labels."""
-        root, state = self.state.dataset_root, self.state
+    def labels_task(self, action: str) -> tuple[Check, Callable[[Reporter], dict[str, int]] | None]:
+        """The worker task of a labels *action* (load | apply | finalize | reopen): the service call, then
+        the table read again. Thousands of pairs take seconds (the dataset tree is walked), so the view runs
+        it in the worker; ``labels_finished`` shows the result. A finalize with pending edits is refused."""
+        if action == "finalize" and self.state.label_edits:
+            return Check("LABELS_EDITS_PENDING"), None
+        root, edits = self.state.dataset_root, dict(self.state.label_edits)
+        calls = {
+            "load": lambda: 0,
+            "apply": lambda: apply_label_edits(root, edits),
+            "finalize": lambda: label_service.finalize_labels(root) and 0,
+            "reopen": lambda: label_service.reopen_labels(root) or 0,
+        }
+
+        def task(reporter: Reporter | None) -> dict[str, int]:
+            count = calls[action]()
+            try:
+                self._new_sheet = read_label_sheet(root)
+            except FileNotFoundError as error:
+                if messages.label_error(error)[0] != "NO_LABELS":
+                    raise
+                self._new_sheet = None  # no classes were given: no label files
+            return {"count": count}
+
+        return Check(), task
+
+    @staticmethod
+    def labels_failure(error: Exception) -> Failed:
+        code, values = messages.label_error(error)
+        return Failed(code, type(error).__name__, values=values)
+
+    def labels_finished(self, event: Done) -> Check:
+        """Main thread, on the ``Done`` of ``labels_task``: show the table read again (pending edits are
+        dropped: applied or reloaded). The step is valid once the labels are finalized, or without labels."""
+        state, sheet = self.state, self._new_sheet
         state.label_edits = {}
-        check, classes = self._labels(lambda: label_classes(root))
-        if check.code == "NO_LABELS":
+        state.label_version += 1
+        if sheet is None:
             state.labels_available, state.label_rows, state.label_classes = False, [], []
             self.complete("labels")
-            return check
-        if check.ok:
-            check, rows = self._labels(lambda: read_label_rows(root))
-        if check.ok:
-            review = label_service.review_labels(root)
-            state.labels_available, state.label_rows, state.label_classes = True, rows, classes
-            state.labels_closed = labels_finalized(root)
-            state.label_counts = {"pairs": review.dataset_pairs, "labeled": review.labeled,
-                                  "foreign": review.not_in_dataset, "invalid": review.invalid_ids}
-        if check.ok and state.labels_closed:
+            return Check("NO_LABELS")
+        review = sheet.review
+        state.labels_available, state.label_rows, state.label_classes = True, sheet.rows, sheet.classes
+        state.labels_closed = sheet.finalized
+        state.label_counts = {"pairs": review.dataset_pairs, "labeled": review.labeled,
+                              "foreign": review.not_in_dataset, "invalid": review.invalid_ids}
+        if state.labels_closed:
             self.complete("labels")
         else:
             self.reopen("labels")
-        return check
+        return Check(values=event.summary)
+
+    def _labels_now(self, action: str) -> Check:
+        """``labels_task`` run in the calling thread (tests and scripts; the view uses the worker)."""
+        check, task = self.labels_task(action)
+        if not check.ok:
+            return check
+        try:
+            summary = task(None)
+        except Exception as error:
+            failed = self.labels_failure(error)
+            return Check(failed.code, failed.values)
+        return self.labels_finished(Done(summary))
+
+    def load_labels(self) -> Check:
+        return self._labels_now("load")
 
     def edit_label(self, index: int, value: str) -> Check:
         """Keep an edit of the class of row *index* (``""`` = unlabeled) until ``apply_labels``."""
+        return self.assign_labels([index], value)
+
+    def assign_labels(self, indices: Sequence[int], value: str) -> Check:
+        """The same class (``""`` = unlabeled) for every row in *indices*, kept until ``apply_labels``."""
         if self.state.labels_closed:
             return Check("LABELS_FINALIZED")
+        if not indices:
+            return Check("NOTHING_SELECTED")
         if value and value not in self.state.label_classes:
             return Check("LABEL_UNKNOWN_CLASS")
+        for index in indices:
+            row = self.state.label_rows[index]
+            self.state.label_edits[(row.participant, row.session)] = value
+        self.state.label_version += 1
+        return Check(values={"count": len(indices)})
+
+    def effective_label(self, index: int) -> tuple[str, str | None]:
+        """The class shown for row *index* (its pending edit, if any) and its defect (none once edited
+        to a class; ``UNLABELED`` once edited to empty)."""
         row = self.state.label_rows[index]
-        self.state.label_edits[(row.participant, row.session)] = value
-        return Check()
+        edited = self.state.label_edits.get((row.participant, row.session))
+        if edited is None:
+            return row.label or "", row.defect
+        return edited, None if edited else "UNLABELED"
+
+    def unlabeled_rows(self) -> list[int]:
+        return [i for i in range(len(self.state.label_rows)) if not self.effective_label(i)[0]]
+
+    def visible_label_rows(self) -> list[int]:
+        """The rows the table shows under the current filter."""
+        rows = range(len(self.state.label_rows))
+        if self.state.label_filter == "unlabeled":
+            return self.unlabeled_rows()
+        if self.state.label_filter == "defect":
+            return [i for i in rows if self.effective_label(i)[1] is not None]
+        return list(rows)
+
+    def set_label_filter(self, name: str) -> None:
+        if name not in ("all", "unlabeled", "defect"):
+            raise ValueError("Unsupported label filter.")
+        self.state.label_filter = name
+        self.state.label_version += 1
+
+    def load_label_corrections(self, path: str) -> Check:
+        """A ``--corrections`` TSV chosen by the user, as pending edits (validated; applied by «Apply»)."""
+        if self.state.labels_closed:
+            return Check("LABELS_FINALIZED")
+        check, edits = self._labels(lambda: read_label_corrections(self.state.dataset_root, Path(path)))
+        if not check.ok:
+            return check
+        self.state.label_edits.update(edits)
+        self.state.label_version += 1
+        return Check(values={"count": len(edits)})
 
     def apply_labels(self) -> Check:
         """Apply the pending edits (all or nothing, logged); ``values["count"]`` = changes."""
-        check, count = self._labels(lambda: apply_label_edits(self.state.dataset_root, self.state.label_edits))
-        if not check.ok:
-            return check
-        reloaded = self.load_labels()
-        return Check(values={"count": count}) if reloaded.ok else reloaded
+        return self._labels_now("apply")
 
     def finalize_labels(self) -> Check:
-        if self.state.label_edits:
-            return Check("LABELS_EDITS_PENDING")
-        check, _ = self._labels(lambda: label_service.finalize_labels(self.state.dataset_root))
-        return self.load_labels() if check.ok else check
+        return self._labels_now("finalize")
 
     def reopen_labels(self) -> Check:
-        check, _ = self._labels(lambda: label_service.reopen_labels(self.state.dataset_root))
-        return self.load_labels() if check.ok else check
+        return self._labels_now("reopen")
 
     def labels_status_lines(self) -> list[str]:
         state = self.state
@@ -419,10 +517,11 @@ class Controller:
         return next((output / name for name in names if is_new_or_empty_dir(output / name)), output / "report")
 
     def ml_exports_task(
-        self, ratios: Sequence[str], seed: str, allow_unfinalized: bool
+        self, ratios: Sequence[str], seed: str
     ) -> tuple[Check, Callable[[Reporter], dict[str, int]] | None]:
         """Validate the split parameters (as ``dataset export-ml``) and return the task writing the ML exports,
-        only if they are not in the dataset yet (never overwritten)."""
+        only if they are not in the dataset yet (never overwritten). The labels must be finalized: unlike the
+        CLI (``--allow-unfinalized``), the GUI never exports open labels (decision of the human)."""
         try:
             ratio_values = [float(value) for value in ratios]
         except ValueError:
@@ -440,11 +539,11 @@ class Controller:
         root = self.state.dataset_root
 
         def task(reporter: Reporter) -> dict[str, int]:
-            written = write_ml_exports(root, ratio_values, seed_value, allow_unfinalized=allow_unfinalized)
+            self._export_kind = "ml"  # set by the task that started, read on its Done
+            written = write_ml_exports(root, ratio_values, seed_value)
             self._new_ml = [path.name for path in written]
             return {"files": len(written)}
 
-        self._export_kind = "ml"
         return Check(), task
 
     def report_task(self, report_dir: str) -> tuple[Check, Callable[[Reporter], dict[str, int]] | None]:
@@ -458,11 +557,11 @@ class Controller:
             return Check("REPORT_INSIDE_DATASET"), None
 
         def task(reporter: Reporter) -> dict[str, int]:
+            self._export_kind = "report"
             names, warnings = write_report(root, folder, reporter.on_report_error)
             self._new_report = (folder, names, warnings)
             return {"files": len(names)}
 
-        self._export_kind = "report"
         return Check(), task
 
     @staticmethod

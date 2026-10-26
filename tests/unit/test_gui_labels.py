@@ -11,6 +11,12 @@ from test_cli_dataset import SECRETS, bids_input
 from test_gui_run import _ready, _run, project  # noqa: F401  (project is a fixture)
 
 
+def settle(app) -> None:
+    """Wait for the labels task of the view and deliver its events (load, apply... run in the worker)."""
+    app.controller.worker.join(120)
+    app._poll()
+
+
 def _labeled(project, classes: str = "AD\nCN") -> Controller:
     bids_input(project / "in")  # 3 subjects; PATIENT03 fails validate: 2 pairs in the dataset
     controller = _ready(project, "bids", classes)
@@ -76,7 +82,8 @@ def test_labels_view_loads_edits_and_finalizes(project):
     app = App(controller)
     app.withdraw()
     try:
-        app.refresh()  # showing the step loads the table
+        app.refresh()  # showing the step loads the table (in the worker)
+        settle(app)
         view = app.views["labels"]
         items = view.tree.get_children()
         assert len(items) == 2 and view.tree.set(items[0], "defect") == controller.text("DEFECT_UNLABELED")
@@ -88,8 +95,10 @@ def test_labels_view_loads_edits_and_finalizes(project):
             view.commit_edit(index, label)
         assert view.tree.set(items[0], "label") == "AD" and str(view._apply.cget("state")) == "normal"
         view._apply.invoke()
+        settle(app)
         assert controller.text("LABELS_APPLIED", count=2) in view._status.cget("text")
         view._finalize.invoke()
+        settle(app)
         assert controller.state.labels_closed and str(app._next.cget("state")) == "normal"
         assert str(view._reopen.cget("state")) == "normal" and str(view._finalize.cget("state")) == "disabled"
         assert view.start_edit(0) is None and controller.text("LABELS_FINALIZED") in view._status.cget("text")
@@ -109,9 +118,11 @@ def test_reload_says_how_many_pending_edits_it_discards(project):
     app.withdraw()
     try:
         app.refresh()
+        settle(app)
         view = app.views["labels"]
         view.commit_edit(0, "AD")
         view._reload.invoke()
+        settle(app)
         assert controller.text("LABELS_DISCARDED", count=1) in view._status.cget("text")
         assert controller.state.label_edits == {}
     finally:

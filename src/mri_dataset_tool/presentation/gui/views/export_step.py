@@ -25,7 +25,6 @@ class ExportStep(StepView):
         state = self.controller.state
         self.ratios = [tk.StringVar(value=str(r)) for r in state.ratios]
         self.seed = tk.StringVar(value=str(state.seed))
-        self.allow_unfinalized = tk.BooleanVar(value=False)
         self.report_dir = tk.StringVar()
         self.columnconfigure(1, weight=1)
 
@@ -40,8 +39,6 @@ class ExportStep(StepView):
         self._seed_label = ttk.Label(self._ml)
         self._seed_label.grid(row=1, column=0, sticky="w", pady=4)
         ttk.Entry(self._ml, textvariable=self.seed, width=8).grid(row=1, column=1, sticky="w", padx=6)
-        self._allow = ttk.Checkbutton(self._ml, variable=self.allow_unfinalized)
-        self._allow.grid(row=2, column=0, columnspan=2, sticky="w")
         self._write_ml = ttk.Button(self._ml, command=self.write_ml)
         self._write_ml.grid(row=3, column=0, sticky="w", pady=(6, 0))
 
@@ -66,13 +63,12 @@ class ExportStep(StepView):
 
     def refresh_texts(self) -> None:
         text, state = self.controller.text, self.controller.state
-        if not self.report_dir.get() and state.dataset_root is not None:
+        if not self.report_dir.get() and state.dataset_root is not None and state.output_dir is not None:
             self.report_dir.set(str(self.controller.default_report_dir()))
         busy = "disabled" if self.controller.worker.busy else "normal"
         self._ml.configure(text=text("ML_EXPORTS"))
         self._ratios_label.configure(text=text("RATIOS"))
         self._seed_label.configure(text=text("SEED"))
-        self._allow.configure(text=text("ALLOW_UNFINALIZED"))
         self._write_ml.configure(text=text("WRITE_ML"),
                                  state="disabled" if self.controller.ml_exports_present() else busy)
         self._report.configure(text=text("REPORT"))
@@ -100,7 +96,7 @@ class ExportStep(StepView):
 
     def write_ml(self) -> None:
         self._start(*self.controller.ml_exports_task(
-            [variable.get() for variable in self.ratios], self.seed.get(), self.allow_unfinalized.get()
+            [variable.get() for variable in self.ratios], self.seed.get()
         ))
 
     def write_report(self) -> None:

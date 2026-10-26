@@ -11,7 +11,12 @@ import tempfile
 from dataclasses import dataclass
 from pathlib import Path
 
-from mri_dataset_tool.application.services.labels import apply_label_corrections, dataset_pairs, review_labels
+from mri_dataset_tool.application.services.labels import (
+    LabelReview,
+    apply_label_corrections,
+    dataset_pairs,
+    review_labels,
+)
 from mri_dataset_tool.infrastructure.dataset.bids_layout import validate_label
 from mri_dataset_tool.infrastructure.dataset.labels import (
     FINAL_JSON,
@@ -42,10 +47,31 @@ def labels_finalized(dataset_root: Path) -> bool:
     return (dataset_root / FINAL_JSON).exists()
 
 
+@dataclass(frozen=True)
+class LabelSheet:
+    """Everything the labels step shows, read with a single ``review_labels``."""
+
+    rows: list[LabelRow]
+    classes: list[str]
+    finalized: bool
+    review: LabelReview
+
+
+def read_label_sheet(dataset_root: Path) -> LabelSheet:
+    """The classes, the rows (``read_label_rows``), whether the labels are finalized and their review.
+    No ``labels.json`` → ``FileNotFoundError("Label classes file not found.")`` (no labels)."""
+    classes = label_classes(dataset_root)
+    review = review_labels(dataset_root)
+    return LabelSheet(_rows(dataset_root, review), classes, labels_finalized(dataset_root), review)
+
+
 def read_label_rows(dataset_root: Path) -> list[LabelRow]:
     """One row per dataset pair, sorted as ``dataset_pairs``. Structural defects of the label files
     raise the fixed errors of ``review_labels``."""
-    review = review_labels(dataset_root)
+    return _rows(dataset_root, review_labels(dataset_root))
+
+
+def _rows(dataset_root: Path, review: LabelReview) -> list[LabelRow]:
     defects = {
         **{key: UNLABELED for key in review.unlabeled},
         **{key: UNKNOWN_CLASS for key in review.unknown_class},
@@ -96,3 +122,30 @@ def apply_label_edits(dataset_root: Path, edits: dict[LabelKey, str]) -> int:
         return apply_label_corrections(dataset_root, Path(name))
     finally:
         Path(name).unlink(missing_ok=True)
+
+
+def read_label_corrections(dataset_root: Path, corrections_path: Path) -> dict[LabelKey, str]:
+    """A corrections TSV (the ``--corrections`` format: the columns of ``labels.tsv``) as label edits,
+    validated as ``apply_label_corrections`` validates it; nothing is written (``apply_label_edits``
+    applies them). Fixed ``FileNotFoundError``/``ValueError`` messages, never the file content."""
+    pairs, classes = set(dataset_pairs(dataset_root)), set(label_classes(dataset_root))
+    try:
+        rows = parse_label_rows(corrections_path)
+    except FileNotFoundError:
+        raise FileNotFoundError("Corrections file not found.") from None
+    except ValueError:
+        raise ValueError("Corrections file is invalid.") from None
+    edits: dict[LabelKey, str] = {}
+    for participant_cell, session_cell, label in rows:
+        try:
+            key = parse_label_key(participant_cell, session_cell)
+        except ValueError:
+            raise ValueError("Corrections file is invalid.") from None
+        if key not in pairs:
+            raise ValueError("Correction targets a participant/session not in the dataset.")
+        if key in edits:
+            raise ValueError("Corrections have a duplicate participant/session.")
+        if label and label not in classes:
+            raise ValueError("Label table has an unknown class.")
+        edits[key] = label
+    return edits
