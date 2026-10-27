@@ -4,7 +4,7 @@ import argparse
 from pathlib import Path
 
 from mri_dataset_tool.application.services.conversion import convert_dicom_to_nifti, convert_nifti_to_dicom
-from mri_dataset_tool.infrastructure.nifti.reader import is_nifti_file
+from mri_dataset_tool.application.services.inputs import is_nifti_file
 from mri_dataset_tool.presentation.cli._common import (
     EXIT_FAILED,
     EXIT_OK,

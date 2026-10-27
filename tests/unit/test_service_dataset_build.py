@@ -11,6 +11,7 @@ from mri_dataset_tool.application.services.dataset_build import (
     StageFailed,
     build_dataset,
     check_build_args,
+    is_new_or_empty_dir,
     load_build_pipeline,
     parse_classes,
 )
@@ -94,8 +95,18 @@ def test_check_build_args_existing_output_and_classes(tmp_path):
     assert check_build_args(source, tmp_path / "out", CONFIG) is None
     assert check_build_args(source, tmp_path / "out", CONFIG, ["AD=x", "CN"]) == {"AD": "x", "CN": ""}
     (tmp_path / "out").mkdir()
-    with pytest.raises(FileExistsError, match="Output directory already exists; choose a new one."):
+    assert check_build_args(source, tmp_path / "out", CONFIG) is None  # an empty folder is used
+    for entry in (".hidden", "file.txt"):  # any entry, hidden ones included, makes it unusable
+        (tmp_path / "out" / entry).write_text("x", encoding="utf-8")
+        with pytest.raises(FileExistsError, match="Output directory already exists; choose a new one."):
+            check_build_args(source, tmp_path / "out", CONFIG)
+        (tmp_path / "out" / entry).unlink()
+    (tmp_path / "out" / "sub").mkdir()
+    with pytest.raises(FileExistsError):
         check_build_args(source, tmp_path / "out", CONFIG)
+    (tmp_path / "file").write_text("x", encoding="utf-8")
+    with pytest.raises(FileExistsError):  # a file is not a folder
+        check_build_args(source, tmp_path / "file", CONFIG)
 
 
 def test_load_build_pipeline_requires_anonymize_and_a_valid_config(tmp_path):
@@ -147,3 +158,34 @@ def test_a_failed_stage_raises_stage_failed(tmp_path):
     with pytest.raises(StageFailed) as raised:
         _build(_dataset(tmp_path / "ds"), tmp_path / "out", classes={"AD": ""}, corrections=bad_fix)
     assert raised.value.stage == "labels" and str(raised.value) == "Stage failed: labels."
+
+
+def test_build_uses_an_empty_output_folder_but_never_one_filled_meanwhile(tmp_path):
+    source = _dataset(tmp_path / "ds")
+    (tmp_path / "out").mkdir()
+    result, _, _ = _build(source, tmp_path / "out")
+    assert result.exported.studies_written and (tmp_path / "out" / "report").is_dir()
+    (tmp_path / "late").mkdir()
+    (tmp_path / "late" / "other.txt").write_text("someone else's", encoding="utf-8")  # after check_build_args
+    with pytest.raises(StageFailed) as raised:
+        _build(source, tmp_path / "late")
+    assert raised.value.stage == "export" and raised.value.error_type == "FileExistsError"
+    assert [p.name for p in (tmp_path / "late").iterdir()] == ["other.txt"]
+
+
+@pytest.mark.parametrize("entry", ["hidden file", "empty subfolder", "output is a file"])
+def test_an_output_with_any_entry_or_a_file_is_not_empty(tmp_path, entry):
+    source, out = _dataset(tmp_path / "ds"), tmp_path / "out"
+    if entry == "output is a file":
+        out.write_text("x", encoding="utf-8")
+    elif entry == "hidden file":
+        out.mkdir()
+        (out / ".DS_Store").write_text("", encoding="utf-8")
+    else:
+        out.mkdir()
+        (out / "sub").mkdir()
+    before = sorted(tmp_path.rglob("*"))
+    assert not is_new_or_empty_dir(out)
+    with pytest.raises(FileExistsError, match="Output directory already exists; choose a new one."):
+        check_build_args(source, out, CONFIG)
+    assert sorted(tmp_path.rglob("*")) == before

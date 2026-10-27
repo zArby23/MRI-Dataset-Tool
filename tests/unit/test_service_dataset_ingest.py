@@ -2,14 +2,19 @@
 
 import gc
 import weakref
-from pathlib import Path
+from pathlib import Path, PurePosixPath
 
 import nibabel as nib
 import numpy as np
 import pytest
 
 from mri_dataset_tool.application.services.dataset_build import InvalidBuildInput
-from mri_dataset_tool.application.services.dataset_ingest import iter_ingested_studies, load_mapping, plan_ingest
+from mri_dataset_tool.application.services.dataset_ingest import (
+    SeriesDecision,
+    iter_ingested_studies,
+    load_mapping,
+    plan_ingest,
+)
 from mri_dataset_tool.infrastructure.anonymization.pseudonym import pseudonymize_label
 from test_anonymize_dicom_tree import KEY, write_synthetic_series
 
@@ -253,3 +258,41 @@ def test_the_key_is_read_from_the_environment_when_not_given(tmp_path, monkeypat
     monkeypatch.setenv("MRI_ANON_KEY", KEY)
     plan = plan_ingest("dicom", dicom_tree(tmp_path / "in"))
     assert plan.entries[0][1] == pseudonymize_label("PAT12345", "subject", KEY_BYTES)
+
+
+def test_studies_without_patient_id_are_counted_unless_mapped(tmp_path):
+    root = dicom_tree(tmp_path / "in")
+    write_synthetic_series(root / "b" / "t2", StudyInstanceUID=STUDY_B, SeriesInstanceUID=f"{STUDY_B}.2",
+                           SeriesDescription="T2 TSE", PatientID="")
+    assert plan_ingest("dicom", root, key=KEY_BYTES).missing_patient_id == 1
+    rows = load_mapping(_mapping(tmp_path / "m.tsv", "b	P01		"), root)
+    assert plan_ingest("dicom", root, key=KEY_BYTES, mapping=rows).missing_patient_id == 0
+    assert plan_ingest("dicom", dicom_tree(tmp_path / "ok"), key=KEY_BYTES).missing_patient_id == 0
+
+
+def test_plan_records_one_decision_per_dicom_series(tmp_path):
+    root = dicom_tree(tmp_path / "in")
+    rows = load_mapping(_mapping(tmp_path / "m.tsv", "b	P01			CN", header=HEADER + "	label"), root, {"CN": ""})
+    plan = plan_ingest("dicom", root, key=KEY_BYTES, mapping=rows)
+    subject_a = pseudonymize_label("PAT12345", "subject", KEY_BYTES)
+    session_a = pseudonymize_label(STUDY_A, "session", KEY_BYTES)
+    assert sorted(plan.decisions, key=lambda d: d.location) == [
+        SeriesDecision(PurePosixPath("a/adc"), None, "EXCLUDED", subject_a, session_a),
+        SeriesDecision(PurePosixPath("a/t1"), "T1w", "MATCHED", subject_a, session_a),
+        SeriesDecision(PurePosixPath("b/flair"), "FLAIR", "MATCHED", "P01",
+                       pseudonymize_label(STUDY_B, "session", KEY_BYTES), "CN"),
+    ]
+
+
+def test_plan_records_one_decision_per_nifti_file_also_when_skipped(tmp_path):
+    root = tmp_path / "in"
+    _nifti(root / "x" / "scan_T1.nii.gz")
+    _nifti(root / "notes.nii.gz")
+    rows = load_mapping(_mapping(tmp_path / "m.tsv", "notes.nii.gz	P02	V1	T2w"), root)
+    plan = plan_ingest("nifti", root, key=KEY_BYTES, mapping=rows)
+    by_location = {d.location.as_posix(): d for d in plan.decisions}
+    assert by_location["notes.nii.gz"] == SeriesDecision(by_location["notes.nii.gz"].location, "T2w", "MAPPED", "P02", "V1")
+    assert (by_location["x/scan_T1.nii.gz"].suffix, by_location["x/scan_T1.nii.gz"].code) == ("T1w", "MATCHED")
+    plan = plan_ingest("nifti", root, key=KEY_BYTES)
+    assert {d.location.as_posix(): d.code for d in plan.decisions} == {"notes.nii.gz": "NO_MATCH", "x/scan_T1.nii.gz": "MATCHED"}
+    assert plan.skipped == {"NO_MATCH": 1}  # decisions do not change what is skipped

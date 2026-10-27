@@ -30,7 +30,21 @@ volúmenes. Escribe en la raíz del dataset:
 | `splits.tsv` | `participant_id`, `split` (solo participantes asignados) |
 | `splits.json` | `seed`, `ratios`, `stratified`, `labels_finalized`, participantes por partición, `unlabeled_participants` y `warnings` |
 
-- `image` es la ruta **relativa a la raíz del dataset**, con `/`; nunca rutas absolutas.
+- `image` es la ruta **relativa a la carpeta de los archivos de exporte**, con `/`; nunca rutas absolutas. En
+  el juego estándar (en la raíz del dataset) es relativa a la raíz: `sub-01/anat/sub-01_T1w.nii.gz`.
+- **Juego regenerado** (`write_ml_exports(..., output_dir=DIR)`; en la GUI, el paso 6 escribe en
+  `<salida>/ml_exports_2`, `_3`…): los cuatro archivos van a `DIR`, que debe ser nueva o estar vacía, fuera del
+  dataset y en su mismo disco (en Windows no hay ruta relativa entre unidades), y `image` es relativa a `DIR`:
+  `../dataset/sub-01/anat/sub-01_T1w.nii.gz`. MONAI (`load_decathlon_datalist`, cuya `base_dir` por defecto es la
+  carpeta del `datalist.json`) y una unión `Path(DIR) / image` resuelven la imagen real. Los archivos de la raíz
+  nunca se tocan; `splits.json` registra `seed`, `ratios` y `labels_finalized` del juego. La carpeta se vuelve a
+  comprobar vacía tras crearla: si algo apareció en ella entre la validación y la escritura, `FileExistsError` sin
+  escribir nada. La CLI aún no tiene `--output-dir` (mejora posible).
+- **Límite (enlaces simbólicos y junctions):** la ruta relativa se calcula entre las ubicaciones **reales**
+  (resueltas) de la carpeta del juego y del dataset. Si una de las dos se alcanza por un enlace simbólico o una
+  junction de Windows, `../dataset/…` es correcto desde la ubicación real de la carpeta del juego, pero puede no
+  serlo desde la ruta del enlace: abra el `datalist.json` por su ruta real o resuelva la ruta
+  (`Path(...).resolve()`) antes de unirla.
 - Los ids llevan el prefijo BIDS en los archivos (`sub-…`, `ses-…`). Las filas siguen el orden de la
   ruta como texto (igual en Windows y Linux).
 - `datalist.json` tiene una entrada por imagen (no agrupa las imágenes de una sesión). `label` es el
@@ -68,7 +82,7 @@ volúmenes. Escribe en la raíz del dataset:
 | Dataset sin imágenes | `ValueError("No dataset images were found.")` |
 | Un NIfTI cuya ruta no es exactamente la de `bids_path` (otra entidad, `.nii`, otra carpeta, `run-01`) | `ValueError("Dataset contains a file outside the BIDS layout.")` |
 | Tabla de etiquetas inválida | errores de `read_labels` (`labels.md`) |
-| Hay `labels.json` o `labels_final.json` pero falta `labels.tsv` (renombrado, "guardar como"), o al revés (QA4-09) | `FileNotFoundError("Label table not found.")` / `FileNotFoundError("Label classes file not found.")`, también con `allow_unfinalized`, antes de leer las imágenes |
+| Hay `labels.json` o `labels_final.json` pero falta `labels.tsv` (renombrado, "guardar como"), o al revés | `FileNotFoundError("Label table not found.")` / `FileNotFoundError("Label classes file not found.")`, también con `allow_unfinalized`, antes de leer las imágenes |
 | Etiquetas sin cerrar o cierre desactualizado (sin `allow_unfinalized`) | `ValueError("Labels are not finalized.")` |
 | Algún archivo de exportación ya existe | `FileExistsError("Dataset file already exists.")`, sin escribir ninguno |
 

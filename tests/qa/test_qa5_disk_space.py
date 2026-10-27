@@ -75,6 +75,8 @@ def test_threshold_through_the_cli(tmp_path, monkeypatch) -> None:
 def test_the_output_drive_is_checked_not_the_input_drive(tmp_path, monkeypatch) -> None:
     if not os.path.isdir("E:/"):
         pytest.skip("needs a second drive (E:)")
+    if Path(tmp_path).drive.upper() == "E:":  # e.g. --basetemp on E:: input and output would share the drive
+        pytest.skip("tmp_path is on E:; the input must be on another drive")
     source = _bids(tmp_path)
     out = Path("E:/qa5_tmp") / tmp_path.name / "deep" / "missing"
     seen: list[Path] = []
@@ -86,7 +88,6 @@ def test_the_output_drive_is_checked_not_the_input_drive(tmp_path, monkeypatch) 
 
         shutil.rmtree(Path("E:/qa5_tmp") / tmp_path.name, ignore_errors=True)
     assert seen and all(p.drive.upper() == "E:" for p in seen), seen
-    assert Path(tmp_path).drive.upper() != "E:"
 
 
 def test_missing_drive_letter_is_silent_and_fails_cleanly(tmp_path) -> None:

@@ -51,6 +51,10 @@ def test_each_rule(texts, suffix):
         "T1 map", "T2 map", "T2_mapping", "T1_MOLLI", "t1_vibe_dyn", "T1 dynamic", "T1 perf", "t1_twist",
         # derived
         "ep2d_diff_TENSOR", "t1_vibe_dixon_W",
+        # Siemens SPACE dark-fluid; reformats, non-distortion-corrected, relaxometry, STIR,
+        # BIDS derivatives
+        "t2_spc_da-fl_sag_p2_iso", "t2_spc_da_fl_irprep_sag_p2_iso", "Sag T1 Reformatted", "t1_mprage_sag_ND",
+        "T2 relaxometry", "Cor T2 STIR", "sub-01_space-MNI_desc-preproc_T1w",
     ],
 )
 def test_excluded_words_are_never_mapped(text):
@@ -71,3 +75,13 @@ def test_sub_is_a_subtraction_only_when_asked():
     assert suffix_from_text("T1_SUB", exclude_sub=True) == (None, EXCLUDED)
     assert suffix_from_text("t1_mprage_sag_SUB", exclude_sub=True) == (None, EXCLUDED)
     assert suffix_from_text("sub-01_T1w") == ("T1w", MATCHED)  # NIfTI names: the BIDS subject entity
+
+
+@pytest.mark.parametrize("text", ["T2_STAR_HEMO", "Ax T2 Star", "T2 STAR", "t2-star"])
+def test_t2_star_in_two_words_is_t2starw(text):
+    assert suffix_from_text(text, exclude_sub=True) == ("T2starw", MATCHED)
+
+
+@pytest.mark.parametrize("text", ["t2_spc_sag_p2_iso", "T2 SPACE sag", "sub-01_ses-1_T1w", "Sag CUBE T2"])
+def test_qa6_exclusions_do_not_catch_plain_names(text):
+    assert suffix_from_text(text)[1] == MATCHED

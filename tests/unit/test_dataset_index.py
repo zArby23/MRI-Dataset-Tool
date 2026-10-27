@@ -276,3 +276,65 @@ def test_label_files_without_their_pair_block_the_exports(tmp_path: Path, lost, 
         write_ml_exports(root, allow_unfinalized=True)
     assert str(info.value) == message
     assert not any((root / name).exists() for name in EXPORTS)
+
+
+def test_ml_files_into_another_folder_keep_paths_to_the_dataset(tmp_path):
+    from mri_dataset_tool.application.services.dataset import write_ml_exports
+
+    root = tmp_path / "out" / "dataset"
+    for subject in ("a1", "b2"):
+        anat = root / f"sub-{subject}" / "anat"
+        anat.mkdir(parents=True)
+        (anat / f"sub-{subject}_T1w.nii.gz").write_bytes(b"")
+    standard = write_ml_exports(root, (1, 0, 0), 0)
+    before = {path.name: path.read_bytes() for path in standard}
+    other = tmp_path / "out" / "ml_exports_2"
+    written = write_ml_exports(root, (0.5, 0.5, 0), 1, output_dir=other)
+    assert sorted(p.name for p in written) == sorted(before) and all(p.parent == other for p in written)
+    assert {path.name: path.read_bytes() for path in standard} == before
+    index = (other / "dataset_index.csv").read_text(encoding="utf-8")
+    assert "../dataset/sub-a1/anat/sub-a1_T1w.nii.gz" in index
+    with pytest.raises(FileExistsError, match="ML export directory is not empty."):
+        write_ml_exports(root, (1, 0, 0), 0, output_dir=other)
+    with pytest.raises(ValueError, match="ML export directory must be outside the dataset."):
+        write_ml_exports(root, (1, 0, 0), 0, output_dir=root / "ml")
+    assert not (root / "ml").exists()
+
+
+def test_ml_files_into_another_drive_are_rejected_before_creating_anything(tmp_path):
+    import os
+    import string
+
+    from mri_dataset_tool.application.services.dataset import write_ml_exports
+
+    here = os.path.splitdrive(str(tmp_path.resolve()))[0].upper()
+    others = [f"{letter}:" for letter in string.ascii_uppercase if f"{letter}:" != here and Path(f"{letter}:/").exists()]
+    if os.name != "nt" or not here or not others:
+        pytest.skip("Needs Windows with a second drive.")
+    root = tmp_path / "dataset"
+    (root / "sub-a1" / "anat").mkdir(parents=True)
+    (root / "sub-a1" / "anat" / "sub-a1_T1w.nii.gz").write_bytes(b"")
+    target = Path(others[0] + "/") / "mri_tool_never_created_ml_exports"
+    with pytest.raises(ValueError, match="Output directory must be on the same drive as the dataset."):
+        write_ml_exports(root, (1, 0, 0), 0, output_dir=target)
+    assert not target.exists()
+
+
+def test_ml_files_never_mix_with_files_that_appear_after_the_check(tmp_path, monkeypatch):
+    from mri_dataset_tool.application.services import dataset as dataset_service
+
+    root = tmp_path / "out" / "dataset"
+    (root / "sub-a1" / "anat").mkdir(parents=True)
+    (root / "sub-a1" / "anat" / "sub-a1_T1w.nii.gz").write_bytes(b"")
+    other = tmp_path / "out" / "ml_exports_2"
+    original = dataset_service.scan_images
+
+    def scan_and_fill(path):  # between the check of output_dir and the write
+        other.mkdir(parents=True)
+        (other / "someone_else.txt").write_text("x", encoding="utf-8")
+        return original(path)
+
+    monkeypatch.setattr(dataset_service, "scan_images", scan_and_fill)
+    with pytest.raises(FileExistsError, match="ML export directory is not empty."):
+        dataset_service.write_ml_exports(root, (1, 0, 0), 0, output_dir=other)
+    assert [p.name for p in other.iterdir()] == ["someone_else.txt"]

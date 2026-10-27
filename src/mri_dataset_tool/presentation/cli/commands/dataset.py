@@ -14,8 +14,12 @@ from mri_dataset_tool.application.services.dataset_build import (
 )
 from mri_dataset_tool.application.services.dataset_ingest import load_mapping, plan_ingest
 from mri_dataset_tool.application.services.dataset_report import report_dataset
-from mri_dataset_tool.infrastructure.config.loader import DEFAULT_CONFIG_DIR
-from mri_dataset_tool.infrastructure.dataset.splits import DEFAULT_RATIOS, DEFAULT_SEED, check_split_params
+from mri_dataset_tool.application.services.inputs import (
+    DEFAULT_CONFIG_DIR,
+    DEFAULT_RATIOS,
+    DEFAULT_SEED,
+    check_split_params,
+)
 from mri_dataset_tool.presentation.cli._common import (
     EXIT_FAILED,
     EXIT_OK,
@@ -154,13 +158,15 @@ def _print_status(event: str, counts: dict[str, int]) -> None:
     if event == "labels_incomplete":
         print(f"WARNING LABELS_INCOMPLETE: {counts}")
     elif event == "ingested":  # warnings: printed also with --quiet
-        unmapped = {code: n for code, n in counts.items() if code not in ("MAPPING_UNUSED", "NOT_4D_DWI") and n}
+        unmapped = {code: n for code, n in counts.items() if code not in ("MAPPING_UNUSED", "NOT_4D_DWI", "MISSING_PATIENT_ID") and n}
         if unmapped:
             print(f"WARNING UNMAPPED_SERIES: {unmapped}")
         if counts.get("NOT_4D_DWI"):  # a suffix was found, but the volume cannot be a dwi
             print(f"WARNING NOT_4D_DWI: {counts['NOT_4D_DWI']}")
         if counts.get("MAPPING_UNUSED"):
             print(f"WARNING MAPPING_UNUSED: {counts['MAPPING_UNUSED']}")
+        if counts.get("MISSING_PATIENT_ID"):  # the patient may be split into several participants
+            print(f"WARNING MISSING_PATIENT_ID: {counts['MISSING_PATIENT_ID']}")
     else:
         status(_MESSAGES[event].format(**counts))
 

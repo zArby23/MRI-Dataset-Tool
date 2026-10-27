@@ -9,6 +9,7 @@ from mri_dataset_tool.infrastructure.anonymization.pseudonym import load_key, ps
 from mri_dataset_tool.infrastructure.anonymization.report import AnonymizationReport
 # Approved exception: reuses the private walker of the frozen DICOMBatchReader so both skip hidden files alike.
 from mri_dataset_tool.infrastructure.dicom.batch_reader import _iter_visible_files
+from mri_dataset_tool.infrastructure.dicom._study_assembler import quiet_value_validation
 from mri_dataset_tool.infrastructure.logging.logger import get_logger
 
 logger = get_logger(__name__)
@@ -16,6 +17,7 @@ logger = get_logger(__name__)
 REPORT_NAME = "anonymization_report.json"
 
 
+@quiet_value_validation()
 def anonymize_dicom_tree(
     input_dir: Path,
     output_dir: Path,

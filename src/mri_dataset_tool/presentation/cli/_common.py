@@ -8,7 +8,7 @@ from collections.abc import Callable
 from pathlib import Path
 
 from mri_dataset_tool.application.services.disk_space import check_free_space, estimate_input_bytes
-from mri_dataset_tool.infrastructure.anonymization.pseudonym import KEY_ENV_VAR, load_key
+from mri_dataset_tool.application.services.inputs import KEY_ENV_VAR, load_key
 
 EXIT_OK = 0  # also when some studies failed and were reported (RF16)
 EXIT_FAILED = 1  # previous output exists or a stage failed

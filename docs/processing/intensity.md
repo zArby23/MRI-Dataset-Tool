@@ -41,18 +41,18 @@ for study in NIfTIBatchReader().iter_studies(root, lazy=True):
   - Errores con mensaje fijo, sin rutas: `"Invalid volume dtype."` (solo enteros y flotantes reales),
     `"Unsupported volume dimensionality."` (no 3D/4D), `"Unable to read volume data."` (archivo
     truncado, corrupto o borrado al materializar) y `"Unsupported NIfTI data type."` (origen complejo:
-    convertirlo a real perdería la parte imaginaria; `NIfTIReader` ya rechaza estos archivos al cargar, QA1-01).
-- Extensiones (QA1-02): `is_nifti_file` no distingue mayúsculas, así que los lectores NIfTI y BIDS
+    convertirlo a real perdería la parte imaginaria; `NIfTIReader` ya rechaza estos archivos al cargar).
+- Extensiones: `is_nifti_file` no distingue mayúsculas, así que los lectores NIfTI y BIDS
   (`find_nifti_files`, `BIDSReader`, `BIDSBatchReader`) cargan `.NII`/`.nii.GZ`. BIDS exige minúsculas,
   pero el lector las tolera: `metadata["bids"]["extension"]` conserva la extensión tal como está escrita (p. ej. `.NII.GZ`).
-- Con `lazy=True` el lector abre la imagen con `nib.load(path, mmap=False, keep_file_open=True)` (QA1-06).
+- Con `lazy=True` el lector abre la imagen con `nib.load(path, mmap=False, keep_file_open=True)`.
   Cargar no abre el archivo. La primera lectura de vóxeles lo abre y queda abierto mientras viva el proxy,
   es decir, el estudio. Se cierra al soltar la última referencia (no hace falta `gc.collect()`). El runner
   y los lectores por lote sueltan cada estudio antes de leer el siguiente, así que solo queda abierto el
   archivo del estudio actual. Antes de la primera lectura el archivo se puede borrar o mover (también en
   Windows), y materializarlo después falla con `"Unable to read volume data."`. Después de leer, en
   Windows no se puede borrar ni mover mientras el estudio exista.
-- **4D `.nii.gz` (QA1-06).** gzip no permite acceso aleatorio. Sin un archivo abierto persistente, cada
+- **4D `.nii.gz`.** gzip no permite acceso aleatorio. Sin un archivo abierto persistente, cada
   `volume[..., t]` reabría y descomprimía desde el principio, así que la lectura era O(T²): con T=80,
   4,25 s en lazy frente a 0,25 s en eager. Con el archivo abierto, `iter_volumes_3d` lee los volúmenes
   en orden y avanza sobre el mismo flujo, así que la lectura es lineal en T (≈ eager). Un acceso en
@@ -151,7 +151,7 @@ Algoritmos en `infrastructure/processing/normalize.py` (`normalize_volume`, `che
   volumen (Chan et al.) o mín/máx, sin materializar el 4D en `float64`. Límite: `percentile` global
   guarda todos los valores de la máscara en `float32` (≈ el 4D en `float32`) para calcular los
   percentiles exactos.
-- **Comprobación de RAM (QA1-09).** Antes de leer el volumen o reservar nada, `normalize_volume` compara
+- **Comprobación de RAM.** Antes de leer el volumen o reservar nada, `normalize_volume` compara
   su estimación del pico con `psutil.virtual_memory().available` mediante el helper
   `check_available_memory` de `processing/memory.py`, el mismo que usa `resample`. La estimación es
   `required_bytes(shape, method, per_volume)` = `4 × N` (salida `float32`) `+ 32 × V` (copias de trabajo

@@ -6,10 +6,12 @@ mappings and conflicting labels raise ``InvalidBuildInput``. ``iter_ingested_stu
 yields one study at a time with its volumes (DICOM built as float32, NIfTI lazy). Participant
 and session ids are either pseudonyms (``pseudonymize_label``, the same as the ``anonymize``
 step, which leaves them unchanged) or mapping labels that ``anonymize`` pseudonymizes. Source
-names, paths, ``PatientID`` and descriptions are never returned, logged or written.
+names, ``PatientID`` and descriptions are never returned, logged or written; paths relative to the
+input root are returned only in ``IngestPlan.decisions`` (the GUI mapping table), never logged.
 Rules and table format: ``docs/dataset/ingest.md``.
 """
 
+import posixpath
 import re
 from collections import Counter
 from collections.abc import Callable, Iterator, Sequence
@@ -50,6 +52,21 @@ class MappingRow:
     label: str = ""
 
 
+@dataclass(frozen=True)
+class SeriesDecision:
+    """What ``plan_ingest`` decided for one series, for the GUI mapping table (shown only there).
+
+    *location*: the series folder (DICOM) or file (NIfTI) relative to the input root; *participant*
+    and *session*: a pseudonym or the mapping id, before ``anonymize``; *suffix* ``None`` = skipped."""
+
+    location: PurePosixPath
+    suffix: str | None
+    code: str  # MATCHED | NO_MATCH | AMBIGUOUS | EXCLUDED | MAPPED
+    participant: str
+    session: str | None
+    label: str = ""
+
+
 @dataclass
 class IngestPlan:
     """What ``iter_ingested_studies`` will yield. ``skipped`` (code -> series) grows while iterating."""
@@ -60,6 +77,8 @@ class IngestPlan:
     labels: dict[LabelKey, str] = field(default_factory=dict)  # final (pseudonymized) pair -> class
     skipped: Counter = field(default_factory=Counter)
     mapping_unused: int = 0
+    decisions: list[SeriesDecision] = field(default_factory=list)  # one per input series, in reading order
+    missing_patient_id: int = 0  # DICOM studies whose participant fell back to the study (no PatientID, not mapped)
 
     @property
     def series(self) -> int:
@@ -182,6 +201,7 @@ def plan_ingest(
             study_files = [PurePosixPath(f.relative_to(root).as_posix()) for s in study.series for f in s.files]
             study_values = _resolve(rows, study_files, used)  # rows that contain the whole study
             subject = study_values.get("participant", subject_default)
+            plan.missing_patient_id += "participant" not in study_values and study.study_uid in identities.missing_patient_id
             session = study_values.get("session", session_default)
             suffixes = []
             for series in study.series:
@@ -193,6 +213,8 @@ def plan_ingest(
                     series.series_uid, (None, "NO_MATCH")
                 )
                 suffixes.append(suffix)
+                folder = PurePosixPath(posixpath.commonpath([f.parent.as_posix() for f in files]))
+                plan.decisions.append(SeriesDecision(folder, suffix, code, subject, session, values.get("label", "")))
                 if suffix is None:
                     plan.skipped[code] += 1
                 else:
@@ -209,12 +231,13 @@ def plan_ingest(
             suffix, code = (values["suffix"], MAPPED) if "suffix" in values else suffix_from_text(
                 _NIFTI_EXTENSION.sub("", path.name)
             )
-            if suffix is None:
-                plan.skipped[code] += 1
-                continue
             # without a mapped participant, one participant per file, from a keyed hash of its path
             subject = values.get("participant") or pseudonymize_label(relative.as_posix(), "subject", key)
             session = values.get("session") or None
+            plan.decisions.append(SeriesDecision(relative, suffix, code, subject, session, values.get("label", "")))
+            if suffix is None:
+                plan.skipped[code] += 1
+                continue
             groups.setdefault((subject, session), []).append((path, suffix))
             place(subject, session, values)
         plan.entries = [(subject, session, group) for (subject, session), group in groups.items()]

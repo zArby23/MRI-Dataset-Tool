@@ -81,7 +81,8 @@ remuestreo a un espaciado menor o la salida en `float32` de entradas `int16` pue
 entrada. Si el espacio libre no se puede leer, no hay aviso. `dataset report` y `dataset export-ml` escriben
 archivos pequeños y no avisan.
 
-La CLI **nunca sobrescribe**: si una salida ya existe termina con código 1; bórrela o elija otra carpeta.
+La CLI **nunca sobrescribe**: si una salida ya existe termina con código 1; bórrela o elija otra carpeta. La
+única excepción es la carpeta `--output-dir` de `dataset build`: una carpeta existente y vacía se usa (sección 5).
 
 ## 3. Opciones globales y códigos de salida
 
@@ -293,7 +294,10 @@ mri-dataset dataset report DATASET OUT
 
 - `build`: lee `IN` (BIDS por defecto; con `--format dicom` un árbol DICOM y con `--format nifti` NIfTI sueltos),
   aplica `CFG` (debe incluir `anonymize`; requiere `MRI_ANON_KEY`) y escribe
-  `OUT/dataset` (BIDS con seudónimos) y `OUT/report`. `OUT` debe ser nueva y estar fuera de `IN`. Con `--classes`
+  `OUT/dataset` (BIDS con seudónimos) y `OUT/report`. `OUT` debe estar fuera de `IN` y ser nueva o una carpeta
+  **vacía** (sin ningún archivo ni carpeta, ocultos incluidos); una `OUT` con contenido termina con código 1 sin
+  tocar nada (`Output directory already exists; choose a new one.`), también si algo aparece en ella entre la
+  validación y la escritura. Con `--classes`
   escribe la plantilla de etiquetas; `--corrections` (exige `--classes`) las asigna. Si quedan completas se cierran
   y se escriben los exportes para ML; si no, se avisa con `WARNING LABELS_INCOMPLETE` y se omiten salvo
   `--allow-unfinalized`.
@@ -395,6 +399,7 @@ pipeline:
 | `error: Invalid arguments (see --help).` | Falta un argumento, sobra uno o tiene un valor no admitido; el valor no se repite por privacidad. Revise con `--help`. |
 | `WARNING UNMAPPED_SERIES: {...}` | Series sin sufijo seguro (localizadores, mapas derivados, nombres ambiguos...): se omiten. Fuerce el sufijo con `--mapping` si corresponde (`docs/dataset/ingest.md`). |
 | `WARNING MAPPING_UNUSED: n` | Filas de `--mapping` que no aplican a ninguna serie (p. ej. una carpeta sin DICOM). |
+| `WARNING MISSING_PATIENT_ID: n` | Estudios DICOM con algún archivo sin `PatientID` y sin participante en `--mapping`: cada uno queda como un participante propio y el paciente puede partirse. Use una fila con la carpeta del estudio. |
 | `Mapping paths not found in the input: N.` | `path` de la tabla que no existe en la entrada (relativo a `IN`, con `/`). |
 | `Invalid --mapping.` | Cabecera, columnas, `path`, ids o sufijo inválidos en la tabla. |
 | `Mapping labels need --classes.` / `Mapping label is not one of --classes.` | La columna `label` exige `--classes` y una de esas clases. |

@@ -16,7 +16,7 @@ python scripts/run_stage4_dataset.py <dataset_root> --output-dir E:/mri/stage4 `
 |---|---|---|
 | `dataset_root` | `data/raw/bids_test_studies` | BIDS de entrada, leído con `BIDSBatchReader(lazy=True)` |
 | `--output-dir` | obligatorio | Directorio **nuevo**; si ya existe, código 1. Si la salida estimada (el tamaño de la entrada) alcanza el 90 % del espacio libre del disco de salida sale `WARNING INSUFFICIENT_DISK_SPACE` (no bloquea) |
-| `--config` | `config/stage3_bids.yaml` | Configuración de la corrida (pasos del pipeline). **Debe incluir el paso `anonymize`**: si no, «The pipeline must include the anonymize step.» y código 2 antes de crear nada (QA4-01) |
+| `--config` | `config/stage3_bids.yaml` | Configuración de la corrida (pasos del pipeline). **Debe incluir el paso `anonymize`**: si no, «The pipeline must include the anonymize step.» y código 2 antes de crear nada |
 | `--classes NAME[=DESCRIPCIÓN] ...` | — | Clases de las etiquetas; escribe la plantilla (`write_label_template`, todas las sesiones sin etiquetar) |
 | `--corrections` | — | TSV con las columnas de `labels.tsv`; se aplica con `apply_label_corrections`. Exige `--classes` |
 | `--ratios TRAIN VAL TEST` | `0.7 0.15 0.15` | Proporciones de las particiones |
@@ -50,7 +50,7 @@ salidas parciales en `--output-dir` y la corrida siguiente con el mismo director
 («Output directory already exists»): **borrar `--output-dir` antes de reintentar**. `--output-dir` dentro
 de `dataset_root` (o igual) se rechaza antes de crear nada, con código 2.
 
-## Conteos de la consola (QA4-11)
+## Conteos de la consola
 
 Cada `on_error` se cuenta aparte y por tipo de excepción:
 
@@ -60,7 +60,7 @@ Cada `on_error` se cuenta aparte y por tipo de excepción:
 | `Input files skipped by the reader` | Archivos de la entrada que el lector omite (no NIfTI legibles: punteros de git-annex, archivos truncados); no son errores de exportación |
 | `Report read errors` | Archivos del dataset ya escrito que el reporte no pudo leer |
 
-`--classes` con un nombre repetido (`A=uno A=dos`) se rechaza como `Invalid --classes.` (código 2, QA4-10).
+`--classes` con un nombre repetido (`A=uno A=dos`) se rechaza como `Invalid --classes.` (código 2).
 
 ## Códigos de salida
 

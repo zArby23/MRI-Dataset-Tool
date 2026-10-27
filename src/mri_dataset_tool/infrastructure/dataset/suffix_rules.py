@@ -11,15 +11,16 @@ import re
 MATCHED, NO_MATCH, AMBIGUOUS, EXCLUDED = "MATCHED", "NO_MATCH", "AMBIGUOUS", "EXCLUDED"
 
 # Words whose series cannot be told apart safely, so they are never mapped: localizers, derived
-# maps, contrast-enhanced and subtraction images, dark-fluid (FLAIR-like) and gradient-echo (T2*-like)
-# sequences named "T2", quantitative maps, dynamic/perfusion, angiography, functional and multi-image ones.
+# maps and reformats, contrast-enhanced and subtraction images, dark-fluid/STIR (FLAIR-like) and gradient-echo
+# (T2*-like) sequences named "T2", quantitative maps, dynamic/perfusion, angiography, functional and multi-image ones.
 EXCLUDED_WORDS = frozenset({
     "localizer", "localiser", "scout", "survey", "loc",
-    "adc", "fa", "trace", "tracew", "colfa", "exp", "tensor", "dixon", "mpr", "mip", "reformat", "subtraction",
+    "adc", "fa", "trace", "tracew", "colfa", "exp", "tensor", "dixon", "mpr", "mip", "reformat", "reformatted",
+    "subtraction", "nd", "desc", "preproc",
     "c", "km", "mdc", "ce",
-    "dark", "darkfluid", "tirm",
+    "dark", "darkfluid", "tirm", "stir",
     "gre", "ffe", "fl2d", "fl3d", "medic", "merge",
-    "map", "mapping", "molli", "dyn", "dynamic", "perf", "twist",
+    "map", "mapping", "relaxometry", "molli", "dyn", "dynamic", "perf", "twist",
     "perfusion", "dsc", "dce", "asl", "swi", "mra", "tof",
     "bold", "fmri", "rest", "resting",
     "mp2rage", "inv1", "inv2", "uni",
@@ -37,7 +38,8 @@ SUFFIX_WORDS = {
 }
 
 _WORD = re.compile(r"[a-z0-9]+")
-_T2_STAR = re.compile(r"t2\s*\*")
+_T2_STAR = re.compile(r"t2\s*\*|t2[\s_-]*star")  # "t2*", "T2 STAR", "T2_STAR"
+_DARK_FLUID = re.compile(r"(?<![a-z0-9])da[-_]?fl(?![a-z0-9])")  # Siemens SPACE dark-fluid, "da-fl"
 
 
 def suffix_from_text(*texts: str | None, exclude_sub: bool = False) -> tuple[str | None, str]:
@@ -51,6 +53,7 @@ def suffix_from_text(*texts: str | None, exclude_sub: bool = False) -> tuple[str
         words & EXCLUDED_WORDS
         or any(part in word for word in words for part in EXCLUDED_PARTS)
         or (exclude_sub and "sub" in words)
+        or _DARK_FLUID.search(text)
     ):
         return None, EXCLUDED
     found = {suffix for suffix, keys in SUFFIX_WORDS.items() if words & keys}

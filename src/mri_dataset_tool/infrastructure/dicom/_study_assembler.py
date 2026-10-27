@@ -1,9 +1,12 @@
-from collections.abc import Iterable
+from collections.abc import Iterable, Iterator
+import threading
+from contextlib import contextmanager
 from dataclasses import dataclass, field
 from pathlib import Path
 from typing import Any
 
 import pydicom
+import pydicom.config
 from pydicom.dataset import Dataset
 
 from mri_dataset_tool.domain.models.serie import MRISeries
@@ -45,20 +48,50 @@ class _SeriesAccumulator:
     files: list[Path] = field(default_factory=list)
 
 
+_quiet_lock = threading.Lock()
+_quiet_depth = 0
+_quiet_previous: int | None = None
+
+
+@contextmanager
+def quiet_value_validation() -> Iterator[None]:
+    """Skip pydicom's value validation while reading: its warnings quote the value
+    (a non-conformant UID) on stderr and the ``pydicom`` logger. It only warns, so the files
+    accepted or rejected are the same. Wrap the read and every element access.
+
+    The setting is process-wide: the first thread to enter sets it and the last to leave restores it,
+    so overlapping reads (nested or in other threads) never restore it early."""
+    global _quiet_depth, _quiet_previous
+    settings = pydicom.config.settings
+    with _quiet_lock:
+        if _quiet_depth == 0:
+            _quiet_previous = settings.reading_validation_mode
+            settings.reading_validation_mode = pydicom.config.IGNORE
+        _quiet_depth += 1
+    try:
+        yield
+    finally:
+        with _quiet_lock:
+            _quiet_depth -= 1
+            if _quiet_depth == 0:
+                settings.reading_validation_mode = _quiet_previous
+
+
 def read_dicom_header(path: Path) -> DICOMInstanceHeader:
     """Read only the DICOM header elements required by the readers."""
-    dataset = pydicom.dcmread(
-        path,
-        stop_before_pixels=True,
-        specific_tags=DICOM_HEADER_TAGS,
-    )
-    return DICOMInstanceHeader(
-        path=path,
-        study_uid=_as_optional_str(dataset.get("StudyInstanceUID")),
-        series_uid=_as_optional_str(dataset.get("SeriesInstanceUID")),
-        modality=_as_optional_str(dataset.get("Modality")),
-        metadata=extract_series_metadata(dataset),
-    )
+    with quiet_value_validation():
+        dataset = pydicom.dcmread(
+            path,
+            stop_before_pixels=True,
+            specific_tags=DICOM_HEADER_TAGS,
+        )
+        return DICOMInstanceHeader(
+            path=path,
+            study_uid=_as_optional_str(dataset.get("StudyInstanceUID")),
+            series_uid=_as_optional_str(dataset.get("SeriesInstanceUID")),
+            modality=_as_optional_str(dataset.get("Modality")),
+            metadata=extract_series_metadata(dataset),
+        )
 
 
 def extract_series_metadata(dataset: Dataset) -> dict[str, Any]:
