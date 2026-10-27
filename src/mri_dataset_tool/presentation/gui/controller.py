@@ -38,6 +38,7 @@ from mri_dataset_tool.application.services.inputs import (
     check_input_paths,
     check_split_params,
     is_valid_folder_name,
+    new_folders_valid,
     project_config_dir,
     with_memory_consent,
 )
@@ -162,6 +163,8 @@ class Controller:
             output = output / new_folder
             if output.exists():
                 return Check("FOLDER_NAME_EXISTS")
+        if not new_folders_valid(output):
+            return Check("INVALID_OUTPUT_PATH")
         check, _ = _check(lambda: check_input_paths(source, output))
         if check.code == "OUTPUT_EXISTS" and not new_folder:
             return Check("OUTPUT_NOT_EMPTY")
@@ -303,6 +306,8 @@ class Controller:
             write_mapping(self.state.mapping, Path(path), self.state.input_dir, self.state.classes)
         except FileExistsError:
             return Check("MAPPING_FILE_EXISTS")
+        except OSError:  # a folder, a missing parent, a read-only drive (QA7-03)
+            return Check("MAPPING_FILE_UNWRITABLE")
         except InvalidBuildInput as error:
             code, values = messages.invalid_input(error)
             return Check(code, values)

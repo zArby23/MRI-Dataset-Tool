@@ -16,7 +16,7 @@ from mri_dataset_tool.infrastructure.nifti.reader import is_nifti_file
 
 __all__ = [
     "DEFAULT_CONFIG_DIR", "DEFAULT_RATIOS", "DEFAULT_SEED", "KEY_ENV_VAR", "MEMORY_STEPS", "check_input_paths",
-    "check_split_params", "is_nifti_file", "is_valid_folder_name", "load_config", "load_key", "project_config_dir",
+    "check_split_params", "is_nifti_file", "is_valid_folder_name", "load_config", "load_key", "new_folders_valid", "project_config_dir",
     "with_memory_consent",
 ]
 
@@ -25,16 +25,29 @@ MEMORY_STEPS = ("resample", "normalize")
 
 
 _INVALID_NAME_CHARS = re.compile(r'[<>:"/\\|?*\x00-\x1f]')
+MAX_NAME_BYTES = 255  # file-name limit of ext4 (bytes) and NTFS (characters)
 _RESERVED_NAMES = {"CON", "PRN", "AUX", "NUL", *(f"{p}{n}" for p in ("COM", "LPT") for n in range(1, 10))}
 
 
 def is_valid_folder_name(name: str) -> bool:
     """A plain folder name valid on Windows and Linux: no separators, ``..``, characters invalid on
-    Windows, trailing dot or space, or reserved device name (``CON``, ``COM1``...)."""
+    Windows, trailing dot or space, reserved device name (``CON``, ``COM1``...) or more than 255 bytes."""
     return (
         bool(name) and name not in (".", "..") and not _INVALID_NAME_CHARS.search(name)
         and not name.endswith((".", " ")) and name.split(".")[0].upper() not in _RESERVED_NAMES
+        and len(name.encode("utf-8", "surrogatepass")) <= MAX_NAME_BYTES
     )
+
+
+def new_folders_valid(path: Path) -> bool:
+    """True if every folder of *path* that does not exist yet (the ones a run creates) has a valid name and
+    the drive exists: else it would fail only at the run (QA7-02: ``E:/o/a:b`` names an NTFS stream,
+    ``a:b`` a drive that is not there, a name too long)."""
+    while not path.exists() and path.name:
+        if not is_valid_folder_name(path.name):
+            return False
+        path = path.parent
+    return path.exists()
 
 
 def project_config_dir() -> Path:

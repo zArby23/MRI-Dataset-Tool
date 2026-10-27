@@ -239,12 +239,21 @@ def test_output_new_empty_or_with_content(project):
     assert controller.set_input("in", "bids", "taken").code == "OUTPUT_NOT_EMPTY"  # never mixed with notes.txt
     assert controller.set_input("in", "bids", "taken", "run1").ok
     assert controller.state.output_dir == Path("taken") / "run1" and not (project / "taken" / "run1").exists()
-    for name in ("a/b", "..", "x.", "CON", "a:b"):
+    for name in ("a/b", "..", "x.", "CON", "a:b", "y" * 256):
         assert controller.set_input("in", "bids", "taken", name).code == "INVALID_FOLDER_NAME"
     (project / "taken" / "run2").mkdir()  # even empty: the name must be new
     assert controller.set_input("in", "bids", "taken", "run2").code == "FOLDER_NAME_EXISTS"
     assert controller.set_input("in", "bids", "taken", "notes.txt").code == "FOLDER_NAME_EXISTS"
     assert [p.name for p in (project / "taken").iterdir()] == ["notes.txt", "run2"]
+
+
+def test_an_output_path_that_could_only_fail_at_the_run_is_refused(project):
+    """QA7-02: a new folder of the path with an invalid name or on a missing drive, caught in step 1."""
+    controller = Controller()
+    for output in ("new/a:b", "new/" + "y" * 256, "new/CON/x", "new/x./y"):
+        assert controller.set_input("in", "bids", output).code == "INVALID_OUTPUT_PATH"
+    assert controller.set_input("in", "bids", "new/deeper/run").ok
+    assert not (project / "new").exists()
 
 
 def test_an_output_with_only_a_hidden_file_is_not_used(project):

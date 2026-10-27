@@ -65,6 +65,10 @@ CATALOG: dict[str, dict[str, str]] = {
             "espacio al final."
         ),
         "FOLDER_NAME_EXISTS": "Ya existe una carpeta o un archivo con ese nombre; elija otro.",
+        "INVALID_OUTPUT_PATH": (
+            "La ruta de salida no se puede crear: una carpeta nueva de la ruta tiene un nombre no válido (sin / \\ "
+            ": * ? \" < > |, sin punto ni espacio al final, de 255 bytes como máximo)."
+        ),
         # step 2: configuration
         "CONFIG_FILE": "Archivo de configuración (preajuste o propio)",
         "MEMORY_TITLE": "Uso de memoria",
@@ -116,6 +120,10 @@ CATALOG: dict[str, dict[str, str]] = {
         "MAPPING_SAVED": "Tabla guardada.",
         "MAPPING_LOADED": "Tabla cargada: pulse «Vista previa».",
         "MAPPING_FILE_EXISTS": "El archivo ya existe; elija otro nombre.",
+        "MAPPING_FILE_UNWRITABLE": (
+            "No se pudo escribir el archivo (¿una carpeta, una carpeta que no existe o un disco de solo lectura?); "
+            "elija otro."
+        ),
         "SHARED_SERIES_FOLDER": (
             "Varias series comparten esta carpeta: el sufijo no se puede fijar desde aquí (use un archivo de tabla)."
         ),
@@ -335,6 +343,10 @@ CATALOG: dict[str, dict[str, str]] = {
             "trailing dot or space."
         ),
         "FOLDER_NAME_EXISTS": "A folder or file with that name already exists; choose another.",
+        "INVALID_OUTPUT_PATH": (
+            "The output path cannot be created: a new folder in the path has an invalid name (without / \\ : * ? "
+            "\" < > |, without a trailing dot or space, 255 bytes at most)."
+        ),
         # step 2: configuration
         "CONFIG_FILE": "Configuration file (preset or your own)",
         "MEMORY_TITLE": "Memory use",
@@ -386,6 +398,9 @@ CATALOG: dict[str, dict[str, str]] = {
         "MAPPING_SAVED": "Table saved.",
         "MAPPING_LOADED": "Table loaded: press \"Preview\".",
         "MAPPING_FILE_EXISTS": "The file already exists; choose another name.",
+        "MAPPING_FILE_UNWRITABLE": (
+            "The file could not be written (a folder, a missing folder or a read-only drive?); choose another."
+        ),
         "SHARED_SERIES_FOLDER": (
             "Several series share this folder: the suffix cannot be set from here (use a table file)."
         ),

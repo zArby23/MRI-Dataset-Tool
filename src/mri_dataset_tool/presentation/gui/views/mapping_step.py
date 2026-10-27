@@ -64,7 +64,11 @@ class MappingStep(StepView):
         shown = (id(self.controller.state.preview), self.controller.language)
         if shown == self._shown:
             return
-        self._shown = shown
+        same_preview, self._shown = self._shown is not None and self._shown[0] == shown[0], shown
+        if same_preview:  # only the language changed: the cells keep the pending edits (QA7-04)
+            for index, row in enumerate(self.controller.state.preview):
+                self.tree.set(str(index), "code", self.controller.text(f"CODE_{row.code}"))
+            return
         self.tree.delete(*self.tree.get_children())
         for index, row in enumerate(self.controller.state.preview):
             self.tree.insert("", "end", iid=str(index), values=(

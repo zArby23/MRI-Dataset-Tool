@@ -1,6 +1,7 @@
 """``inputs``: what the presentation layers take from the infrastructure (Q8 of stage 5B)."""
 
 import ast
+import os
 from pathlib import Path
 
 import pytest
@@ -10,6 +11,7 @@ from mri_dataset_tool.application.services.dataset_build import InvalidBuildInpu
 from mri_dataset_tool.application.services.inputs import (
     check_input_paths,
     is_valid_folder_name,
+    new_folders_valid,
     with_memory_consent,
 )
 
@@ -67,14 +69,24 @@ def test_valid_input_paths_create_nothing(tmp_path):
     assert not (tmp_path / "out").exists()
 
 
-@pytest.mark.parametrize("name", ["run1", "my run", "ok.v2", "café", "dataset-2026_10"])
+@pytest.mark.parametrize("name", ["run1", "my run", "ok.v2", "café", "dataset-2026_10", "y" * 255, "ñ" * 127])
 def test_valid_folder_names(name):
     assert is_valid_folder_name(name)
 
 
 @pytest.mark.parametrize(
     "name", ["", ".", "..", "a/b", "a\\b", "a:b", "a*b", 'a"b', "a<b", "a|b", "a?b", "x.", "x ", "CON", "con.txt",
-             "Com1", "LPT9", "a\x01b", "\x00"],
+             "Com1", "LPT9", "a\x01b", "\x00", "y" * 256, "ñ" * 128],  # 255 bytes at most (QA7-02)
 )
 def test_invalid_folder_names(name):
     assert not is_valid_folder_name(name)
+
+
+def test_new_folders_of_an_output_path(tmp_path):
+    """QA7-02: only the folders a run would create are judged, and the drive must exist."""
+    assert new_folders_valid(tmp_path / "x" / "y") and new_folders_valid(tmp_path)
+    assert not new_folders_valid(tmp_path / "x" / ("y" * 256))
+    assert not new_folders_valid(tmp_path / "x" / "CON" / "y")
+    if os.name == "nt":
+        assert not new_folders_valid(Path(f"{tmp_path}/x/a:b"))  # an NTFS stream
+        assert not new_folders_valid(Path("a:b"))  # drive A:, relative: a drive that is not there

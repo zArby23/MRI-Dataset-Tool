@@ -73,7 +73,14 @@ principal al llegar el `Done`. Cada tarea puede pasar su clasificador de excepci
 classify)`): en el paso 6, `FileExistsError` es «exporte o reporte existente», no «salida existente».
 
 `App.report_callback_exception` registra solo el tipo de una excepción en un callback de Tk y la muestra como
-`UNEXPECTED(tipo)` en la barra inferior: nunca su mensaje ni su traceback.
+`UNEXPECTED(tipo)` en la barra inferior: nunca su mensaje ni su traceback. Si `on_event` de una vista lanza, `_poll`
+lo reporta así y sigue con los eventos siguientes, y el próximo sondeo se programa en un `finally` (QA7-01): la
+cola nunca deja de drenarse, así que `busy` no queda en `True` para siempre.
+
+Rutas: el controlador usa `Path(texto)` sin `resolve`, igual que la CLI; una ruta relativa escrita a mano se
+resuelve contra la carpeta actual del proceso (QA7-06, documentado en el manual). En el paso 1,
+`new_folders_valid` (fachada `inputs`) exige que cada carpeta de la salida que aún no existe tenga un nombre válido
+(`is_valid_folder_name`, ≤ 255 bytes) y que la unidad exista (`INVALID_OUTPUT_PATH`, QA7-02).
 
 ## Mensajes
 
@@ -100,6 +107,9 @@ infraestructura que llaman: todo mensaje fijo debe tener código o estar en una 
 ## Rendimiento
 
 - Un estudio en memoria a la vez: la ejecución usa `build_dataset` como la CLI.
+- La vista previa (`preview_ingest`) y la ejecución (`plan_ingest` dentro de la tarea) leen cada una todas las
+  cabeceras: con árboles DICOM muy grandes cada una puede pasar de 15 minutos (QA7-08), con progreso indeterminado
+  y sin cancelación.
 - La tabla de etiquetas se reconstruye solo cuando cambian sus filas, ediciones, filtro o idioma
   (`label_version`); con miles de pares cada acción recorre el árbol del dataset (`dataset_pairs`, ~2 s con 3000
   pares en Windows) y corre en el trabajador.

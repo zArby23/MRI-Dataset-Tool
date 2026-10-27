@@ -88,12 +88,17 @@ class App(tk.Tk):
         self.refresh()
 
     def _poll(self) -> None:
-        events = self.controller.poll()
-        for event in events:
-            self.views[self.controller.step].on_event(event)
-        if events:
-            self.refresh()
-        self.after(POLL_MS, self._poll)
+        try:
+            events = self.controller.poll()
+            for event in events:
+                try:
+                    self.views[self.controller.step].on_event(event)
+                except Exception as error:  # one failing event must not hide the next ones (QA7-01)
+                    self.report_callback_exception(type(error), error, error.__traceback__)
+            if events:
+                self.refresh()
+        finally:  # never stop polling: else busy stays True for good (QA7-01)
+            self.after(POLL_MS, self._poll)
 
     def report_callback_exception(self, exc, val, tb) -> None:
         """A callback raised: log and show only its type (the message or traceback may name a file)."""

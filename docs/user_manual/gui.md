@@ -76,8 +76,13 @@ en un paso invalida ese paso y los siguientes. Con una entrada BIDS no hay paso 
   carpeta, ocultos incluidos). El selector de carpetas a veces la crea vacía: eso está bien.
   - Si la carpeta elegida **tiene contenido**, no se usa ni se sobrescribe: aparece el campo **«Nombre de la
     carpeta nueva»** y la salida pasa a ser `<carpeta elegida>/<nombre>`. El nombre debe ser simple (sin `/ \ :
-    * ? " < > |`, sin `..`, sin punto ni espacio al final, y no un nombre reservado de Windows como `CON`) y no
-    existir todavía.
+    * ? " < > |`, sin `..`, sin punto ni espacio al final, de 255 bytes como máximo, y no un nombre reservado de
+    Windows como `CON`) y no existir todavía.
+  - Las carpetas de la ruta de salida que todavía no existen siguen las mismas reglas, y la unidad debe existir:
+    si no, «La ruta de salida no se puede crear» (`INVALID_OUTPUT_PATH`) aquí, no al ejecutar.
+- **Rutas escritas a mano**: el selector siempre da rutas absolutas. Una ruta relativa escrita a mano (entrada,
+  salida o carpeta del reporte del paso 6) se resuelve contra la **carpeta actual del proceso**, que en un acceso
+  directo o en un ejecutable puede ser cualquiera: use rutas absolutas o el botón del selector.
 - **Validar** comprueba todo (con las mismas reglas que la CLI) sin crear nada y luego estima el espacio en
   disco: si la salida estimada (el tamaño de la entrada) alcanza el 90 % del espacio libre del disco de salida,
   muestra un aviso. Es solo un aviso: la ejecución no se bloquea.
@@ -120,7 +125,10 @@ son seudónimos. Las reglas de sufijo son las de `docs/dataset/ingest.md`.
   aplica a la serie; participante, sesión y etiqueta a **todo el estudio**.
 - **Asignar etiqueta a la selección**: seleccione varias filas (Ctrl o Mayús), elija la clase y pulse el botón.
 - **Cargar tabla… / Guardar tabla…**: el mismo TSV que `--mapping` de la CLI (`path participant session suffix
-  label`). Guardar nunca sobrescribe un archivo existente.
+  label`). Guardar nunca sobrescribe un archivo existente; si no se puede escribir (una carpeta, una carpeta que
+  no existe, un disco de solo lectura) se pide otro (`MAPPING_FILE_UNWRITABLE`).
+- **Duración**: con árboles DICOM muy grandes (decenas de miles de archivos), la vista previa puede tardar **más
+  de 15 minutos**; la barra de progreso no indica cuánto falta y la tarea no se puede cancelar. Déjela terminar.
 - Después de cualquier cambio pulse **Vista previa** otra vez: sin una vista previa válida no se puede seguir.
 - Si los nombres no indican el sufijo (p. ej. NIfTI con nombres neutros como `scan_01.nii.gz`), la primera vista
   previa sin tabla termina con «Ninguna serie de la entrada tiene un sufijo BIDS» (`NO_MAPPED_SERIES`): **cargue
@@ -129,7 +137,8 @@ son seudónimos. Las reglas de sufijo son las de `docs/dataset/ingest.md`.
 ### Paso 4: Ejecución
 
 **Ejecutar** construye `<salida>/dataset` (BIDS anonimizado) y `<salida>/report` en segundo plano: la ventana
-sigue respondiendo, pero **la tarea no se puede cancelar**. Se ven las etapas con sus cifras, los avisos fijos
+sigue respondiendo, pero **la tarea no se puede cancelar**. Con DICOM y NIfTI vuelve a leer todas las cabeceras
+antes de convertir: con árboles DICOM muy grandes puede tardar **más de 15 minutos** (más la conversión). Se ven las etapas con sus cifras, los avisos fijos
 (`UNMAPPED_SERIES`, `NOT_4D_DWI`, `MAPPING_UNUSED`, `MISSING_PATIENT_ID`, `LABELS_INCOMPLETE`) y, al terminar, los
 errores por tipo, los archivos omitidos por el lector y los errores de lectura del reporte. Un estudio que falla
 (p. ej. un volumen con NaN) se cuenta y el lote sigue. Si las etiquetas quedan completas (o no hay clases) se
@@ -183,6 +192,8 @@ incompleta; vacíe o borre la carpeta de salida antes de reintentar.**
 | Mensaje (código) | Qué hacer |
 |---|---|
 | La carpeta de salida tiene contenido (`OUTPUT_NOT_EMPTY`) | Escriba el nombre de una carpeta nueva o elija otra carpeta. |
+| La ruta de salida no se puede crear (`INVALID_OUTPUT_PATH`) | Una carpeta nueva de la ruta tiene un nombre no válido (`:`, demasiado largo, `CON`…) o la unidad no existe: corríjala. |
+| No se pudo escribir el archivo (`MAPPING_FILE_UNWRITABLE`) | Al guardar la tabla del paso 3: elija un archivo en una carpeta que exista y se pueda escribir. |
 | La salida ya existe (`OUTPUT_EXISTS`) | La carpeta se llenó después del paso 1: elija otra. |
 | La carpeta de salida debe estar fuera de la entrada (`OUTPUT_INSIDE_INPUT`) | Elija una salida fuera de la entrada. |
 | No se encuentra el archivo de configuración / Configuración no válida (`CONFIG_NOT_FOUND`, `INVALID_CONFIG`) | Revise el archivo o use el preajuste. |
@@ -201,8 +212,10 @@ incompleta; vacíe o borre la carpeta de salida antes de reintentar.**
 ## 6. Límites conocidos
 
 - La configuración se lee de la raíz del proyecto; la CLI, de la carpeta actual (sección 2).
-- La vista previa del paso 3 vuelve a leer todas las cabeceras: con árboles DICOM grandes (decenas de miles de
-  archivos) tarda minutos.
+- La vista previa del paso 3 y la ejecución del paso 4 leen todas las cabeceras cada una: con árboles DICOM muy
+  grandes (decenas de miles de archivos) cada una puede tardar **más de 15 minutos**, sin indicar cuánto falta y
+  sin cancelación; el trabajo sigue mientras tanto.
+- Las rutas relativas escritas a mano se resuelven contra la carpeta actual del proceso (paso 1).
 - Si un DICOM guarda varias series en una sola carpeta, su sufijo no se puede fijar desde la tabla (tampoco con
   `--mapping`, que trabaja por carpetas).
 - Una ruta de la tabla que empieza por `=` (una carpeta llamada así) se guarda tal cual en el TSV, igual que en la

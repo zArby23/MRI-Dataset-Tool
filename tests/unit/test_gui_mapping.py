@@ -71,6 +71,8 @@ def test_save_and_load_the_table(ready, tmp_path):
     path = tmp_path / "map.tsv"
     assert ready.save_mapping_file(str(path)).ok
     assert ready.save_mapping_file(str(path)).code == "MAPPING_FILE_EXISTS"
+    for unwritable in (tmp_path, tmp_path / "missing" / "map.tsv"):  # QA7-03: a code, never a raw OSError
+        assert ready.save_mapping_file(str(unwritable)).code == "MAPPING_FILE_UNWRITABLE"
     assert not [secret for secret in SECRETS if secret in path.read_text(encoding="utf-8")]  # paths only (D2)
     saved = list(ready.state.mapping)
     ready.state.mapping = []
