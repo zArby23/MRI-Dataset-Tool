@@ -67,7 +67,8 @@ CATALOG: dict[str, dict[str, str]] = {
         "FOLDER_NAME_EXISTS": "Ya existe una carpeta o un archivo con ese nombre; elija otro.",
         "INVALID_OUTPUT_PATH": (
             "La ruta de salida no se puede crear: una carpeta nueva de la ruta tiene un nombre no válido (sin / \\ "
-            ": * ? \" < > |, sin punto ni espacio al final, de 255 bytes como máximo)."
+            ": * ? \" < > |, sin punto ni espacio al final, de 255 bytes como máximo) o la unidad no existe o no es "
+            "accesible."
         ),
         # step 2: configuration
         "CONFIG_FILE": "Archivo de configuración (preajuste o propio)",
@@ -345,7 +346,8 @@ CATALOG: dict[str, dict[str, str]] = {
         "FOLDER_NAME_EXISTS": "A folder or file with that name already exists; choose another.",
         "INVALID_OUTPUT_PATH": (
             "The output path cannot be created: a new folder in the path has an invalid name (without / \\ : * ? "
-            "\" < > |, without a trailing dot or space, 255 bytes at most)."
+            "\" < > |, without a trailing dot or space, 255 bytes at most) or the drive does not exist or is not "
+            "accessible."
         ),
         # step 2: configuration
         "CONFIG_FILE": "Configuration file (preset or your own)",

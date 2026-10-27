@@ -43,7 +43,8 @@ class MappingStep(StepView):
         self._editor: tk.Widget | None = None
         self._message: tuple[str, dict] | None = None  # (code, values) redrawn in the current language
         self._skipped_files = 0
-        self._shown: tuple[int, str] | None = None  # (preview, language) in the table: pending edits survive a redraw
+        # (preview list, language) in the table, compared with `is`: pending edits survive a language change
+        self._shown: tuple[list, str] | None = None
 
     def refresh_texts(self) -> None:
         text = self.controller.text
@@ -61,10 +62,10 @@ class MappingStep(StepView):
         self._fill()
 
     def _fill(self) -> None:
-        shown = (id(self.controller.state.preview), self.controller.language)
-        if shown == self._shown:
+        preview, language = self.controller.state.preview, self.controller.language
+        if self._shown is not None and self._shown[0] is preview and self._shown[1] == language:
             return
-        same_preview, self._shown = self._shown is not None and self._shown[0] == shown[0], shown
+        same_preview, self._shown = self._shown is not None and self._shown[0] is preview, (preview, language)
         if same_preview:  # only the language changed: the cells keep the pending edits (QA7-04)
             for index, row in enumerate(self.controller.state.preview):
                 self.tree.set(str(index), "code", self.controller.text(f"CODE_{row.code}"))

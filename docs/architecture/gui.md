@@ -121,6 +121,7 @@ plantada, DICOM, NIfTI sueltos), equivalencia con la CLI (mismas cifras, mismos 
 reporte iguales byte a byte salvo el XLSX), un fallo por etapa, catálogo y coberturas de mensajes, trabajador
 (eventos, una tarea a la vez, daemon) y humo de Tk con `skip` si no hay pantalla (un `tk.Tk()` vacío decide).
 Pruebas de las fachadas: `test_service_{session_key,inputs,ingest_preview,labels_table,dataset_outputs}.py`.
+Auditoría adversarial QA7: `tests/qa/test_qa7_gui.py` e informe `docs/testing/qa_etapa7.md`.
 
 ## Decisiones de diseño
 

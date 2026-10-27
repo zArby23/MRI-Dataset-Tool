@@ -537,8 +537,8 @@ def test_regenerated_set_through_an_output_junction_resolves(base, key, tmp_path
 
 @pytest.mark.skipif(os.name != "nt", reason="NTFS junctions")
 def test_an_empty_ml_exports_junction_to_another_drive_fails_with_a_code(base, key, tmp_path):
-    if base == tmp_path:
-        pytest.skip("needs E:")
+    if Path(tmp_path).drive.upper() == base.drive.upper():  # e.g. --basetemp on E:: no other drive to point to
+        pytest.skip("tmp_path is on the drive of the output; the junction must point to another drive")
     controller = _finalized(base)
     _task(controller, controller.ml_exports_task(["0.7", "0.15", "0.15"], "0"), controller.export_failure)
     _junction(base / "out" / "ml_exports_2", tmp_path / "elsewhere")

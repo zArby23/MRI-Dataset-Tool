@@ -83,6 +83,8 @@ en un paso invalida ese paso y los siguientes. Con una entrada BIDS no hay paso 
 - **Rutas escritas a mano**: el selector siempre da rutas absolutas. Una ruta relativa escrita a mano (entrada,
   salida o carpeta del reporte del paso 6) se resuelve contra la **carpeta actual del proceso**, que en un acceso
   directo o en un ejecutable puede ser cualquiera: use rutas absolutas o el botón del selector.
+- Límites aceptados: una ruta `\\?\…` escrita a mano se rechaza; una ruta total de más de 260 caracteres en un
+  Windows sin rutas largas habilitadas pasa este paso y falla al ejecutar (`STAGE_FAILED`), igual que en la CLI.
 - **Validar** comprueba todo (con las mismas reglas que la CLI) sin crear nada y luego estima el espacio en
   disco: si la salida estimada (el tamaño de la entrada) alcanza el 90 % del espacio libre del disco de salida,
   muestra un aviso. Es solo un aviso: la ejecución no se bloquea.
@@ -137,8 +139,9 @@ son seudónimos. Las reglas de sufijo son las de `docs/dataset/ingest.md`.
 ### Paso 4: Ejecución
 
 **Ejecutar** construye `<salida>/dataset` (BIDS anonimizado) y `<salida>/report` en segundo plano: la ventana
-sigue respondiendo, pero **la tarea no se puede cancelar**. Con DICOM y NIfTI vuelve a leer todas las cabeceras
-antes de convertir: con árboles DICOM muy grandes puede tardar **más de 15 minutos** (más la conversión). Se ven las etapas con sus cifras, los avisos fijos
+sigue respondiendo, pero **la tarea no se puede cancelar**. Con DICOM y NIfTI vuelve a leer todas las
+cabeceras antes de convertir: con árboles DICOM muy grandes puede tardar **más de 15 minutos** (más la
+conversión). Se ven las etapas con sus cifras, los avisos fijos
 (`UNMAPPED_SERIES`, `NOT_4D_DWI`, `MAPPING_UNUSED`, `MISSING_PATIENT_ID`, `LABELS_INCOMPLETE`) y, al terminar, los
 errores por tipo, los archivos omitidos por el lector y los errores de lectura del reporte. Un estudio que falla
 (p. ej. un volumen con NaN) se cuenta y el lote sigue. Si las etiquetas quedan completas (o no hay clases) se
