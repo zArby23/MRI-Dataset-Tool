@@ -1,4 +1,4 @@
-"""``inputs``: what the presentation layers take from the infrastructure (Q8 of stage 5B)."""
+"""``inputs``: what the presentation layers take from the infrastructure."""
 
 import ast
 import os
@@ -26,7 +26,7 @@ def test_presentation_imports_no_infrastructure_but_inspect():
                 [alias.name for alias in node.names] if isinstance(node, ast.Import) else [])
             if any(name.startswith("mri_dataset_tool.infrastructure") for name in names):
                 offenders.append(path.relative_to(PRESENTATION).as_posix())
-    assert sorted(set(offenders)) == ["cli/commands/inspect.py"]  # known debt (D4)
+    assert sorted(set(offenders)) == ["cli/commands/inspect.py"]  # known debt
 
 
 def test_memory_consent_is_set_only_in_resample_and_normalize(monkeypatch):
@@ -76,14 +76,14 @@ def test_valid_folder_names(name):
 
 @pytest.mark.parametrize(
     "name", ["", ".", "..", "a/b", "a\\b", "a:b", "a*b", 'a"b', "a<b", "a|b", "a?b", "x.", "x ", "CON", "con.txt",
-             "Com1", "LPT9", "a\x01b", "\x00", "y" * 256, "ñ" * 128],  # 255 bytes at most (QA7-02)
+             "Com1", "LPT9", "a\x01b", "\x00", "y" * 256, "ñ" * 128],  # 255 bytes at most
 )
 def test_invalid_folder_names(name):
     assert not is_valid_folder_name(name)
 
 
 def test_new_folders_of_an_output_path(tmp_path):
-    """QA7-02: only the folders a run would create are judged, and the drive must exist."""
+    """Only the folders a run would create are judged, and the drive must exist."""
     assert new_folders_valid(tmp_path / "x" / "y") and new_folders_valid(tmp_path)
     assert not new_folders_valid(tmp_path / "x" / ("y" * 256))
     assert not new_folders_valid(tmp_path / "x" / "CON" / "y")

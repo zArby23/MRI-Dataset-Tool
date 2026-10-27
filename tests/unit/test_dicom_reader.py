@@ -65,7 +65,7 @@ def test_load_study_groups_dicom_instances_and_extracts_series_metadata(
     }
 
 
-def test_quiet_value_validation_restores_the_pydicom_setting():  # QA6-01
+def test_quiet_value_validation_restores_the_pydicom_setting():
     before = pydicom.config.settings.reading_validation_mode
     with pytest.raises(RuntimeError):
         with quiet_value_validation():

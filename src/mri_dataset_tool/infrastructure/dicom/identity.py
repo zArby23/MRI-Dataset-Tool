@@ -27,7 +27,7 @@ IDENTITY_TAGS = ["StudyInstanceUID", "SeriesInstanceUID", "Modality", "PatientID
 class DicomIdentities:
     subject_by_study: dict[str, str]  # study UID -> 16-hex participant pseudonym
     suffix_by_series: dict[str, tuple[str | None, str]]  # series UID -> (suffix, code)
-    missing_patient_id: frozenset[str] = frozenset()  # study UIDs with a file without PatientID (QA6-06)
+    missing_patient_id: frozenset[str] = frozenset()  # study UIDs with a file without PatientID
 
 
 def _text(value) -> str:

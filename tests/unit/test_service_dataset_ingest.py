@@ -260,7 +260,7 @@ def test_the_key_is_read_from_the_environment_when_not_given(tmp_path, monkeypat
     assert plan.entries[0][1] == pseudonymize_label("PAT12345", "subject", KEY_BYTES)
 
 
-def test_studies_without_patient_id_are_counted_unless_mapped(tmp_path):  # QA6-06
+def test_studies_without_patient_id_are_counted_unless_mapped(tmp_path):
     root = dicom_tree(tmp_path / "in")
     write_synthetic_series(root / "b" / "t2", StudyInstanceUID=STUDY_B, SeriesInstanceUID=f"{STUDY_B}.2",
                            SeriesDescription="T2 TSE", PatientID="")

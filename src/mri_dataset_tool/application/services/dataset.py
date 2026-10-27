@@ -114,7 +114,7 @@ def write_ml_exports(
     current table) unless *allow_unfinalized* is true; otherwise
     ``ValueError("Labels are not finalized.")`` before writing anything. ``splits.json`` records it.
 
-    *output_dir*: write the four files into that folder instead of the root (a regenerated set, G7b), with
+    *output_dir*: write the four files into that folder instead of the root (a regenerated set), with
     each ``image`` relative to it (``../dataset/...``). Before reading anything it must be new or empty
     (``FileExistsError``), outside the dataset and on its drive (``ValueError``); it is created. The
     files at the root are never touched. ``None`` = the root, exactly as before.

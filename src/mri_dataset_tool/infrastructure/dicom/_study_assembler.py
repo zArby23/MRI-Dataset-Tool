@@ -55,7 +55,7 @@ _quiet_previous: int | None = None
 
 @contextmanager
 def quiet_value_validation() -> Iterator[None]:
-    """Skip pydicom's value validation while reading (QA6-01): its warnings quote the value
+    """Skip pydicom's value validation while reading: its warnings quote the value
     (a non-conformant UID) on stderr and the ``pydicom`` logger. It only warns, so the files
     accepted or rejected are the same. Wrap the read and every element access.
 

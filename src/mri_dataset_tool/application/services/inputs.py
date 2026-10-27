@@ -1,5 +1,5 @@
 """What the presentation layers (CLI and GUI) need from the infrastructure, so they import only
-``application`` (Q8 of stage 5B). ``inspect`` still reads with the infrastructure readers (known debt).
+``application``. ``inspect`` still reads with the infrastructure readers (known debt).
 """
 
 import re
@@ -41,7 +41,7 @@ def is_valid_folder_name(name: str) -> bool:
 
 def new_folders_valid(path: Path) -> bool:
     """True if every folder of *path* that does not exist yet (the ones a run creates) has a valid name and
-    the drive exists: else it would fail only at the run (QA7-02: ``E:/o/a:b`` names an NTFS stream,
+    the drive exists: else it would fail only at the run (``E:/o/a:b`` names an NTFS stream,
     ``a:b`` a drive that is not there, a name too long)."""
     while not path.exists() and path.name:
         if not is_valid_folder_name(path.name):
@@ -53,7 +53,7 @@ def new_folders_valid(path: Path) -> bool:
 def project_config_dir() -> Path:
     """The ``config/`` folder the GUI reads (``default.yaml`` and the presets): the project's, next to
     ``src/``, whatever the working directory; ``config`` of the working directory if it is not there.
-    The only place that locates it (the portable build, G9, points it to its bundled YAML files)."""
+    The only place that locates it (a portable build points it to its bundled YAML files)."""
     bundled = Path(__file__).resolve().parents[4] / "config"
     return bundled if (bundled / "default.yaml").is_file() else DEFAULT_CONFIG_DIR
 
@@ -62,7 +62,7 @@ def check_input_paths(dataset_root: Path, output_dir: Path) -> None:
     """The input and output checks of ``check_build_args`` (same order and messages), for a step that
     has no config yet; the config is checked with everything else later."""
     # shortcut: this module file stands for an existing config file (check_build_args checks it before the
-    # output); it does not exist if the package runs without .py files (zip, frozen build): G9 must check it.
+    # output); it does not exist if the package runs without .py files (zip, frozen build): a portable build must check it.
     check_build_args(dataset_root, output_dir, Path(__file__))
 
 

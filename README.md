@@ -13,6 +13,7 @@ This tool automates the loading, validation, conversion, processing, anonymizati
 - DICOM to NIfTI and NIfTI to DICOM (3D only) conversion
 - BIDS reading (flexible mode, sidecar inheritance)
 - Batch processing support
+- Graphical wizard `mri-dataset-gui` (Tkinter, Spanish and English): input (BIDS, DICOM or loose NIfTI) → configuration → series mapping table → background run → label table with batch tools → ML exports and report; same validation and outputs as the command line, no patient data on screen or in logs
 - Processing pipeline core: step contract, streaming batch runner that reports errors and continues, JSON run manifest that records each step's parameters and computed outputs and reproduces a run
 - Processing steps: integrity validation, reorientation to RAS+ (no interpolation), resampling to a fixed spacing (default 1 mm, linear), intensity normalization, and a technical metadata summary
 - Anonymization (in development, tested only with synthetic data): model anonymization step and DICOM file anonymization with a version 1 policy and an audit report
@@ -74,7 +75,14 @@ python -m pip install --upgrade pip
 python -m pip install -e ".[dev]"
 ```
 
-4. Verify the installation:
+4. Launch the graphical interface (on Linux, Tkinter may need the system package `python3-tk`):
+
+```bash
+mri-dataset-gui
+# or: python -m mri_dataset_tool.presentation.gui
+```
+
+5. Verify the installation:
 
 ```bash
 python -m pytest
@@ -88,11 +96,12 @@ python -m pytest
 - [Configuration](/docs/architecture/config.md)
 - [Processing steps: geometry](/docs/processing/geometry.md) and [intensity](/docs/processing/intensity.md)
 - [Anonymization policy](/docs/anonymization/policy.md)
+- [GUI user manual](/docs/user_manual/gui.md) and [GUI architecture](/docs/architecture/gui.md)
 - [Stage 3 QA report](/docs/testing/qa_etapa3.md)
 
 ## Status
 
-In development. Stages 1 to 4 (loading, conversion, pipeline, processing, anonymization and dataset) are complete. Stage 5A adds the `mri-dataset` command line (inspect, convert, anonymize, process, labels, dataset); see `docs/user_manual/cli.md` and `docs/architecture/cli.md`. Pending: GUI (5B) and closing (stage 6).
+In development. Stages 1 to 4 (loading, conversion, pipeline, processing, anonymization and dataset) are complete. Stage 5A adds the `mri-dataset` command line (inspect, convert, anonymize, process, labels, dataset); see `docs/user_manual/cli.md` and `docs/architecture/cli.md`. Stage 5B adds the `mri-dataset-gui` graphical wizard (six steps: input, configuration, series mapping, run, labels, ML exports and report); see `docs/user_manual/gui.md` and `docs/architecture/gui.md`. Pending: visual styling (stage 5C), a portable Windows executable and closing (stage 6).
 
 **Implemented** (library code under `src/mri_dataset_tool`)
 - Loading of DICOM, NIfTI and BIDS studies, and DICOM <-> NIfTI conversion.
@@ -130,12 +139,14 @@ In development. Stages 1 to 4 (loading, conversion, pipeline, processing, anonym
 - The generated DICOM does not conform to the strict MR IOD.
 - Visual checks of converted DICOM volumes are pending.
 - The exported dataset has no `.bval`/`.bvec` for `dwi` and no `EchoTime1/2` for `phasediff`: the official BIDS validator will flag them.
-- Labels are assigned through files or the `--mapping` table; there is no graphical review interface yet.
+- Labels are assigned through files, the `--mapping` table or the label table of the GUI (with batch tools).
+- The GUI generates a new anonymization key per session unless `MRI_ANON_KEY` is set: pseudonyms change between sessions and datasets from different sessions must not be combined.
+- With very large DICOM trees the GUI preview and run steps can take more than 15 minutes, without cancellation.
 - The BIDS suffix of DICOM and loose NIfTI series is deduced with conservative rules: doubtful series are skipped with a warning and can be fixed with the `--mapping` table.
 - Files that are git-annex pointers without downloaded content are skipped as unreadable.
 
 **Not implemented yet**
-- GUI.
+- Visual styling of the GUI and a portable executable (Windows).
 
 ---
 
@@ -154,6 +165,7 @@ La herramienta automatiza la carga, validación, conversión, procesamiento, ano
 - Conversión DICOM a NIfTI y NIfTI a DICOM (solo 3D)
 - Lectura BIDS (modo flexible, herencia de sidecars)
 - Soporte para procesamiento por lotes
+- Asistente gráfico `mri-dataset-gui` (Tkinter, en español e inglés): entrada (BIDS, DICOM o NIfTI sueltos) → configuración → tabla de mapeo de series → ejecución en segundo plano → tabla de etiquetas con herramientas en lote → exportes para ML y reporte; las mismas validaciones y salidas que la línea de comandos, sin datos de pacientes en pantalla ni en logs
 - Núcleo del pipeline de procesamiento: contrato de paso, runner por lotes en streaming que informa errores y continúa, manifiesto JSON que registra parámetros y valores calculados de cada paso y reproduce una corrida
 - Pasos de procesamiento: validación de integridad, reorientación a RAS+ (sin interpolar), remuestreo a un espaciado fijo (1 mm por defecto, lineal), normalización de intensidad y resumen técnico de metadatos
 - Anonimización (en desarrollo, probada solo con datos sintéticos): paso sobre el modelo y anonimización de archivos DICOM con la política v1 e informe de auditoría
@@ -215,7 +227,14 @@ python -m pip install --upgrade pip
 python -m pip install -e ".[dev]"
 ```
 
-4. Verifica la instalación:
+4. Abre la interfaz gráfica (en Linux, Tkinter puede necesitar el paquete del sistema `python3-tk`):
+
+```bash
+mri-dataset-gui
+# o: python -m mri_dataset_tool.presentation.gui
+```
+
+5. Verifica la instalación:
 
 ```bash
 python -m pytest
@@ -233,7 +252,7 @@ python -m pytest
 
 ## Estado
 
-En desarrollo. Las etapas 1 a 4 (carga, conversión, pipeline, procesamiento, anonimización y dataset) están completas. La etapa 5A añade la línea de comandos `mri-dataset` (inspect, convert, anonymize, process, labels, dataset); ver `docs/user_manual/cli.md` y `docs/architecture/cli.md`. Pendiente: GUI (5B) y cierre (etapa 6).
+En desarrollo. Las etapas 1 a 4 (carga, conversión, pipeline, procesamiento, anonimización y dataset) están completas. La etapa 5A añade la línea de comandos `mri-dataset` (inspect, convert, anonymize, process, labels, dataset); ver `docs/user_manual/cli.md` y `docs/architecture/cli.md`. La etapa 5B añade el asistente gráfico `mri-dataset-gui` (seis pasos: entrada, configuración, mapeo de series, ejecución, etiquetas, exportes para ML y reporte); ver `docs/user_manual/gui.md` y `docs/architecture/gui.md`. Pendiente: estilo visual (etapa 5C), ejecutable portable de Windows y cierre (etapa 6).
 
 **Implementado** (código de biblioteca en `src/mri_dataset_tool`)
 - Carga de estudios DICOM, NIfTI y BIDS, y conversión DICOM <-> NIfTI.
@@ -271,9 +290,11 @@ En desarrollo. Las etapas 1 a 4 (carga, conversión, pipeline, procesamiento, an
 - El DICOM generado no es conforme al IOD MR estricto.
 - La verificación visual de los volúmenes DICOM convertidos está pendiente.
 - El dataset exportado no incluye `.bval`/`.bvec` para `dwi` ni `EchoTime1/2` para `phasediff`: el validador oficial de BIDS los marcará.
-- Las etiquetas se asignan por archivos o con la tabla `--mapping`; todavía no hay una interfaz gráfica de revisión.
+- Las etiquetas se asignan por archivos, con la tabla `--mapping` o con la tabla de etiquetas de la GUI (con herramientas en lote).
 - El sufijo BIDS de las series DICOM y NIfTI sueltas se deduce con reglas conservadoras: las series dudosas se omiten con un aviso y se corrigen con la tabla `--mapping`.
 - Los archivos que son punteros de git-annex sin contenido descargado se omiten como ilegibles.
+- La GUI genera una clave de anonimización nueva por sesión salvo que `MRI_ANON_KEY` esté definida: los seudónimos cambian entre sesiones y los datasets de sesiones distintas no deben combinarse.
+- Con árboles DICOM muy grandes, la vista previa y la ejecución de la GUI pueden tardar más de 15 minutos, sin cancelación.
 
 **Todavía no implementado**
-- GUI.
+- Estilo visual de la GUI y ejecutable portable (Windows).

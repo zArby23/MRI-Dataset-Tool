@@ -1,4 +1,4 @@
-"""GUI step 2: a late <<Modified>> of the classes box must never drop a finished run (E7-01). Tk smoke test,
+"""GUI step 2: a late <<Modified>> of the classes box must never drop a finished run. Tk smoke test,
 skipped without a display."""
 
 import tkinter as tk

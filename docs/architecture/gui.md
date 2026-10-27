@@ -38,10 +38,10 @@ Puntos de entrada: `mri-dataset-gui` (`[project.gui-scripts]` → `presentation.
   `plan_ingest`…), construye las tareas largas y convierte excepciones en `Check(code, values)`. Navegación:
   `complete(step)` desbloquea el siguiente paso, `reopen(step)` invalida ese y los siguientes (y, antes de la
   ejecución, el dataset construido).
-- **Servicios** (`application/services/`): toda la lógica de negocio. Fachadas nuevas de la etapa 5B:
+- **Servicios** (`application/services/`): toda la lógica de negocio. Fachadas de la GUI:
   - `session_key.py`: `ensure_session_key()` (clave `sha256(secrets.token_bytes(32))` solo en `os.environ` si
     falta o es corta), `key_is_set()`.
-  - `inputs.py`: lo que la presentación necesita de la infraestructura (Q8; la CLI también lo importa de aquí,
+  - `inputs.py`: lo que la presentación necesita de la infraestructura (la CLI también lo importa de aquí,
     salvo `inspect.py`, deuda conocida). `project_config_dir()` es el único punto que ubica `config/` (raíz del
     proyecto; respaldo, el cwd), `check_input_paths()`, `with_memory_consent()`, `is_valid_folder_name()`.
   - `ingest_preview.py`: `preview_ingest` (las `decisions` de `plan_ingest`), `apply_edit` (edición de la tabla →
@@ -50,9 +50,9 @@ Puntos de entrada: `mri-dataset-gui` (`[project.gui-scripts]` → `presentation.
     `apply_label_edits` (TSV temporal de seudónimos + `apply_label_corrections`), `read_label_corrections`,
     `label_classes`, `labels_finalized`.
   - `dataset_outputs.py`: `ml_exports_exist`, `write_report` (carpeta nueva o vacía) y `report_warnings`.
-  - `write_ml_exports(..., output_dir=None)` / `write_ml_files(..., output_dir=None)` (G7b, aprobado en código
-    congelado): un juego regenerado en otra carpeta con rutas `../dataset/…`; sin `output_dir`, idéntico a antes.
-  - En código de 5A (excepciones aprobadas): `dataset_build.is_new_or_empty_dir` (la salida puede ser una carpeta
+  - `write_ml_exports(..., output_dir=None)` / `write_ml_files(..., output_dir=None)`:
+    un juego regenerado en otra carpeta con rutas `../dataset/…`; sin `output_dir`, idéntico a antes.
+  - En los servicios de la CLI: `dataset_build.is_new_or_empty_dir` (la salida puede ser una carpeta
     vacía, también en la CLI) e `IngestPlan.decisions` (`SeriesDecision` por serie).
 
 ## Trabajador, cola y eventos
@@ -74,13 +74,13 @@ classify)`): en el paso 6, `FileExistsError` es «exporte o reporte existente»,
 
 `App.report_callback_exception` registra solo el tipo de una excepción en un callback de Tk y la muestra como
 `UNEXPECTED(tipo)` en la barra inferior: nunca su mensaje ni su traceback. Si `on_event` de una vista lanza, `_poll`
-lo reporta así y sigue con los eventos siguientes, y el próximo sondeo se programa en un `finally` (QA7-01): la
+lo reporta así y sigue con los eventos siguientes, y el próximo sondeo se programa en un `finally`: la
 cola nunca deja de drenarse, así que `busy` no queda en `True` para siempre.
 
 Rutas: el controlador usa `Path(texto)` sin `resolve`, igual que la CLI; una ruta relativa escrita a mano se
-resuelve contra la carpeta actual del proceso (QA7-06, documentado en el manual). En el paso 1,
+resuelve contra la carpeta actual del proceso (documentado en el manual). En el paso 1,
 `new_folders_valid` (fachada `inputs`) exige que cada carpeta de la salida que aún no existe tenga un nombre válido
-(`is_valid_folder_name`, ≤ 255 bytes) y que la unidad exista (`INVALID_OUTPUT_PATH`, QA7-02).
+(`is_valid_folder_name`, ≤ 255 bytes) y que la unidad exista (`INVALID_OUTPUT_PATH`).
 
 ## Mensajes
 
@@ -94,12 +94,12 @@ infraestructura que llaman: todo mensaje fijo debe tener código o estar en una 
 ## Privacidad (RNF07)
 
 - Estado (`repr`), cola, textos y logs: solo códigos, tipos y conteos. Las filas con rutas relativas (vista
-  previa y mapeo, decisión D2 del humano) y la tabla de etiquetas (seudónimos) están fuera del `repr` del estado
+  previa y mapeo, decisión de diseño) y la tabla de etiquetas (seudónimos) están fuera del `repr` del estado
   y se muestran solo en sus tablas y en el TSV que el usuario guarda.
 - Las rutas mostradas son las que el usuario eligió. La clave de la sesión nunca se muestra, guarda ni registra.
 - Barridos de PHI con valores plantados (PatientID, descripciones, ids, rutas) sobre el estado, los textos, la
   cola y los logs DEBUG en las pruebas de cada paso.
-- QA6-01: pydicom citaba UIDs no conformes en sus avisos. `infrastructure/dicom/_study_assembler.quiet_value_validation()`
+- pydicom citaba UIDs no conformes en sus avisos. `infrastructure/dicom/_study_assembler.quiet_value_validation()`
   pone `reading_validation_mode = IGNORE` durante las lecturas DICOM; el ajuste es de todo el proceso, así que un
   contador protegido con `threading.Lock` hace que el primer hilo que entra lo fije y el último que sale lo
   restaure (la GUI puede leer en el trabajador mientras otro hilo lee).
@@ -108,7 +108,7 @@ infraestructura que llaman: todo mensaje fijo debe tener código o estar en una 
 
 - Un estudio en memoria a la vez: la ejecución usa `build_dataset` como la CLI.
 - La vista previa (`preview_ingest`) y la ejecución (`plan_ingest` dentro de la tarea) leen cada una todas las
-  cabeceras: con árboles DICOM muy grandes cada una puede pasar de 15 minutos (QA7-08), con progreso indeterminado
+  cabeceras: con árboles DICOM muy grandes cada una puede pasar de 15 minutos, con progreso indeterminado
   y sin cancelación.
 - La tabla de etiquetas se reconstruye solo cuando cambian sus filas, ediciones, filtro o idioma
   (`label_version`); con miles de pares cada acción recorre el árbol del dataset (`dataset_pairs`, ~2 s con 3000
@@ -121,14 +121,14 @@ plantada, DICOM, NIfTI sueltos), equivalencia con la CLI (mismas cifras, mismos 
 reporte iguales byte a byte salvo el XLSX), un fallo por etapa, catálogo y coberturas de mensajes, trabajador
 (eventos, una tarea a la vez, daemon) y humo de Tk con `skip` si no hay pantalla (un `tk.Tk()` vacío decide).
 Pruebas de las fachadas: `test_service_{session_key,inputs,ingest_preview,labels_table,dataset_outputs}.py`.
-Auditoría adversarial QA7: `tests/qa/test_qa7_gui.py` e informe `docs/testing/qa_etapa7.md`.
+Auditoría adversarial de la GUI: `tests/qa/test_qa7_gui.py` e informe `docs/testing/qa_etapa7.md`.
 
 ## Decisiones de diseño
 
 - Tkinter: stdlib, Windows y Linux (RNF04, RNF12).
 - Controlador sin Tk: todo lo que se puede probar sin pantalla se prueba sin pantalla.
-- Clave por sesión (decisión del humano): sin pedir la clave; consecuencias en el manual.
-- La configuración se resuelve desde la raíz del proyecto (decisión del humano), en un solo punto
+- Clave por sesión (decisión de diseño): sin pedir la clave; consecuencias en el manual.
+- La configuración se resuelve desde la raíz del proyecto (decisión de diseño), en un solo punto
   (`project_config_dir`), para que un ejecutable portable lo apunte a sus YAML incluidos.
-- La GUI exige etiquetas cerradas para los exportes ML (decisión del humano; la CLI tiene `--allow-unfinalized`).
+- La GUI exige etiquetas cerradas para los exportes ML (decisión de diseño; la CLI tiene `--allow-unfinalized`).
 - Sin cancelación: los servicios no son cancelables.

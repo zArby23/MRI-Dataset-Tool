@@ -82,7 +82,7 @@ volúmenes. Escribe en la raíz del dataset:
 | Dataset sin imágenes | `ValueError("No dataset images were found.")` |
 | Un NIfTI cuya ruta no es exactamente la de `bids_path` (otra entidad, `.nii`, otra carpeta, `run-01`) | `ValueError("Dataset contains a file outside the BIDS layout.")` |
 | Tabla de etiquetas inválida | errores de `read_labels` (`labels.md`) |
-| Hay `labels.json` o `labels_final.json` pero falta `labels.tsv` (renombrado, "guardar como"), o al revés (QA4-09) | `FileNotFoundError("Label table not found.")` / `FileNotFoundError("Label classes file not found.")`, también con `allow_unfinalized`, antes de leer las imágenes |
+| Hay `labels.json` o `labels_final.json` pero falta `labels.tsv` (renombrado, "guardar como"), o al revés | `FileNotFoundError("Label table not found.")` / `FileNotFoundError("Label classes file not found.")`, también con `allow_unfinalized`, antes de leer las imágenes |
 | Etiquetas sin cerrar o cierre desactualizado (sin `allow_unfinalized`) | `ValueError("Labels are not finalized.")` |
 | Algún archivo de exportación ya existe | `FileExistsError("Dataset file already exists.")`, sin escribir ninguno |
 

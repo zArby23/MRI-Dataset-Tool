@@ -63,7 +63,7 @@ class ConfigStep(StepView):
     def _classes_edited(self, _event) -> None:
         """A <<Modified>> of the classes box. It can arrive late (text inserted by code or pasted is
         reported on the next event loop), so it reopens the step only if the step is shown and the text
-        differs from the last validated one: a late event must never drop a finished run (E7-01)."""
+        differs from the last validated one: a late event must never drop a finished run."""
         if not self.classes.edit_modified():
             return
         self.classes.edit_modified(False)

@@ -131,7 +131,7 @@ Algoritmo (`resample.py`), decisiones de diseño:
 - **Memoria:** 4D volumen a volumen con `iter_volumes_3d` en `float32`, pero la salida 4D se reserva
   entera en `float32` desde el principio. El pico es la salida completa más un volumen 3D de entrada
   y sus copias de trabajo (suavizado y relleno), que se liberan antes de leer el siguiente. Medido
-  (QA1-07, entrada perezosa `int16` 144×144×78×T a 1,8 mm → 1 mm, `tracemalloc` y working set
+  (entrada perezosa `int16` 144×144×78×T a 1,8 mm → 1 mm, `tracemalloc` y working set
   coinciden): pico = salida + ≈ 46 MiB constantes (T=5: 228 MiB; T=10: 410 MiB; T=20: 773 MiB),
   ≈ 1,6 s por volumen. Extrapolado a T=140: ≈ 5,0 GiB y ≈ 4 min. Pasos posteriores que crean otro
   volumen (p. ej. `normalize`) suman su propia salida mientras la anterior sigue viva.

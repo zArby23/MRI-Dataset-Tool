@@ -62,7 +62,7 @@ def test_ml_exports_match_the_cli_export_ml(project, caplog):
 
 
 def test_ml_exports_need_finalized_labels(project):
-    controller = _finalized(project, finalize=False)  # the GUI has no --allow-unfinalized (decision of the human)
+    controller = _finalized(project, finalize=False)  # the GUI has no --allow-unfinalized (design decision)
     events = _do(controller, controller.ml_exports_task(["1", "0", "0"], "0"))
     assert events[-1] == Failed("ML_LABELS_NOT_FINALIZED", "ValueError")
     assert not controller.ml_exports_present()

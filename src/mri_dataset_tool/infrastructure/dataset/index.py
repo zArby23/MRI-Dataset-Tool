@@ -1,6 +1,6 @@
 """ML/DL export files of a written BIDS dataset (RF13; no tensors, see docs/dataset/export.md): ``dataset_index.csv``, ``datalist.json``
 (MONAI style), ``splits.tsv`` and ``splits.json``, at the dataset root or, with ``output_dir``, in a folder
-of their own (G7b: a regenerated set, e.g. ``ml_exports_2`` next to the dataset).
+of their own (a regenerated set, e.g. ``ml_exports_2`` next to the dataset).
 
 Paths are POSIX and relative to the folder of the files: the dataset root (``sub-01/anat/...``) or, with
 ``output_dir``, that folder (``../dataset/sub-01/anat/...``). Ids carry the BIDS prefix in the files. Cells are

@@ -1,4 +1,4 @@
-"""The label table of an exported dataset as rows, for the GUI labels step (Q6 of stage 5B).
+"""The label table of an exported dataset as rows, for the GUI labels step.
 
 ``read_label_rows`` lists every (participant, session) pair of the dataset with its class and its
 defect; rows of ``labels.tsv`` that are not dataset pairs (foreign or invalid ids) are only counted

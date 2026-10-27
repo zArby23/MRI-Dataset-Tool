@@ -47,7 +47,7 @@ from mri_dataset_tool.presentation.gui.worker import Done, Event, Failed, Report
 
 STEPS = ("input", "config", "mapping", "run", "labels", "export")
 FORMATS = ("bids", "dicom", "nifti")
-PRESET_NAME = "stage3_bids.yaml"  # in the project's config/ (decision of the human), not the working directory
+PRESET_NAME = "stage3_bids.yaml"  # in the project's config/ (design decision), not the working directory
 
 
 @dataclass
@@ -63,7 +63,7 @@ class WizardState:
     seed: int = DEFAULT_SEED
     config: dict[str, Any] | None = None
     pipeline: Pipeline | None = None
-    # Step 3 (DICOM / loose NIfTI). Rows hold paths relative to the input (D2): only in memory, out of repr.
+    # Step 3 (DICOM / loose NIfTI). Rows hold paths relative to the input: only in memory, out of repr.
     preview: list[PreviewRow] = field(default_factory=list, repr=False)
     mapping: list[MappingRow] = field(default_factory=list, repr=False)
     # Step 4.
@@ -306,7 +306,7 @@ class Controller:
             write_mapping(self.state.mapping, Path(path), self.state.input_dir, self.state.classes)
         except FileExistsError:
             return Check("MAPPING_FILE_EXISTS")
-        except OSError:  # a folder, a missing parent, a read-only drive (QA7-03)
+        except OSError:  # a folder, a missing parent, a read-only drive
             return Check("MAPPING_FILE_UNWRITABLE")
         except InvalidBuildInput as error:
             code, values = messages.invalid_input(error)
@@ -564,8 +564,8 @@ class Controller:
     ) -> tuple[Check, Callable[[Reporter], dict[str, int]] | None]:
         """Validate the split parameters (as ``dataset export-ml``) and return the task writing the ML exports:
         into the dataset if it has none yet (as ``dataset export-ml``), else a regenerated set into the next free
-        ``<output>/ml_exports_N`` (G7b); nothing is ever overwritten. The labels must be finalized: unlike the
-        CLI (``--allow-unfinalized``), the GUI never exports open labels (decision of the human)."""
+        ``<output>/ml_exports_N``; nothing is ever overwritten. The labels must be finalized: unlike the
+        CLI (``--allow-unfinalized``), the GUI never exports open labels (design decision)."""
         try:
             ratio_values = [float(value) for value in ratios]
         except ValueError:

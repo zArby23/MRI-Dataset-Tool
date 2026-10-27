@@ -140,7 +140,7 @@ def _gui_check(case) -> Check:
 def test_steps_reject_what_the_cli_rejects_with_the_same_code(project, capsys, name):
     exit_code, cli_code = _cli_code(capsys, CASES[name])
     assert exit_code == (1 if name == "output exists" else 2)
-    # the GUI asks for a new folder inside an output with content instead of stopping (G2-fix)
+    # the GUI asks for a new folder inside an output with content instead of stopping
     assert _gui_check(CASES[name]).code == {"OUTPUT_EXISTS": "OUTPUT_NOT_EMPTY"}.get(cli_code, cli_code)
     assert not (project / "out").exists() and not (project / "in" / "out").exists()
 
@@ -248,7 +248,7 @@ def test_output_new_empty_or_with_content(project):
 
 
 def test_an_output_path_that_could_only_fail_at_the_run_is_refused(project):
-    """QA7-02: a new folder of the path with an invalid name or on a missing drive, caught in step 1."""
+    """A new folder of the path with an invalid name or on a missing drive, caught in step 1."""
     controller = Controller()
     for output in ("new/a:b", "new/" + "y" * 256, "new/CON/x", "new/x./y"):
         assert controller.set_input("in", "bids", output).code == "INVALID_OUTPUT_PATH"

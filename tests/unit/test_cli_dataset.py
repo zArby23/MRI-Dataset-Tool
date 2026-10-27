@@ -274,7 +274,7 @@ def test_build_from_dicom_without_mapping_uses_pseudonyms(tmp_path, capsys):
     assert not [s for s in DICOM_SECRETS if s in _texts(tmp_path / "out")]
 
 
-def test_missing_patient_id_has_its_own_warning(tmp_path, capsys):  # QA6-06
+def test_missing_patient_id_has_its_own_warning(tmp_path, capsys):
     root = dicom_tree(tmp_path / "in")
     write_synthetic_series(root / "b" / "t2", StudyInstanceUID=STUDY_B, SeriesInstanceUID=f"{STUDY_B}.2",
                            SeriesDescription="T2 TSE", PatientID="")

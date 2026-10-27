@@ -41,7 +41,7 @@ no vacíos, sin espacios al inicio o al final, sin tabuladores ni saltos de lín
 `+`, `-` o `@` (inyección de fórmulas) y solo con caracteres que el
 reporte puede guardar: ni caracteres de control que XML 1.0/XLSX rechazan (`\x00`–`\x1f` salvo
 tabulador y saltos, `￾`, `￿`) ni sustitutos sueltos. Es la misma regla que aplica
-`exporters.py`, así que una clase aceptada siempre se puede reportar (QA4-04). Las descripciones (de
+`exporters.py`, así que una clase aceptada siempre se puede reportar. Las descripciones (de
 clase y de la tabla) siguen la misma regla de caracteres y tampoco admiten tabuladores ni saltos de línea.
 
 ## API
@@ -85,7 +85,7 @@ Todo ocurre en la raíz del dataset exportado. Los pares (participante, sesión)
 `sub-<id>` y, dentro, `ses-<id>` (sin carpetas `ses-` → `(sub, None)`), validadas con
 `bids_layout.validate_label`. Un par cuenta solo si su carpeta tiene al menos un archivo `.nii.gz`
 visible directamente en una carpeta de datatype del layout (`anat`, `dwi`, `fmap`, de
-`SUFFIX_DATATYPES`). Las carpetas `sub-`/`ses-` vacías o sin imágenes del layout no son pares (QA4-07).
+`SUFFIX_DATATYPES`). Las carpetas `sub-`/`ses-` vacías o sin imágenes del layout no son pares.
 Se ignoran las entradas ocultas, los archivos y las carpetas con nombre inválido.
 
 1. **Plantilla**: `write_label_template(root, classes, description="")` escribe `labels.json` y un

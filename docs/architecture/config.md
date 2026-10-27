@@ -62,7 +62,7 @@ Todos con mensaje fijo, sin rutas, nombres de clave ni contenido del archivo (RN
   `ValueError("Invalid YAML configuration file.")`, sin causa encadenada (el error original cita el contenido).
 - Raíz que no es un mapeo, clave desconocida o valor de tipo incorrecto: `ValueError`.
 
-**Límite conocido (QA1-04):** una clave YAML repetida dentro del mismo mapeo no da error ni aviso.
+**Límite conocido:** una clave YAML repetida dentro del mismo mapeo no da error ni aviso.
 Gana la última aparición, que es el comportamiento de PyYAML. Por ejemplo,
 `pipeline: {steps: [], steps: [{name: validate}]}` ejecuta `validate`. El manifiesto registra la
 configuración que se ejecutó realmente, así que conviene revisarlo cuando un archivo de corrida se edita a mano.

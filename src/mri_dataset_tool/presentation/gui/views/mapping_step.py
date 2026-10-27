@@ -1,5 +1,5 @@
 """Step 3 (DICOM / loose NIfTI): the detected series with their suffix decision, editable, and the
-``--mapping`` TSV (load / save). The relative paths of the table are shown only here (D2)."""
+``--mapping`` TSV (load / save). The relative paths of the table are shown only here."""
 
 import tkinter as tk
 from tkinter import filedialog, ttk
@@ -66,7 +66,7 @@ class MappingStep(StepView):
         if self._shown is not None and self._shown[0] is preview and self._shown[1] == language:
             return
         same_preview, self._shown = self._shown is not None and self._shown[0] is preview, (preview, language)
-        if same_preview:  # only the language changed: the cells keep the pending edits (QA7-04)
+        if same_preview:  # only the language changed: the cells keep the pending edits
             for index, row in enumerate(self.controller.state.preview):
                 self.tree.set(str(index), "code", self.controller.text(f"CODE_{row.code}"))
             return

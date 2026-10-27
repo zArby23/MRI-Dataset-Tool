@@ -1,4 +1,4 @@
-"""Anonymization key of a GUI session (decision of the human, stage 5B).
+"""Anonymization key of a GUI session (design decision).
 
 Without ``MRI_ANON_KEY`` in the environment, a new key is generated each time the program starts
 and set only in this process (``os.environ``): it is never returned, saved, shown or logged. As a

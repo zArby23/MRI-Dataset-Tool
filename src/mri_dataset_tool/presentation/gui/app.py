@@ -93,11 +93,11 @@ class App(tk.Tk):
             for event in events:
                 try:
                     self.views[self.controller.step].on_event(event)
-                except Exception as error:  # one failing event must not hide the next ones (QA7-01)
+                except Exception as error:  # one failing event must not hide the next ones
                     self.report_callback_exception(type(error), error, error.__traceback__)
             if events:
                 self.refresh()
-        finally:  # never stop polling: else busy stays True for good (QA7-01)
+        finally:  # never stop polling: else busy stays True for good
             self.after(POLL_MS, self._poll)
 
     def report_callback_exception(self, exc, val, tb) -> None:

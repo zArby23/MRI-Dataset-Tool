@@ -51,8 +51,8 @@ def test_each_rule(texts, suffix):
         "T1 map", "T2 map", "T2_mapping", "T1_MOLLI", "t1_vibe_dyn", "T1 dynamic", "T1 perf", "t1_twist",
         # derived
         "ep2d_diff_TENSOR", "t1_vibe_dixon_W",
-        # QA6-02 (Siemens SPACE dark-fluid) and QA6-04 (reformats, non-distortion-corrected, relaxometry, STIR,
-        # BIDS derivatives)
+        # Siemens SPACE dark-fluid; reformats, non-distortion-corrected, relaxometry, STIR,
+        # BIDS derivatives
         "t2_spc_da-fl_sag_p2_iso", "t2_spc_da_fl_irprep_sag_p2_iso", "Sag T1 Reformatted", "t1_mprage_sag_ND",
         "T2 relaxometry", "Cor T2 STIR", "sub-01_space-MNI_desc-preproc_T1w",
     ],
@@ -78,7 +78,7 @@ def test_sub_is_a_subtraction_only_when_asked():
 
 
 @pytest.mark.parametrize("text", ["T2_STAR_HEMO", "Ax T2 Star", "T2 STAR", "t2-star"])
-def test_t2_star_in_two_words_is_t2starw(text):  # QA6-03
+def test_t2_star_in_two_words_is_t2starw(text):
     assert suffix_from_text(text, exclude_sub=True) == ("T2starw", MATCHED)
 
 

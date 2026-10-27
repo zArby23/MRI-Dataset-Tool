@@ -1,9 +1,9 @@
-"""Preview and edition of the DICOM / loose NIfTI ingest decisions, for the GUI mapping table (Q5).
+"""Preview and edition of the DICOM / loose NIfTI ingest decisions, for the GUI mapping table.
 
 ``preview_ingest`` returns what ``plan_ingest`` decided per series (headers only, nothing is created).
 ``apply_edit`` turns an edit of the table into ``--mapping`` rows (``MappingRow``), so the GUI and
 ``dataset build --mapping`` share one format; ``write_mapping`` saves them as that TSV. The paths are
-relative to the input root and are shown only in the table and the saved TSV (D2), never logged.
+relative to the input root and are shown only in the table and the saved TSV, never logged.
 """
 
 import posixpath
