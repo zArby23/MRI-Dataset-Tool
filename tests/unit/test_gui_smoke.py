@@ -29,7 +29,7 @@ def test_window_opens_navigates_and_switches_language():
     app = _app()
     try:
         app.update()
-        assert app.title() == "MRI Dataset Tool: asistente"
+        assert app.title() == "MRI Dataset Tool — Paso 1 de 5: Entrada"  # 5C: the step in the title
         assert str(app._next.cget("state")) == "disabled"
         app.controller.complete("input")
         app.refresh()
@@ -38,7 +38,7 @@ def test_window_opens_navigates_and_switches_language():
         assert app.views["input"].winfo_manager() == ""
         app._language.set("en")
         app._set_language()
-        assert app.title() == "MRI Dataset Tool: wizard" and app._back.cget("text") == "< Back"
+        assert app.title() == "MRI Dataset Tool — Step 2 of 5: Configuration" and app._back.cget("text") == "< Back"
     finally:
         app.destroy()
 

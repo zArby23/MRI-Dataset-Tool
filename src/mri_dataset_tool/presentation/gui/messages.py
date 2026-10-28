@@ -11,10 +11,79 @@ DEFAULT_LANGUAGE = "es"
 
 CATALOG: dict[str, dict[str, str]] = {
     "es": {
-        "APP_TITLE": "MRI Dataset Tool: asistente",
+        "APP_TITLE_STEP": "MRI Dataset Tool — {header}",
         "MENU_LANGUAGE": "Idioma",
         "LANGUAGE_es": "Español",
         "LANGUAGE_en": "Inglés",
+        "APP_NAME": "MRI Dataset Tool",
+        "WELCOME_SUBTITLE": "Preparación de datasets de resonancia magnética para ML/DL",
+        "VERSION": "Versión {version}",
+        "VERSION_UNKNOWN": "desconocida",
+        "LOADING": "Cargando…",
+        "STARTUP_FAILED": "No se pudo iniciar ({error_type}).",
+        "CLOSE": "Cerrar",
+        "CLOSE_CONFIRM_TITLE": "Cerrar la herramienta",
+        "CLOSE_CONFIRM": "¿Cerrar la herramienta?",
+        "PREFIX_error": "Error:",
+        "PREFIX_warning": "Aviso:",
+        "PREFIX_ok": "Listo:",
+        "ACTIVITY_disk_space": "Comprobando el espacio en disco…",
+        "ACTIVITY_preview": "Leyendo cabeceras para la vista previa…",
+        "ACTIVITY_run": "Construyendo el dataset…",
+        "ACTIVITY_labels": "Leyendo y escribiendo etiquetas…",
+        "ACTIVITY_corrections": "Leyendo las correcciones…",
+        "ACTIVITY_ml": "Escribiendo los exportes para ML…",
+        "ACTIVITY_report": "Escribiendo el reporte…",
+        "ACTIVITY_COUNTS": "Omitidos: {skipped} · Fallidos: {failed} · Ilegibles: {unreadable}",
+        "THEME_LABEL": "Tema",
+        "THEME_light": "Claro",
+        "THEME_dark": "Oscuro",
+        "PRIVACY_BUTTON": "Privacidad y memoria",
+        "PRIVACY_TITLE": "Privacidad y uso de memoria",
+        "DIALOG_OK": "Aceptar",
+        "DIALOG_CANCEL": "Cancelar",
+        "MORE_INFO": "Más información",
+        "FORMAT_HELP_bids": "Carpetas sub-/ses- con NIfTI",
+        "FORMAT_HELP_dicom": "Carpetas con series DICOM",
+        "FORMAT_HELP_nifti": "NIfTI sueltos (.nii, .nii.gz)",
+        "SUMMARY_DONE": (
+            "Dataset terminado: {studies} estudios, {series} series, {participants} participantes; "
+            "{skipped} archivos omitidos."
+        ),
+        "OPEN_FAILED": "No se pudo abrir la carpeta ({error_type}).",
+        "PRIVACY_SUMMARY": "Sus datos se quedan en este equipo y los resultados se anonimizan.",
+        "PRIVACY_HEADING": "Aviso de privacidad",
+        "PRIVACY_LEAD": "Sus datos se quedan en este equipo.",
+        "PRIVACY_1": (
+            "• Los estudios se procesan localmente; la herramienta no envía información por la red."
+        ),
+        "PRIVACY_2": (
+            "• Los resultados se anonimizan: los identificadores se reemplazan por seudónimos y solo se conservan"
+            " los metadatos técnicos necesarios (política v1)."
+        ),
+        "PRIVACY_3": (
+            "• La clave que genera los seudónimos no se muestra ni se guarda. Si usted no define una, se crea una"
+            " nueva en cada sesión: los seudónimos cambian y los datasets de sesiones distintas no deben combinar"
+            "se."
+        ),
+        "PRIVACY_4": (
+            "• La anonimización no borra texto incrustado en las imágenes ni elimina los rasgos de la cara (defac"
+            "ing). Revise el resultado antes de compartirlo."
+        ),
+        "MEMORY_1": (
+            "Antes de remuestrear o normalizar, la herramienta estima la memoria que necesitará y la compara con "
+            "la disponible. Si no alcanza, ese estudio se marca como fallido y el lote continúa con los demás."
+        ),
+        "MEMORY_2": (
+            "Puede forzar la ejecución con la casilla «Permitir continuar…», bajo su responsabilidad: el equipo p"
+            "uede volverse muy lento, otros programas pueden cerrarse y el proceso puede terminar sin guardar res"
+            "ultados."
+        ),
+        "MEMORY_3": (
+            "La estimación es de un instante y no incluye otros programas. Los volúmenes 4D grandes, como las dif"
+            "usiones, pueden necesitar varios GB. El tamaño máximo de salida solo se cambia en el archivo de conf"
+            "iguración."
+        ),
         "BACK": "< Atrás",
         "NEXT": "Siguiente >",
         "STEP_HEADER": "Paso {number} de {total}: {title}",
@@ -41,10 +110,9 @@ CATALOG: dict[str, dict[str, str]] = {
         "OUTPUT_DIR": "Carpeta de salida (nueva)",
         "BROWSE": "Examinar…",
         "VALIDATE": "Validar",
-        "KEY_DEFINED": "Clave de anonimización: definida en el entorno (MRI_ANON_KEY).",
+        "KEY_DEFINED": "Clave de anonimización: definida por usted (se mantiene entre sesiones).",
         "KEY_GENERATED": (
-            "Clave de anonimización: generada para esta sesión. Los seudónimos cambian cada vez que se abre el "
-            "programa (vea el manual)."
+            "Clave de anonimización: generada para esta sesión; los seudónimos cambian en cada sesión."
         ),
         "INPUT_OK": "Entrada y salida válidas.",
         "CHECKING_DISK_SPACE": "Comprobando el espacio en disco…",
@@ -73,20 +141,6 @@ CATALOG: dict[str, dict[str, str]] = {
         # step 2: configuration
         "CONFIG_FILE": "Archivo de configuración (preajuste o propio)",
         "MEMORY_TITLE": "Uso de memoria",
-        "MEMORY_NOTICE": (
-            "Antes de remuestrear (resample) o normalizar (normalize), la herramienta estima la memoria que "
-            "necesita el volumen de salida y la compara con la RAM disponible en ese momento. Si no alcanza, el "
-            "estudio se marca como fallido y el lote continúa con los demás. Puede forzar la ejecución con la "
-            "casilla de abajo, que equivale al parámetro allow_insufficient_memory: true de los pasos resample y "
-            "normalize del archivo de configuración; ese consentimiento queda registrado en el manifiesto de la "
-            "corrida. Hágalo bajo su responsabilidad: si la memoria no alcanza, el equipo puede volverse muy lento "
-            "por el uso de disco como memoria, otros programas pueden cerrarse, y el proceso puede terminar "
-            "abruptamente sin guardar resultados (en Linux, el sistema puede finalizarlo). La comprobación es una "
-            "estimación en un instante y no cubre la memoria de otros pasos ni de otros programas que se abran "
-            "durante la ejecución. Volúmenes 4D grandes, como las difusiones, pueden necesitar varios GB. Además, "
-            "resample rechaza cualquier salida de más de max_output_voxels vóxeles (por defecto 2**32, eje temporal "
-            "incluido), aunque haya memoria; ese límite solo se cambia en el archivo de configuración."
-        ),
         "ALLOW_MEMORY": "Permitir continuar aunque la memoria disponible no alcance (bajo mi responsabilidad)",
         "CLASSES": "Clases de etiqueta, una por línea: NOMBRE o NOMBRE=descripción (vacío = sin etiquetas)",
         "RATIOS": "Proporciones entrenamiento / validación / prueba",
@@ -227,10 +281,9 @@ CATALOG: dict[str, dict[str, str]] = {
         "REGENERATE_ML": "Regenerar exportes en una carpeta nueva",
         "ML_WRITTEN_IN": "Exportes para ML escritos en «{folder}»: {files} archivos.",
         "ML_REGENERATE_HELP": (
-            "El paso de ejecución escribe los exportes con los valores estándar (70/15/15, semilla 0) en el dataset. "
-            "Aquí puede escribir otro juego con otras proporciones o semilla: va a una carpeta nueva junto al "
-            "dataset (ml_exports_2, ml_exports_3…), con rutas relativas a esa carpeta (../dataset/…). Nunca se "
-            "sobrescribe ni se borra nada."
+            "Al ejecutar se escriben los exportes con los valores estándar (70/15/15, semilla 0). Aquí puede gene"
+            "rar otro juego con otras proporciones o semilla: se guarda en una carpeta nueva junto al dataset (ml"
+            "_exports_2, ml_exports_3…)."
         ),
         "ML_DIR_NOT_EMPTY": "La carpeta de los exportes tiene contenido; no se usa.",
         "ML_DIR_INSIDE_DATASET": "La carpeta de los exportes debe estar fuera del dataset.",
@@ -290,10 +343,77 @@ CATALOG: dict[str, dict[str, str]] = {
         "PIPELINE_WITHOUT_ANONYMIZE": "El pipeline debe incluir el paso anonymize.",
     },
     "en": {
-        "APP_TITLE": "MRI Dataset Tool: wizard",
+        "APP_TITLE_STEP": "MRI Dataset Tool — {header}",
         "MENU_LANGUAGE": "Language",
         "LANGUAGE_es": "Spanish",
         "LANGUAGE_en": "English",
+        "APP_NAME": "MRI Dataset Tool",
+        "WELCOME_SUBTITLE": "Preparing MRI datasets for ML/DL",
+        "VERSION": "Version {version}",
+        "VERSION_UNKNOWN": "unknown",
+        "LOADING": "Loading…",
+        "STARTUP_FAILED": "Could not start ({error_type}).",
+        "CLOSE": "Close",
+        "CLOSE_CONFIRM_TITLE": "Close the tool",
+        "CLOSE_CONFIRM": "Close the tool?",
+        "PREFIX_error": "Error:",
+        "PREFIX_warning": "Warning:",
+        "PREFIX_ok": "Done:",
+        "ACTIVITY_disk_space": "Checking disk space…",
+        "ACTIVITY_preview": "Reading headers for the preview…",
+        "ACTIVITY_run": "Building the dataset…",
+        "ACTIVITY_labels": "Reading and writing labels…",
+        "ACTIVITY_corrections": "Reading the corrections…",
+        "ACTIVITY_ml": "Writing the ML exports…",
+        "ACTIVITY_report": "Writing the report…",
+        "ACTIVITY_COUNTS": "Skipped: {skipped} · Failed: {failed} · Unreadable: {unreadable}",
+        "THEME_LABEL": "Theme",
+        "THEME_light": "Light",
+        "THEME_dark": "Dark",
+        "PRIVACY_BUTTON": "Privacy and memory",
+        "PRIVACY_TITLE": "Privacy and memory use",
+        "DIALOG_OK": "OK",
+        "DIALOG_CANCEL": "Cancel",
+        "MORE_INFO": "More information",
+        "FORMAT_HELP_bids": "sub-/ses- folders with NIfTI",
+        "FORMAT_HELP_dicom": "Folders with DICOM series",
+        "FORMAT_HELP_nifti": "Loose NIfTI (.nii, .nii.gz)",
+        "SUMMARY_DONE": (
+            "Dataset finished: {studies} studies, {series} series, {participants} participants; "
+            "{skipped} files skipped."
+        ),
+        "OPEN_FAILED": "The folder could not be opened ({error_type}).",
+        "PRIVACY_SUMMARY": "Your data stays on this computer and the results are anonymized.",
+        "PRIVACY_HEADING": "Privacy notice",
+        "PRIVACY_LEAD": "Your data stays on this computer.",
+        "PRIVACY_1": (
+            "• Studies are processed locally; the tool sends no information over the network."
+        ),
+        "PRIVACY_2": (
+            "• The results are anonymized: identifiers are replaced by pseudonyms and only the technical metadata"
+            " needed is kept (policy v1)."
+        ),
+        "PRIVACY_3": (
+            "• The key that generates the pseudonyms is never shown or saved. If you do not set one, a new one is"
+            " created every session: pseudonyms change and datasets from different sessions must not be combined."
+        ),
+        "PRIVACY_4": (
+            "• Anonymization does not remove text burned into the images or the facial features (defacing). Revie"
+            "w the result before sharing it."
+        ),
+        "MEMORY_1": (
+            "Before resampling or normalizing, the tool estimates the memory it will need and compares it with th"
+            "e memory available. If it is not enough, that study is marked as failed and the batch goes on with t"
+            "he others."
+        ),
+        "MEMORY_2": (
+            "You can force the run with the «Allow the run to continue…» checkbox, at your own risk: the computer"
+            " may become very slow, other programs may close and the process may end without saving results."
+        ),
+        "MEMORY_3": (
+            "The estimate is a snapshot and does not include other programs. Large 4D volumes, such as diffusion "
+            "scans, may need several GB. The maximum output size can only be changed in the configuration file."
+        ),
         "BACK": "< Back",
         "NEXT": "Next >",
         "STEP_HEADER": "Step {number} of {total}: {title}",
@@ -320,11 +440,8 @@ CATALOG: dict[str, dict[str, str]] = {
         "OUTPUT_DIR": "Output folder (new)",
         "BROWSE": "Browse…",
         "VALIDATE": "Validate",
-        "KEY_DEFINED": "Anonymization key: defined in the environment (MRI_ANON_KEY).",
-        "KEY_GENERATED": (
-            "Anonymization key: generated for this session. The pseudonyms change each time the program is "
-            "opened (see the manual)."
-        ),
+        "KEY_DEFINED": "Anonymization key: set by you (kept across sessions).",
+        "KEY_GENERATED": "Anonymization key: generated for this session; pseudonyms change every session.",
         "INPUT_OK": "Valid input and output.",
         "CHECKING_DISK_SPACE": "Checking the disk space…",
         "DISK_SPACE_OK": "Enough disk space for the estimated output.",
@@ -352,20 +469,6 @@ CATALOG: dict[str, dict[str, str]] = {
         # step 2: configuration
         "CONFIG_FILE": "Configuration file (preset or your own)",
         "MEMORY_TITLE": "Memory use",
-        "MEMORY_NOTICE": (
-            "Before resampling (resample) or normalizing (normalize), the tool estimates the memory the output "
-            "volume needs and compares it with the RAM available at that moment. If it is not enough, the study "
-            "is marked as failed and the batch goes on with the others. You can force the run with the checkbox "
-            "below, which is the same as the allow_insufficient_memory: true parameter of the resample and "
-            "normalize steps in the configuration file; that consent is recorded in the run manifest. Do it at "
-            "your own risk: if the memory is not enough, the computer may become very slow because the disk is "
-            "used as memory, other programs may close, and the process may end abruptly without saving results "
-            "(on Linux, the system may kill it). The check is an estimate at one moment and does not cover the "
-            "memory of other steps or of other programs opened during the run. Large 4D volumes, such as "
-            "diffusion series, may need several GB. Also, resample rejects any output larger than "
-            "max_output_voxels voxels (2**32 by default, time axis included) even with enough memory; that limit "
-            "is changed only in the configuration file."
-        ),
         "ALLOW_MEMORY": "Allow the run to continue even if the available memory is not enough (at my own risk)",
         "CLASSES": "Label classes, one per line: NAME or NAME=description (empty = no labels)",
         "RATIOS": "Training / validation / test ratios",
@@ -503,10 +606,9 @@ CATALOG: dict[str, dict[str, str]] = {
         "REGENERATE_ML": "Regenerate exports in a new folder",
         "ML_WRITTEN_IN": "ML exports written in \"{folder}\": {files} files.",
         "ML_REGENERATE_HELP": (
-            "The run step writes the exports with the standard values (70/15/15, seed 0) in the dataset. Here you "
-            "can write another set with other ratios or seed: it goes to a new folder next to the dataset "
-            "(ml_exports_2, ml_exports_3…), with paths relative to that folder (../dataset/…). Nothing is ever "
-            "overwritten or deleted."
+            "Running writes the exports with the standard values (70/15/15, seed 0). Here you can generate anothe"
+            "r set with other ratios or seed: it is saved in a new folder next to the dataset (ml_exports_2, ml_e"
+            "xports_3…)."
         ),
         "ML_DIR_NOT_EMPTY": "The exports folder has content; it is not used.",
         "ML_DIR_INSIDE_DATASET": "The exports folder must be outside the dataset.",
@@ -566,6 +668,33 @@ CATALOG: dict[str, dict[str, str]] = {
         "PIPELINE_WITHOUT_ANONYMIZE": "The pipeline must include the anonymize step.",
     },
 }
+
+
+# The severity of a message, for its color, icon and prefix («Error:», «Aviso:», «Listo:»). Codes not listed
+# are errors: the failures and validation codes.
+OK_CODES = frozenset({
+    "INPUT_OK", "CONFIG_OK", "DISK_SPACE_OK", "PREVIEW_OK", "MAPPING_LOADED", "MAPPING_SAVED", "MAPPING_ASSIGNED",
+    "LABELS_APPLIED", "ASSIGNED", "CORRECTIONS_LOADED", "ML_WRITTEN_IN", "REPORT_WRITTEN", "RUN_DONE", "SUMMARY_DONE",
+})
+INFO_CODES = frozenset({
+    "CHECKING_DISK_SPACE", "PREVIEW_RUNNING", "EDIT_PENDING", "TASK_STARTED", "NO_LABELS", "NOTHING_UNLABELED",
+    "RUN_RUNNING", "LABELS_OPEN", "LABELS_CLOSED", "LABELS_PENDING", "ML_PRESENT", "ML_ABSENT", "FILE_NAME",
+})
+WARNING_CODES = frozenset({
+    "LOW_DISK_SPACE", "LABELS_DISCARDED", "LABELS_FOREIGN", "OUTPUT_NOT_EMPTY", "REPORT_WARNING",
+    "LABELS_FINALIZED", "LABELS_EDITS_PENDING", "TASK_RUNNING", "NOTHING_SELECTED",  # the action was not done
+})
+
+
+def severity(code: str | None) -> str:
+    """``ok``, ``info``, ``warning`` or ``error`` for message *code* (``None`` = no message: ``info``)."""
+    if code is None or code in INFO_CODES:
+        return "info"
+    if code in OK_CODES:
+        return "ok"
+    if code in WARNING_CODES or code.startswith(("WARN_", "REPORT_WARNING_")):
+        return "warning"
+    return "error"
 
 
 def text(code: str, language: str = DEFAULT_LANGUAGE, **values: object) -> str:

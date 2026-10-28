@@ -4,6 +4,7 @@ import tkinter as tk
 from collections.abc import Callable
 from tkinter import ttk
 
+from mri_dataset_tool.presentation.gui import theme, widgets
 from mri_dataset_tool.presentation.gui.controller import Controller
 from mri_dataset_tool.presentation.gui.worker import Event
 
@@ -12,7 +13,7 @@ class StepView(ttk.Frame):
     """Base of the step views. *on_change* asks the window to redraw (e.g. after a validation)."""
 
     def __init__(self, master, controller: Controller, step: str, on_change: Callable[[], None]) -> None:
-        super().__init__(master, padding=12)
+        super().__init__(master, padding=theme.space("m"))
         self.controller, self.step, self.on_change = controller, step, on_change
         self.build()
         self.refresh_texts()
@@ -27,6 +28,11 @@ class StepView(ttk.Frame):
 
     def on_event(self, event: Event) -> None:
         """A worker event while this step is shown."""
+
+    def status_line(self, master: tk.Misc | None = None) -> widgets.StatusLine:
+        """A message line with the severity icon, prefix and color, in the current language."""
+        return widgets.StatusLine(master or self, lambda: {severity: self.controller.text(f"PREFIX_{severity}")
+                                                           for severity in ("error", "warning", "ok")})
 
     def invalidate_on_edit(self, *variables: tk.Variable) -> None:
         """Editing any of *variables* invalidates this step until it is validated again."""

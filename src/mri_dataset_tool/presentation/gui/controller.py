@@ -6,7 +6,6 @@ same ``application`` functions as ``mri-dataset dataset build``, before anything
 holds only what the user chose (paths, format, options), never ids, paths or values read from the data.
 """
 
-import json
 from collections.abc import Callable, Sequence
 from dataclasses import dataclass, field
 from pathlib import Path
@@ -43,7 +42,18 @@ from mri_dataset_tool.application.services.inputs import (
     with_memory_consent,
 )
 from mri_dataset_tool.presentation.gui import messages
-from mri_dataset_tool.presentation.gui.worker import Done, Event, Failed, Reporter, Status, Worker, failure
+from mri_dataset_tool.presentation.gui.worker import (
+    Done,
+    Event,
+    Failed,
+    ReportReadError,
+    Reporter,
+    Skipped,
+    Status,
+    StudyFailed,
+    Worker,
+    failure,
+)
 
 STEPS = ("input", "config", "mapping", "run", "labels", "export")
 FORMATS = ("bids", "dicom", "nifti")
@@ -68,6 +78,7 @@ class WizardState:
     mapping: list[MappingRow] = field(default_factory=list, repr=False)
     # Step 4.
     dataset_root: Path | None = None  # <output>/dataset once the run succeeded
+    run_summary: dict[str, int] = field(default_factory=dict)  # counts of the finished run (closing summary)
     # Step 5. Dataset ids are pseudonyms; still kept out of repr (shown only in the table).
     label_rows: list[LabelRow] = field(default_factory=list, repr=False)
     label_edits: dict[tuple[str, str | None], str] = field(default_factory=dict, repr=False)
@@ -94,6 +105,18 @@ class Check:
         return self.code is None
 
 
+@dataclass
+class Activity:
+    """What the activity indicator of the footer shows: the running task, its last stage and counts (codes
+    and integers only). No event carries a total, so the bar is always indeterminate."""
+
+    task: str | None = None  # disk_space | preview | run | labels | corrections | ml | report; None = idle
+    stage: Status | None = None
+    skipped: int = 0
+    failed: int = 0
+    unreadable: int = 0
+
+
 def _check(validate: Callable[[], object]) -> tuple[Check, object]:
     """Run a service validation; its exceptions become codes (never their messages)."""
     try:
@@ -118,6 +141,7 @@ class Controller:
         self._export_kind = ""  # "ml" or "report": which exports task runs
         self._new_ml: tuple[Path, list[str]] | None = None
         self._new_report: tuple[Path, list[str], dict[str, int]] | None = None
+        self.activity = Activity()
 
     # --- texts ------------------------------------------------------------------------------------
 
@@ -176,12 +200,15 @@ class Controller:
         return check
 
     def start_task(
-        self, task: Callable[[Reporter], dict[str, int] | None], classify: Callable[[Exception], Failed] = failure
+        self, task: Callable[[Reporter], dict[str, int] | None], classify: Callable[[Exception], Failed] = failure,
+        activity: str = "task",
     ) -> bool:
-        """Start *task* in the worker; ``False`` (nothing started) while another task runs."""
+        """Start *task* in the worker; ``False`` (nothing started) while another task runs. *activity* names it
+        in the footer indicator (``ACTIVITY_<activity>``)."""
         if self.worker.busy:
             return False
         self.worker.start(task, classify)
+        self.activity = Activity(task=activity)
         return True
 
     def disk_space_task(self) -> Callable[[Reporter], dict[str, int]]:
@@ -243,10 +270,10 @@ class Controller:
         return check
 
     def pipeline_summary(self) -> list[str]:
-        """One line per pipeline step: its name and parameters (from the user's config file)."""
+        """The names of the pipeline steps, in order (a repeated step appears each time); no parameters."""
         if self.state.pipeline is None:
             return []
-        return [f"{step.name} {json.dumps(step.params, sort_keys=True)}" for step in self.state.pipeline.steps]
+        return [step.name for step in self.state.pipeline.steps]
 
     # --- step 3: mapping (DICOM / loose NIfTI) -----------------------------------------------------
 
@@ -339,10 +366,20 @@ class Controller:
 
         return task
 
-    def run_finished(self) -> None:
-        """Main thread, on the ``Done`` of ``run_task``: the dataset exists; the labels step opens."""
+    def run_finished(self, summary: dict[str, int] | None = None) -> None:
+        """Main thread, on the ``Done`` of ``run_task``: the dataset exists; the labels step opens. *summary*
+        (counts only) feeds the closing summary of step 6."""
         self.state.dataset_root = self.state.output_dir / "dataset"
+        self.state.run_summary = dict(summary or {})
         self.complete("run")
+
+    def summary_text(self) -> str | None:
+        """The closing summary of a finished run (counts only); ``None`` before a run."""
+        counts = self.state.run_summary
+        if self.state.dataset_root is None or not counts:
+            return None
+        return self.text("SUMMARY_DONE", **{key: counts.get(key, 0)
+                                            for key in ("studies", "series", "participants", "skipped")})
 
     def status_lines(self, event: Status) -> list[str]:
         """The texts of a ``build_dataset`` status event, with the fixed warnings of the CLI."""
@@ -641,6 +678,11 @@ class Controller:
         """The steps of the current input format, in order."""
         return [step for step in STEPS if step != "mapping" or self.state.input_format != "bids"]
 
+    def step_states(self) -> list[tuple[str, str]]:
+        """Each step of the current format with its state for the step indicator: done | current | pending."""
+        return [(step, "current" if step == self.step else "done" if step in self._complete else "pending")
+                for step in self.steps()]
+
     def complete(self, step: str) -> None:
         """Mark *step* as validated: the next one is unlocked."""
         self._complete.add(step)
@@ -673,9 +715,43 @@ class Controller:
     # --- events and closing -----------------------------------------------------------------------
 
     def poll(self) -> list[Event]:
-        """The worker events published since the last call (never blocks; main thread only)."""
-        return self.worker.drain()
+        """The worker events published since the last call (never blocks; main thread only); they also
+        update ``activity``."""
+        events = self.worker.drain()
+        activity = self.activity
+        for event in events:
+            if isinstance(event, Status):
+                activity.stage = event
+            elif isinstance(event, Skipped):
+                activity.skipped += 1
+            elif isinstance(event, StudyFailed):
+                activity.failed += 1
+            elif isinstance(event, ReportReadError):
+                activity.unreadable += 1
+            elif isinstance(event, (Done, Failed)):
+                self.activity = Activity()
+        return events
+
+    def activity_text(self) -> str:
+        """The footer line of the running task: its stage (or name) and its counts; ``""`` when idle."""
+        activity = self.activity
+        if activity.task is None:
+            return ""
+        stage = self.status_lines(activity.stage) if activity.stage is not None else []
+        code = f"ACTIVITY_{activity.task}"
+        line = stage[0] if stage else self.text(code if code in messages.CATALOG[self.language] else "TASK_STARTED")
+        if activity.skipped or activity.failed or activity.unreadable:
+            line += " · " + self.text("ACTIVITY_COUNTS", skipped=activity.skipped, failed=activity.failed,
+                                      unreadable=activity.unreadable)
+        return line
 
     def close_warning(self) -> str | None:
         """The text to confirm before closing while a task runs; ``None`` = close right away."""
         return self.text("CLOSE_WHILE_RUNNING") if self.worker.busy else None
+
+    def close_question(self, confirm: bool = False) -> tuple[str, str] | None:
+        """The (title, text) codes to ask before closing; ``None`` = close right away. A running task always
+        asks; *confirm* (the «Close» button of the last step) asks also without one."""
+        if self.worker.busy:
+            return "CLOSE_TITLE", "CLOSE_WHILE_RUNNING"
+        return ("CLOSE_CONFIRM_TITLE", "CLOSE_CONFIRM") if confirm else None

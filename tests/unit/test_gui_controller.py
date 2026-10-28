@@ -164,7 +164,7 @@ def test_valid_steps_fill_the_state_and_unlock_the_next_step(project):
     assert check.ok and controller.go_next() == "mapping"
     state = controller.state
     assert state.classes == {"AD": "Alzheimer", "CN": ""} and state.ratios == (0.6, 0.2, 0.2) and state.seed == 7
-    assert controller.pipeline_summary() == ['validate {"modalities": null}', 'anonymize {"policy_version": "1"}']
+    assert controller.pipeline_summary() == ["validate", "anonymize"]
     assert not (project / "out").exists()
     texts = [repr(state), *controller.pipeline_summary(), controller.check_text(check, "CONFIG_OK")]
     assert not [text for text in texts if KEY in text or "Planted" in text]
