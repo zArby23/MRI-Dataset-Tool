@@ -43,11 +43,13 @@ class MappingStep(StepView):
         table.columnconfigure(0, weight=1)
         for column in COLUMNS:
             self.tree.column(column, width=theme.px(theme.MAPPING_COLUMNS[column]), stretch=column == "location")
-        self.tree.bind("<Double-1>", self._start_edit)
+        # one click on an editable cell opens its editor (a double click was not discovered)
+        self._editable_under_pointer = widgets.bind_cell_editing(self.tree, EDITABLE_COLUMNS, self._open_editor)
         self.tree.bind("<ButtonRelease-1>", self._column_resized, add="+")
         self.tree.bind("<Configure>", lambda _: self._elide_locations(), add="+")
         widgets.bind_row_hover(self.tree)
-        self._location_tip = widgets.Tooltip(self.tree, self._location_under_pointer)
+        self._location_tip = widgets.Tooltip(self.tree, self._tip_under_pointer)
+        self._elided_width: int | None = None  # the location column width the «…» were computed for
         self._status = self.status_line()
         self._status.pack(fill="x", pady=theme.space("s"))
         self._editor: tk.Widget | None = None
@@ -67,7 +69,8 @@ class MappingStep(StepView):
         self._assign.configure(text=text("ASSIGN_LABEL_SELECTION"), state=busy if classes else "disabled")
         self._help.configure(text=text("MAPPING_HELP"))
         for column in COLUMNS:
-            self.tree.heading(column, text=text(f"COL_{column}"))
+            mark = f" {theme.EDIT_MARK}" if column in EDITABLE_COLUMNS else ""
+            self.tree.heading(column, text=text(f"COL_{column}") + mark)
         self._show_message()
         self._fill()
 
@@ -87,12 +90,16 @@ class MappingStep(StepView):
                 row.participant, row.session or "", row.label,
             ))
         widgets.stripe(self.tree)
-        self._elide_locations()
+        self._elide_locations(force=True)
 
-    def _elide_locations(self) -> None:
-        """Paths longer than their column end with «…»; the tooltip shows them whole."""
+    def _elide_locations(self, force: bool = False) -> None:
+        """Paths longer than their column end with «…»; the tooltip shows them whole. Computed again only for new
+        rows or a new column width (thousands of series: not on every <Configure> of the window)."""
         font = tkfont.nametofont("TkDefaultFont", root=self)
         width = int(self.tree.column("location", "width")) - theme.space("m")
+        if width == self._elided_width and not force:
+            return
+        self._elided_width = width
         for index, row in enumerate(self.controller.state.preview):
             if self.tree.exists(str(index)):
                 self.tree.set(str(index), "location", widgets.elide(row.location.as_posix(), font, width))
@@ -101,12 +108,18 @@ class MappingStep(StepView):
         if self.tree.identify_region(event.x, event.y) == "separator":  # not on every click: thousands of rows
             self._elide_locations()
 
+    def _tip_under_pointer(self) -> str | None:
+        """The whole path of a cut location cell, or the hint of an editable cell, under the pointer."""
+        if self._editable_under_pointer():
+            return self.controller.text("HINT_EDIT_CELL")
+        return self._location_under_pointer()
+
     def _location_under_pointer(self) -> str | None:
         """The whole path of the cell under the pointer, only when it was cut."""
         x = self.tree.winfo_pointerx() - self.tree.winfo_rootx()
         y = self.tree.winfo_pointery() - self.tree.winfo_rooty()
-        item, column = self.tree.identify_row(y), self.tree.identify_column(x)
-        if not item or column != "#1":
+        item = self.tree.identify_row(y)
+        if not item or widgets.column_at(self.tree, item, x) != "location":
             return None
         whole = self.controller.state.preview[int(item)].location.as_posix()
         return whole if self.tree.set(item, "location") != whole else None
@@ -164,14 +177,13 @@ class MappingStep(StepView):
 
     # --- cell editing -----------------------------------------------------------------------------
 
-    def _start_edit(self, event) -> None:
-        item, column_id = self.tree.identify_row(event.y), self.tree.identify_column(event.x)
-        if not item or self.controller.worker.busy:
+    def _open_editor(self, item: str, column: str) -> None:
+        """One click (or Enter / F2) on an editable cell: its editor, a list already open for suffix and label."""
+        if self.controller.worker.busy:
             return
-        column = COLUMNS[int(column_id[1:]) - 1]
-        if column not in EDITABLE_COLUMNS:
-            return
-        self.start_edit(int(item), column)
+        editor = self.start_edit(int(item), column)
+        if isinstance(editor, ttk.Combobox):
+            widgets.open_list(editor)
 
     def start_edit(self, index: int, column: str) -> tk.Widget | None:
         """Open the editor of a cell (a closed list for suffix and label, free text otherwise)."""
@@ -195,7 +207,7 @@ class MappingStep(StepView):
         editor.place(x=x, y=y, width=width, height=height)
         editor.focus_set()
         editor.bind("<Return>", lambda _: self.commit_edit(index, column, editor.get()))
-        editor.bind("<Escape>", lambda _: self._close_editor())
+        editor.bind("<Escape>", lambda _: self._close_editor(refocus=True))
         editor.bind("<<ComboboxSelected>>", lambda _: self.commit_edit(index, column, editor.get()))
         self._editor = editor
         return editor
@@ -211,7 +223,9 @@ class MappingStep(StepView):
         self._show_message()
         self.on_change()
 
-    def _close_editor(self) -> None:
+    def _close_editor(self, refocus: bool = False) -> None:
         if self._editor is not None:
             self._editor.destroy()
             self._editor = None
+            if refocus:  # Esc: back to the table, with its selection
+                self.tree.focus_set()

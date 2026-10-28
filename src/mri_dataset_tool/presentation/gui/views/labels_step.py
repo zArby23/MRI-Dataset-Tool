@@ -28,6 +28,8 @@ class LabelsStep(StepView):
 
         batch = ttk.Frame(self)
         batch.pack(fill="x", pady=(theme.space("s"), 0))
+        show = ttk.Frame(self)  # its own row: with the class row it did not fit the window
+        show.pack(fill="x", pady=(theme.space("s"), 0))
         self._class_label = ttk.Label(batch)
         self._class_label.pack(side="left")
         self.batch_class = tk.StringVar()
@@ -36,11 +38,11 @@ class LabelsStep(StepView):
         self._assign = widgets.Button(batch, command=self.assign_selection)
         self._assign.pack(side="left", padx=(0, theme.space("s")))
         self._assign_unlabeled = widgets.Button(batch, command=self.assign_unlabeled)
-        self._assign_unlabeled.pack(side="left", padx=(0, theme.space("l")))
-        self._filter_label = ttk.Label(batch)
+        self._assign_unlabeled.pack(side="left")
+        self._filter_label = ttk.Label(show)
         self._filter_label.pack(side="left")
         self.filter = tk.StringVar(value=self.controller.state.label_filter)
-        self._filter_buttons = [ttk.Radiobutton(batch, value=name, variable=self.filter, command=self._filter_changed)
+        self._filter_buttons = [ttk.Radiobutton(show, value=name, variable=self.filter, command=self._filter_changed)
                                 for name in FILTERS]
         for button in self._filter_buttons:
             button.pack(side="left", padx=(theme.space("s"), 0))
@@ -58,7 +60,10 @@ class LabelsStep(StepView):
         across.grid(row=1, column=0, sticky="ew")
         table.rowconfigure(0, weight=1)
         table.columnconfigure(0, weight=1)
-        self.tree.bind("<Double-1>", self._start_edit)
+        # one click on a «Label» cell opens the list of classes (a double click was not discovered)
+        self._label_under_pointer = widgets.bind_cell_editing(self.tree, ("label",), self._open_editor)
+        widgets.Tooltip(self.tree, lambda: self.controller.text("HINT_EDIT_LABEL") if self._label_under_pointer()
+                        else None)
         widgets.bind_row_hover(self.tree)
         self._status = self.status_line()
         self._status.pack(fill="x", pady=theme.space("s"))
@@ -79,7 +84,9 @@ class LabelsStep(StepView):
         usable = state.labels_available and not busy
         editable = "normal" if usable and not state.labels_closed else "disabled"
         self._reload.configure(text=text("RELOAD"), state="normal" if state.dataset_root and not busy else "disabled")
-        self._apply.configure(text=text("APPLY"), state=editable if state.label_edits else "disabled")
+        pending = self.controller.pending_label_edits()
+        # «Apply» stands out while there are edits to apply, so they are not forgotten
+        self._apply.configure(text=text("APPLY"), state=editable if pending else "disabled", primary=bool(pending))
         self._finalize.configure(text=text("FINALIZE"), state=editable)
         self._reopen.configure(text=text("REOPEN"), state="normal" if usable and state.labels_closed else "disabled")
         self._corrections.configure(text=text("LOAD_CORRECTIONS"), state=editable)
@@ -95,8 +102,11 @@ class LabelsStep(StepView):
         lines = self.controller.labels_status_lines()
         if self._message is not None:
             lines.append(text(self._message[0], **self._message[1]))
-        self._status.configure(text="\n".join(lines),
-                               severity=messages.severity(None if self._message is None else self._message[0]))
+        if pending:  # the line the warning is about goes first
+            unapplied = text("LABELS_UNAPPLIED", count=pending)
+            lines.sort(key=lambda line: line != unapplied)
+        code = self._message[0] if self._message is not None else "LABELS_UNAPPLIED" if pending else None
+        self._status.configure(text="\n".join(lines), severity=messages.severity(code))
 
     def _draw_table(self) -> None:
         """Rebuild the rows only when they, their edits, the filter or the language changed (thousands of
@@ -107,7 +117,9 @@ class LabelsStep(StepView):
         self._drawn = drawn
         text, rows = self.controller.text, self.controller.state.label_rows
         for column in COLUMNS:
-            self.tree.heading(column, text=text(f"COL_{column}"))
+            mark = f" {theme.EDIT_MARK}" if column == "label" else ""
+            self.tree.heading(column, text=text(f"COL_{column}") + mark)
+        selected, focused = self.tree.selection(), self.tree.focus()  # kept across the rebuild
         self.tree.delete(*self.tree.get_children())
         for index in self.controller.visible_label_rows():
             label, defect = self.controller.effective_label(index)
@@ -116,6 +128,9 @@ class LabelsStep(StepView):
                 row.participant, row.session or "", label, "" if defect is None else text(f"DEFECT_{defect}"),
             ))
         widgets.stripe(self.tree)
+        self.tree.selection_set([item for item in selected if self.tree.exists(item)])
+        if focused and self.tree.exists(focused):
+            self.tree.focus(focused)
 
     def _say(self, check, ok_code: str | None = None) -> None:
         self._message = (check.code, check.values) if not check.ok else (ok_code, check.values) if ok_code else None
@@ -193,10 +208,10 @@ class LabelsStep(StepView):
 
     # --- one cell ---------------------------------------------------------------------------------
 
-    def _start_edit(self, event) -> None:
-        item = self.tree.identify_row(event.y)
-        if item and self.tree.identify_column(event.x) == f"#{COLUMNS.index('label') + 1}":
-            self.start_edit(int(item))
+    def _open_editor(self, item: str, column: str) -> None:
+        """One click (or Enter / F2) on a label cell: the editor with its list already open."""
+        if (editor := self.start_edit(int(item))) is not None:
+            widgets.open_list(editor)
 
     def start_edit(self, index: int) -> ttk.Combobox | None:
         """A closed list of the classes over the label cell (``""`` = unlabeled)."""
@@ -218,7 +233,7 @@ class LabelsStep(StepView):
         editor.place(x=x, y=y, width=width, height=height)
         editor.focus_set()
         editor.bind("<<ComboboxSelected>>", lambda _: self.commit_edit(index, editor.get()))
-        editor.bind("<Escape>", lambda _: self._close_editor())
+        editor.bind("<Escape>", lambda _: self._close_editor(refocus=True))
         self._editor = editor
         return editor
 
@@ -229,7 +244,9 @@ class LabelsStep(StepView):
         self.refresh_texts()
         self.on_change()
 
-    def _close_editor(self) -> None:
+    def _close_editor(self, refocus: bool = False) -> None:
         if self._editor is not None:
             self._editor.destroy()
             self._editor = None
+            if refocus:  # Esc: back to the table, with its selection
+                self.tree.focus_set()

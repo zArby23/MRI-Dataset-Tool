@@ -567,6 +567,20 @@ class Controller:
     def reopen_labels(self) -> Check:
         return self._labels_now("reopen")
 
+    def pending_label_edits(self) -> int:
+        """The label edits not applied yet (the step 5 «Apply» button and warning follow it)."""
+        return len(self.state.label_edits)
+
+    def leave_question(self) -> int | None:
+        """Leaving the labels step with edits not applied asks first: their count; ``None`` = leave at once."""
+        count = self.pending_label_edits()
+        return count if self.step == "labels" and count and not self.worker.busy else None
+
+    def discard_label_edits(self) -> None:
+        """Drop the pending label edits (the table shows the saved labels again)."""
+        self.state.label_edits = {}
+        self.state.label_version += 1
+
     def labels_status_lines(self) -> list[str]:
         state = self.state
         if not state.labels_available:
@@ -576,7 +590,7 @@ class Controller:
         if counts.get("foreign") or counts.get("invalid"):
             lines.append(self.text("LABELS_FOREIGN", **counts))
         if state.label_edits:
-            lines.append(self.text("LABELS_PENDING", count=len(state.label_edits)))
+            lines.append(self.text("LABELS_UNAPPLIED", count=len(state.label_edits)))
         return lines
 
     # --- step 6: exports and report --------------------------------------------------------------
@@ -751,7 +765,10 @@ class Controller:
 
     def close_question(self, confirm: bool = False) -> tuple[str, str] | None:
         """The (title, text) codes to ask before closing; ``None`` = close right away. A running task always
-        asks; *confirm* (the «Close» button of the last step) asks also without one."""
+        asks; label edits not applied ask to apply, discard or stay (``CLOSE_PENDING``, three buttons); *confirm*
+        (the «Close» button of the last step) asks also without either."""
         if self.worker.busy:
             return "CLOSE_TITLE", "CLOSE_WHILE_RUNNING"
+        if self.step == "labels" and self.pending_label_edits():
+            return "LEAVE_PENDING_TITLE", "CLOSE_PENDING"
         return ("CLOSE_CONFIRM_TITLE", "CLOSE_CONFIRM") if confirm else None

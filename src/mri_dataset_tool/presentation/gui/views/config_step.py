@@ -34,6 +34,9 @@ class ConfigStep(StepView):
         self.classes = tk.Text(self, height=4, width=40)
         self.classes.grid(row=3, column=0, columnspan=3, sticky="ew", pady=theme.space("xs"))
         self.classes.bind("<<Modified>>", self._classes_edited)
+        # Ctrl+Enter is «Next» in the window; in the classes box it does nothing (no new line, no step change)
+        self.classes.bind("<Control-Return>", lambda _: "break")
+        self.classes.bind("<Control-KP_Enter>", lambda _: "break")
         self._validated_classes = self.classes.get("1.0", "end")  # the text of the last validation
 
         self._validate = widgets.Button(self, command=self.validate)

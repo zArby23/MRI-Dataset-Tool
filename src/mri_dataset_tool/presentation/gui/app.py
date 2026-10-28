@@ -7,6 +7,7 @@ imported only then, so this module stays light.
 """
 
 import logging
+import sys
 import threading
 import tkinter as tk
 from collections.abc import Callable
@@ -78,6 +79,7 @@ class App(tk.Tk):
         super().__init__()
         self.controller: Controller | None = None
         self._after_id: str | None = None
+        self._closed = False  # set by destroy: nothing is redrawn or scheduled after it
         self.views: dict = {}
         self._language = tk.StringVar(value=messages.DEFAULT_LANGUAGE if controller is None else controller.language)
         self._theme = theme.DEFAULT_THEME
@@ -154,6 +156,13 @@ class App(tk.Tk):
         self._next.pack(side="right")
         self._back = widgets.Button(buttons, icon="back", command=self._go_back)
         self._back.pack(side="right", padx=(0, s))
+        widgets.Tooltip(self._next, lambda: self._text("HINT_NEXT"))
+        widgets.Tooltip(self._back, lambda: self._text("HINT_BACK"))
+        for sequence, move in (("<Alt-Right>", self._go_next), ("<Control-Return>", self._go_next),
+                               ("<Control-KP_Enter>", self._go_next), ("<Alt-Left>", self._go_back)):
+            self.bind(sequence, lambda _, move=move: self._shortcut(move))
+        self._after_apply: Callable[[], None] | None = None  # the move waiting for «Apply and continue»
+        self._focused_step: str | None = None  # the step whose first control got the focus
         ttk.Separator(self).pack(side="bottom", fill="x")
 
         self._body = ttk.Frame(self)
@@ -205,6 +214,8 @@ class App(tk.Tk):
 
     def _schedule(self, callback: Callable[[], None]) -> None:
         """The single pending poll (a direct call of ``_poll`` replaces it); ``destroy`` cancels it."""
+        if self._closed:
+            return
         if self._after_id is not None:
             self.after_cancel(self._after_id)
         self._after_id = self.after(POLL_MS, callback)
@@ -212,6 +223,7 @@ class App(tk.Tk):
     def destroy(self) -> None:
         """Cancel the poll and stop the animated bars first: their pending Tcl timers would run on a
         destroyed window and print errors."""
+        self._closed = True
         if self._after_id is not None:
             self.after_cancel(self._after_id)
             self._after_id = None
@@ -278,6 +290,9 @@ class App(tk.Tk):
             else:
                 view.pack_forget()
             view.refresh_texts()
+        if self._focused_step != self.controller.step:  # a new step: the keyboard starts on its first control
+            self._focused_step = self.controller.step
+            self.after_idle(self.views[self.controller.step].focus_first)  # once the step is mapped
 
     def _refresh_steps(self) -> None:
         """The steps of the current format: «n Name», with a mark when done (not color alone)."""
@@ -341,11 +356,34 @@ class App(tk.Tk):
                               section)
 
     def _go_next(self) -> None:
-        self.controller.go_next()
-        self.refresh()
+        self._leave(self.controller.go_next)
 
     def _go_back(self) -> None:
-        self.controller.go_back()
+        self._leave(self.controller.go_back)
+
+    def _shortcut(self, move: Callable[[], None]) -> str:
+        """Alt+→ / Ctrl+Enter / Alt+←: the same as the buttons, only when they are enabled."""
+        button = self._next if move == self._go_next else self._back
+        if self.controller is not None and button.cget("state") != "disabled":
+            move()
+        return "break"
+
+    def _leave(self, move: Callable[[], object]) -> None:
+        """Leave the step with *move*; label edits not applied ask first: apply and continue, discard, or stay."""
+        count = self.controller.leave_question()
+        if count is not None:
+            choice = dialogs.ask_choice(
+                self._text("LEAVE_PENDING_TITLE"), self._text("LEAVE_PENDING", count=count),
+                [("apply", self._text("APPLY_AND_CONTINUE")), ("discard", self._text("DISCARD")),
+                 ("cancel", self._text("DIALOG_CANCEL"))], parent=self)
+            if choice == "apply":  # the labels task runs; the move waits for its end (see _poll)
+                self._after_apply = move
+                self.views["labels"].run("apply")
+                return
+            if choice != "discard":
+                return
+            self.controller.discard_label_edits()
+        move()
         self.refresh()
 
     # --- events and closing -----------------------------------------------------------------------
@@ -359,6 +397,12 @@ class App(tk.Tk):
                 except Exception as error:  # one failing event must not hide the next ones
                     self.report_callback_exception(type(error), error, error.__traceback__)
             if events:
+                if self._after_apply is not None and not self.controller.worker.busy:
+                    move, self._after_apply = self._after_apply, None
+                    if not self.controller.pending_label_edits():  # applied: continue; failed: stay with the error
+                        move()
+                        if self._closed:  # «Apply and close»
+                            return
                 self.refresh()
         finally:  # never stop polling: else busy stays True for good
             self._schedule(self._poll)
@@ -378,14 +422,40 @@ class App(tk.Tk):
                                      cancel_text=self._text("DIALOG_CANCEL"))
 
     def request_close(self, confirm: bool = False) -> None:
-        """Close the window: the X asks only while a task runs; the «Close» button (*confirm*) always asks."""
+        """Close the window: the X asks while a task runs or label edits are not applied; the «Close» button
+        (*confirm*) always asks."""
         if self.controller is None:
             self.destroy()
             return
         question = self.controller.close_question(confirm)
+        if question is not None and question[1] == "CLOSE_PENDING":  # label edits not applied: never lost silently
+            choice = dialogs.ask_choice(
+                self._text(question[0]), self._text(question[1], count=self.controller.pending_label_edits()),
+                [("apply", self._text("APPLY_AND_CLOSE")), ("discard", self._text("DISCARD")),
+                 ("cancel", self._text("DIALOG_CANCEL"))], parent=self)
+            if choice == "apply":  # closes when the apply task ends well (see _poll); a failure stays open
+                self._after_apply = self.destroy
+                self.views["labels"].run("apply")
+            elif choice == "discard":
+                self.destroy()
+            return
         if question is None or self.ask(question[0], self._text(question[1])):
             self.destroy()
 
 
+def enable_dpi_awareness() -> bool:
+    """Windows: declare the process DPI aware before Tk starts, so text is sharp and sizes follow the display
+    scaling (125 %, 150 %) instead of a stretched bitmap. Elsewhere, or if it fails, nothing changes."""
+    if sys.platform != "win32":
+        return False
+    try:
+        import ctypes
+
+        return ctypes.windll.shcore.SetProcessDpiAwareness(1) == 0  # system DPI aware
+    except (AttributeError, OSError):  # an old Windows without shcore
+        return False
+
+
 def main() -> None:
+    enable_dpi_awareness()
     App(startup=load_services).mainloop()

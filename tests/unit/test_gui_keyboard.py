@@ -2,6 +2,7 @@
 tooltips, icon shapes, «…» cutting and the fixed text of a failed «Open the output folder». The Tk tests
 are skipped without a display; key events need the keyboard focus, so their windows are shown."""
 
+import time
 import tkinter as tk
 from pathlib import Path
 from tkinter import font as tkfont
@@ -25,8 +26,13 @@ def _press(widget: tk.Misc, *keys: str) -> None:
     widget.focus_force()
     widget.update()
     for key in keys:
-        widget.focus_get().event_generate(key)
-        widget.update()
+        before = widget.focus_get()
+        before.event_generate(key)
+        for _ in range(100):  # a loaded machine moves the focus late: wait for Tab to land before the next key
+            widget.update()
+            if key != "<Tab>" or widget.focus_get() is not before:
+                break
+            time.sleep(0.01)
 
 
 # --- without a display ----------------------------------------------------------------------------

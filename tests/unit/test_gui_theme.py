@@ -151,7 +151,7 @@ def test_window_shows_name_steps_and_footer_and_switches_theme():
         header = app._header_canvas
         assert header._name == "MRI Dataset Tool"
         assert header.step_texts() == ["1 Entrada", "2 Configuración", "3 Ejecución", "4 Etiquetas",
-                                       "5 Exportes y reporte"]
+                                       "5 Resultados"]
         assert header._steps[0][2] == "current"
         app.controller.complete("input")
         app.refresh()
@@ -200,7 +200,7 @@ def test_welcome_panel_until_startup_finishes_then_the_first_step(monkeypatch):
     app.withdraw()
     try:
         app.update()
-        assert app.controller is None and app._welcome_status.cget("text") == "Cargando…"
+        assert app.controller is None and app._welcome_status.cget("text") == "Cargando"
         assert app._welcome_privacy.cget("text") == messages.text("PRIVACY_SUMMARY")
         assert str(app._next.cget("state")) == "disabled"
         release.set()

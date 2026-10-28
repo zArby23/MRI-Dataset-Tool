@@ -58,9 +58,11 @@ class RunStep(StepView):
                 lines.append((text(payload), "ok" if payload == "RUN_DONE" else "text"))
         if self._lines and not self.controller.worker.busy:
             counts = self.controller.counts_text
-            for code, counter in (("RUN_ERRORS", self._errors), ("RUN_SKIPPED", self._skipped),
-                                  ("RUN_REPORT_ERRORS", self._report_errors)):
-                lines.append((text(code, counts=counts(counter)), "warning" if counter else "text"))
+            problems = [(code, counter) for code, counter in (("RUN_ERRORS", self._errors), ("RUN_SKIPPED", self._skipped),
+                                                              ("RUN_REPORT_ERRORS", self._report_errors)) if counter]
+            # only what happened: one «No errors.» line instead of three «none»
+            lines += [(text(code, counts=counts(counter)), "warning") for code, counter in problems] or [
+                (text("RUN_CLEAN"), "ok")]
         return lines
 
     def run(self) -> None:

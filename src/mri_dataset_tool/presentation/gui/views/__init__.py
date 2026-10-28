@@ -29,6 +29,13 @@ class StepView(ttk.Frame):
     def on_event(self, event: Event) -> None:
         """A worker event while this step is shown."""
 
+    def focus_first(self) -> None:
+        """Give the keyboard focus to the first control of the step (the next in Tab order after the step)."""
+        self.update_idletasks()  # Tab order skips widgets not mapped yet: finish laying out the step first
+        target = self.tk.call("tk_focusNext", str(self))
+        if target and str(target).startswith(str(self)):
+            self.nametowidget(str(target)).focus_set()
+
     def status_line(self, master: tk.Misc | None = None) -> widgets.StatusLine:
         """A message line with the severity icon, prefix and color, in the current language."""
         return widgets.StatusLine(master or self, lambda: {severity: self.controller.text(f"PREFIX_{severity}")

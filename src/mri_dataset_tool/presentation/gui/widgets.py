@@ -119,7 +119,7 @@ class RoundedButton(tk.Canvas):
         options = {**(cnf or {}), **options}
         if not options:
             return super().configure()
-        for key in ("text", "command", "state", "style"):
+        for key in ("text", "command", "state", "style", "primary"):
             if key in options:
                 value = options.pop(key)
                 if key == "text":
@@ -128,6 +128,8 @@ class RoundedButton(tk.Canvas):
                     self._command = value
                 elif key == "state":
                     self._state = str(value)
+                elif key == "primary":  # e.g. «Apply» while there are edits to apply
+                    self._primary = bool(value)
         if options:
             super().configure(**options)
         self._draw()
@@ -581,6 +583,53 @@ def bind_row_hover(tree: ttk.Treeview) -> None:
 
     tree.bind("<Motion>", move, add="+")
     tree.bind("<Leave>", leave, add="+")
+
+
+def column_at(tree: ttk.Treeview, item: str, x: int) -> str | None:
+    """The column under *x* in row *item*, from the cell boxes (``identify_column`` also counts the hidden
+    tree column of a ``show="headings"`` table in this Tk, and gives the column to its left)."""
+    for name in tree["columns"]:
+        box = tree.bbox(item, name)
+        if box and box[0] <= x < box[0] + box[2]:
+            return name
+    return None
+
+
+def bind_cell_editing(tree: ttk.Treeview, columns: Sequence[str], start: Callable[[str, str], object]
+                      ) -> Callable[[], bool]:
+    """One click on a cell of *columns* opens its editor (``start(item, column)``) after the click selected the
+    row; Enter or F2 open the first editable cell of the focused row; the pointer turns into a hand over them.
+    Returns a function telling whether the pointer is over such a cell (for a hint tooltip)."""
+    names = list(tree["columns"])
+
+    def cell(x: int, y: int) -> tuple[str, str] | None:
+        item = tree.identify_row(y)
+        name = column_at(tree, item, x) if item and tree.identify_region(x, y) == "cell" else None
+        return (item, name) if name in columns else None
+
+    def click(event) -> None:
+        if (found := cell(event.x, event.y)) is not None:
+            start(*found)
+
+    def key(_event) -> str | None:
+        if item := tree.focus():
+            start(item, next(name for name in names if name in columns))
+            return "break"
+        return None
+
+    def under_pointer() -> bool:
+        return cell(tree.winfo_pointerx() - tree.winfo_rootx(), tree.winfo_pointery() - tree.winfo_rooty()) is not None
+
+    tree.bind("<ButtonRelease-1>", click, add="+")
+    for sequence in ("<Return>", "<KP_Enter>", "<F2>"):
+        tree.bind(sequence, key, add="+")
+    tree.bind("<Motion>", lambda event: tree.configure(cursor="hand2" if cell(event.x, event.y) else ""), add="+")
+    return under_pointer
+
+
+def open_list(editor: ttk.Combobox) -> None:
+    """Show the drop-down list of a combobox editor at once (one click instead of two)."""
+    editor.after_idle(lambda: editor.winfo_exists() and editor.tk.call("ttk::combobox::Post", editor))
 
 
 def stripe(tree: ttk.Treeview) -> None:

@@ -47,6 +47,10 @@ class _Dialog(tk.Toplevel):
         y = parent.winfo_rooty() + (parent.winfo_height() - self.winfo_reqheight()) // 3
         self.geometry(f"+{max(x, 0)}+{max(y, 0)}")
         self.deiconify()
+        try:  # Linux refuses a grab on a window that is not viewable yet ("window not viewable")
+            self.wait_visibility()
+        except tk.TclError:
+            pass
         self.grab_set()
         focus.focus_force()  # a modal dialog takes the keyboard focus even if the window had lost it
         self.wait_window()
@@ -65,6 +69,15 @@ def ask_ok_cancel(title: str, text: str, parent: tk.Misc | None = None, ok_text:
     ttk.Label(dialog.body, text=text, wraplength=theme.size("dialog_wrap"), justify="left").pack(anchor="w")
     accept, _ = dialog.add_buttons([(ok_text, True, True), (cancel_text, False, False)])
     return bool(dialog.show(accept))
+
+
+def ask_choice(title: str, text: str, choices: Sequence[tuple[str, str]], parent: tk.Misc | None = None) -> str | None:
+    """Ask among *choices* ``(value, button text)``, the first one primary (Enter); Esc or the window's X give
+    ``None`` (cancel). Callers use it through this module so a test can replace it."""
+    dialog = _Dialog(parent or tk._default_root, title, None)
+    ttk.Label(dialog.body, text=text, wraplength=theme.size("dialog_wrap"), justify="left").pack(anchor="w")
+    buttons = dialog.add_buttons([(label, value, index == 0) for index, (value, label) in enumerate(choices)][::-1])
+    return dialog.show(buttons[-1])
 
 
 def show_sections(parent: tk.Misc, title: str, sections: Sequence[tuple[str, str, Sequence[str]]],

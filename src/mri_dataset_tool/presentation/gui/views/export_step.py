@@ -37,14 +37,15 @@ class ExportStep(StepView):
         ratios.grid(row=0, column=1, sticky="w", padx=theme.space("s"))
         for variable in self.ratios:
             ttk.Entry(ratios, textvariable=variable, width=6).pack(side="left", padx=(0, theme.space("s")))
+        # created here: Tab reaches it with the first row, where it is drawn
+        self._ml.columnconfigure(2, weight=1)
+        self._ml_info = widgets.InfoIcon(self._ml, lambda: self.controller.text("ML_REGENERATE_HELP"))
+        self._ml_info.grid(row=0, column=3, sticky="ne")
         self._seed_label = ttk.Label(self._ml)
         self._seed_label.grid(row=1, column=0, sticky="w", pady=theme.space("xs"))
         ttk.Entry(self._ml, textvariable=self.seed, width=8).grid(row=1, column=1, sticky="w", padx=theme.space("s"))
         self._write_ml = widgets.Button(self._ml, command=self.write_ml)
         self._write_ml.grid(row=3, column=0, sticky="w", pady=(theme.space("s"), 0))
-        self._ml.columnconfigure(2, weight=1)
-        self._ml_info = widgets.InfoIcon(self._ml, lambda: self.controller.text("ML_REGENERATE_HELP"))
-        self._ml_info.grid(row=0, column=3, sticky="ne")
 
         self._report = ttk.LabelFrame(self, padding=theme.space("s"))
         self._report.grid(row=1, column=0, columnspan=3, sticky="ew", pady=theme.space("s"))

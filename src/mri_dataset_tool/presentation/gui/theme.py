@@ -51,7 +51,8 @@ SPACE = {"xs": 4, "s": 8, "m": 12, "l": 16, "xl": 24}  # logical pixels (96 dpi)
 WINDOW = (960, 680)  # logical pixels: a fixed window (design decision), centered on the screen
 TASKBAR = 48  # logical pixels kept free at the bottom of the screen when the window does not fit
 WRAP = 900  # logical pixels: the width of wrapped help and result texts (the body of the fixed window)
-DONE_MARK = "✓"
+DONE_MARK = "✓"  # after the name of a finished step, so the state is not told by color alone
+EDIT_MARK = "▾"  # after the heading of a column edited with one click
 
 # Fixed sizes in logical pixels (``size`` scales them) and other drawing constants: the only place they are set.
 SIZES = {
@@ -61,10 +62,11 @@ SIZES = {
 }
 BAR_STEP_MS = 12  # animation step of the indeterminate bars
 DIALOG_TEXT = (60, 20)  # characters x lines of the sections dialog
-MAPPING_COLUMNS = {"location": 260, "suffix": 80, "code": 160, "participant": 140, "session": 140, "label": 90}  # after the name of a finished step, so the state is not told by color alone
+MAPPING_COLUMNS = {"location": 260, "suffix": 80, "code": 160, "participant": 140, "session": 140, "label": 90}
 
-# name: (base font, extra points, weight, underline)
-FONT_SIZES = {"MRIAppName": ("TkHeadingFont", 6, "bold", 0), "MRIStepTitle": ("TkHeadingFont", 3, "bold", 0),
+# name: (base font, extra points, weight, underline). Three levels (design decision): name 13 bold, step title
+# 12 normal, text 9 (bold only in the current step pill); all in the same family.
+FONT_SIZES = {"MRIAppName": ("TkHeadingFont", 4, "bold", 0), "MRIStepTitle": ("TkHeadingFont", 3, "normal", 0),
               "MRIStepCurrent": ("TkDefaultFont", 0, "bold", 0), "MRILink": ("TkDefaultFont", 0, "normal", 1)}
 
 _scale = 1.0  # screen pixels per logical pixel, set by apply_theme from Tk's scaling
@@ -141,6 +143,8 @@ def _recolor_tk_widgets(widget: tk.Misc, colors: dict[str, str]) -> None:
         widget.configure(background=colors["surface"], foreground=colors["text"], selectbackground=colors["select_bg"],
                          selectforeground=colors["text"], highlightcolor=colors["accent"],
                          highlightbackground=colors["border"])
+        if isinstance(widget, tk.Listbox):  # no underlined «active» line: the log is read, not navigated
+            widget.configure(activestyle="none")
         if isinstance(widget, tk.Text):  # an input: the border and font of the entries (Tk's default is TkFixedFont)
             widget.configure(insertbackground=colors["text"], relief="flat", borderwidth=0, highlightthickness=px(1),
                              font="TkTextFont",

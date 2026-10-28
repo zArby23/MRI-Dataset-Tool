@@ -192,7 +192,7 @@ def test_disk_space_task_and_text(project, monkeypatch):
     assert done.summary == {"required": 0, "free": 2**30, "insufficient": 0}
     assert controller.disk_space_text(done.summary) == controller.text("DISK_SPACE_OK")
     low = {"required": 2**30, "free": 2**30, "insufficient": 1}
-    assert controller.disk_space_text(low).startswith("Aviso: la salida estimada (1.0 GiB)")
+    assert controller.disk_space_text(low) == controller.text("LOW_DISK_SPACE", required="1.0", free="1.0")
 
 
 def test_key_text_follows_the_state():
