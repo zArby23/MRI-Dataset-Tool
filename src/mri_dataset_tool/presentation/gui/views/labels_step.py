@@ -5,7 +5,7 @@ Every edit stays pending until «Apply» (all or nothing, logged)."""
 import tkinter as tk
 from tkinter import filedialog, ttk
 
-from mri_dataset_tool.presentation.gui import messages, theme, widgets
+from mri_dataset_tool.presentation.gui import dialogs, messages, theme, widgets
 from mri_dataset_tool.presentation.gui.views import StepView
 from mri_dataset_tool.presentation.gui.worker import Done, Event, Failed
 
@@ -167,6 +167,8 @@ class LabelsStep(StepView):
                 self._message = (check.code, check.values)
             elif self._action == "apply":
                 self._message = ("LABELS_APPLIED", check.values)
+                if self.controller.offer_finalize():
+                    self.after_idle(self.ask_finalize)  # once the table shows the applied rows
             elif self._action == "load" and self._pending:  # reloading discarded them: say so
                 self._message = ("LABELS_DISCARDED", {"count": self._pending})
             else:
@@ -192,6 +194,13 @@ class LabelsStep(StepView):
         question = self.controller.text("CONFIRM_ASSIGN_UNLABELED", label=label, count=len(indices))
         if self.confirm(question):
             self._say(self.controller.assign_labels(indices, label), "ASSIGNED")
+
+    def ask_finalize(self) -> None:
+        """Every row has a class: «Finalize» runs the button's action, «Later» does nothing."""
+        text = self.controller.text
+        if dialogs.ask_ok_cancel(text("FINALIZE_NOW_TITLE"), text("FINALIZE_NOW"), parent=self.winfo_toplevel(),
+                                 ok_text=text("FINALIZE"), cancel_text=text("LATER")):
+            self.run("finalize")
 
     def confirm(self, question: str) -> bool:
         return self.winfo_toplevel().ask("CONFIRM_TITLE", question)

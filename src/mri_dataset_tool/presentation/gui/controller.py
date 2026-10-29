@@ -85,6 +85,8 @@ class WizardState:
     label_edits: dict[tuple[str, str | None], str] = field(default_factory=dict, repr=False)
     label_classes: list[str] = field(default_factory=list)
     labels_closed: bool = False
+    labels_complete: bool = False  # every pair has a class and no defect: they can be finalized
+    finalize_offered: bool = False  # asked once they became complete; asked again only after incomplete
     labels_available: bool = False  # False: no classes were given (no label files)
     label_counts: dict[str, int] = field(default_factory=dict)  # pairs, labeled, foreign, invalid
     label_filter: str = "all"  # all | unlabeled | defect
@@ -480,6 +482,9 @@ class Controller:
         review = sheet.review
         state.labels_available, state.label_rows, state.label_classes = True, sheet.rows, sheet.classes
         state.labels_closed = sheet.finalized
+        state.labels_complete = review.is_complete
+        if state.labels_closed or not state.labels_complete:
+            state.finalize_offered = False
         state.label_counts = {"pairs": review.dataset_pairs, "labeled": review.labeled,
                               "foreign": review.not_in_dataset, "invalid": review.invalid_ids}
         if state.labels_closed:
@@ -586,6 +591,15 @@ class Controller:
     def apply_labels(self) -> Check:
         """Apply the pending edits (all or nothing, logged); ``values["count"]`` = changes."""
         return self._labels_now("apply")
+
+    def offer_finalize(self) -> bool:
+        """After a successful apply: whether to ask «finalize now?». Once per time the labels become complete,
+        so «Later» is not asked again until they are incomplete and complete again."""
+        state = self.state
+        if state.labels_available and state.labels_complete and not state.labels_closed and not state.finalize_offered:
+            state.finalize_offered = True
+            return True
+        return False
 
     def finalize_labels(self) -> Check:
         return self._labels_now("finalize")

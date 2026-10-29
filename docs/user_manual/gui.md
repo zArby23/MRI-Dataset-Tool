@@ -218,8 +218,10 @@ desconocida*, *repetida en la tabla*, *falta en la tabla*).
   prefijos `sub-`/`ses-`) y `label`, el mismo formato que `--corrections` de la CLI. Se valida entero y sus filas
   pasan a cambios pendientes.
 - **Recargar** vuelve a leer la tabla y descarta los cambios pendientes (avisa cuántos).
-- **Cerrar** exige todas las filas con clase y ningún cambio pendiente; habilita el paso 6. **Reabrir** permite
-  volver a editar.
+- **Finalizar etiquetas** exige todas las filas con clase y ningún cambio pendiente; habilita el paso 6.
+  **Reabrir** permite volver a editar. Cuando un «Aplicar» deja todas las filas con clase, un diálogo pregunta
+  «¿Finalizar las etiquetas ahora?»: **Finalizar** hace lo mismo que el botón y **Más tarde** no hace nada (no se
+  vuelve a preguntar hasta que falte alguna clase y se complete otra vez).
 - **Si sale del paso con cambios sin aplicar** (Atrás, Siguiente o los atajos), un diálogo pregunta: **Aplicar y
   continuar** (aplica y cambia de paso solo si se aplicaron bien), **Descartar** o **Cancelar** (Esc).
 

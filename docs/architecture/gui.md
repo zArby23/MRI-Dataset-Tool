@@ -132,6 +132,10 @@ permiten: crecen con la fuente.
 - **Salir del paso 5 con cambios sin aplicar** (Atrás, Siguiente o atajos): `dialogs.ask_choice` con «Aplicar y
   continuar» (aplica con la tarea de siempre y navega solo si terminó bien), «Descartar» o «Cancelar». La pregunta
   está en la navegación de la ventana; `controller.go_next()`/`go_back()` no cambian.
+- **Finalizar tras aplicar** (V8): tras un «Aplicar» que deja las etiquetas completas y abiertas,
+  `LabelsStep.ask_finalize` muestra `dialogs.ask_ok_cancel` con «Finalizar» (la misma tarea que el botón
+  «Finalizar etiquetas») o «Más tarde». `controller.offer_finalize()` decide sin Tk: una vez cada vez que pasan a
+  completas (`labels_complete`, `finalize_offered`, que vuelve a `False` al quedar incompletas o cerradas).
 
 ## Arranque y bienvenida
 

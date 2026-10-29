@@ -241,12 +241,15 @@ CATALOG: dict[str, dict[str, str]] = {
         # step 5: labels
         "LABELS_HELP": (
             "Haga clic en una celda de «Etiqueta» para elegir la clase. Los cambios quedan pendientes hasta "
-            "que pulse «Aplicar», y cada cambio queda registrado. Para cerrar las etiquetas, todas las filas "
+            "que pulse «Aplicar», y cada cambio queda registrado. Para «Finalizar etiquetas», todas las filas "
             "deben tener clase; después podrá crear los archivos para entrenamiento. «Reabrir» permite volver "
             "a editarlas."
         ),
         "APPLY": "Aplicar",
-        "FINALIZE": "Cerrar",
+        "FINALIZE": "Finalizar etiquetas",
+        "FINALIZE_NOW_TITLE": "Etiquetas completas",
+        "FINALIZE_NOW": "Todas las filas tienen etiqueta. ¿Finalizar las etiquetas ahora?",
+        "LATER": "Más tarde",
         "REOPEN": "Reabrir",
         "RELOAD": "Recargar",
         "COL_defect": "Defecto",
@@ -596,11 +599,14 @@ CATALOG: dict[str, dict[str, str]] = {
         # step 5: labels
         "LABELS_HELP": (
             "Click a \"Label\" cell to choose the class. Changes stay pending until you press \"Apply\", and "
-            "every change is logged. To close the labels, every row must have a class; then you can create "
+            "every change is logged. To \"Finalize labels\", every row must have a class; then you can create "
             "the training files. \"Reopen\" lets you edit them again."
         ),
         "APPLY": "Apply",
-        "FINALIZE": "Finalize",
+        "FINALIZE": "Finalize labels",
+        "FINALIZE_NOW_TITLE": "Labels complete",
+        "FINALIZE_NOW": "Every row has a label. Finalize the labels now?",
+        "LATER": "Later",
         "REOPEN": "Reopen",
         "RELOAD": "Reload",
         "COL_defect": "Defect",
