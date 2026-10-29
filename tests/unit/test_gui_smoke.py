@@ -29,7 +29,7 @@ def test_window_opens_navigates_and_switches_language():
     app = _app()
     try:
         app.update()
-        assert app.title() == "MRI Dataset Tool - Paso 1 de 5: Entrada"  # 5C: the step in the title
+        assert app.title() == "MRI Dataset Tool - Paso 1 de 5: Entrada"  # the step in the title
         assert str(app._next.cget("state")) == "disabled"
         app.controller.complete("input")
         app.refresh()

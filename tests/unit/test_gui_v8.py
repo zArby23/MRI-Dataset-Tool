@@ -1,4 +1,4 @@
-"""Stage 5C V8: after an «Apply» that leaves every row with a class, the labels step offers to finalize them
+"""After an «Apply» that leaves every row with a class, the labels step offers to finalize them
 («Finalize» / «Later»), once per time they become complete. Tk tests are skipped without a display."""
 
 import tkinter as tk

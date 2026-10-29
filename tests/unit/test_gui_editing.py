@@ -1,4 +1,4 @@
-"""Stage 5C V4h: one-click cell editing, pending label edits that are not forgotten, the run log without empty
+"""One-click cell editing, pending label edits that are not forgotten, the run log without empty
 «none» lines and bars that fit the fixed window. The Tk tests are skipped without a display."""
 
 import tkinter as tk

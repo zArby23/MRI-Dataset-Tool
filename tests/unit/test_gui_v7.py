@@ -1,4 +1,4 @@
-"""Stage 5C V7 (QA8 fixes): report warnings with any code, the batch label per study, the step-6 card on small
+"""Report warnings with any code, the batch label per study, the step-6 card on small
 screens, and the cell editors (kept on focus loss, never floating). Tk tests are skipped without a display."""
 
 import json
@@ -123,7 +123,7 @@ def _mapping_app(monkeypatch):
 @pytest.mark.parametrize(("leave", "stored"), [("other widget", True), ("step change", True), ("other program", False)])
 def test_free_text_of_a_mapping_cell_is_stored_inside_the_window_and_kept_when_another_program_takes_the_focus(
         monkeypatch, leave, stored):
-    """QA8-05: a click elsewhere or a step change stores the text; Alt+Tab to another program leaves it open."""
+    """A click elsewhere or a step change stores the text; Alt+Tab to another program leaves it open."""
     _display()
     app, controller, view = _mapping_app(monkeypatch)
     try:

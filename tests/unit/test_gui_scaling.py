@@ -1,4 +1,4 @@
-"""Stage 5C V5: display scaling (simulated 100/125/150 % on a 1920x1080 screen), keyboard focus order, initial
+"""Display scaling (simulated 100/125/150 % on a 1920x1080 screen), keyboard focus order, initial
 focus, shortcuts and the Windows DPI declaration. The Tk tests are skipped without a display; the window is
 shown because keyboard focus and real geometry need it."""
 

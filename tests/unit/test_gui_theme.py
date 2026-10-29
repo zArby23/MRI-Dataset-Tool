@@ -1,4 +1,4 @@
-"""The GUI theme and frame (stage 5C, V1-V2): palettes, contrast and the literal sweep without a display;
+"""The GUI theme and frame: palettes, contrast and the literal sweep without a display;
 the styled window, the step indicator, the footer and the welcome panel with Tk (skipped without a display)."""
 
 import os
@@ -45,7 +45,7 @@ def test_header_gradient_runs_from_a_darker_top_to_the_background():
     for name, palette in theme.PALETTES.items():
         assert theme.mix(palette["header_top"], palette["bg"], 0) == palette["header_top"]
         assert theme.mix(palette["header_top"], palette["bg"], 1) == palette["bg"]
-        assert theme.contrast_ratio(palette["header_top"], palette["bg"]) > 1.5  # clearly visible (V4e)
+        assert theme.contrast_ratio(palette["header_top"], palette["bg"]) > 1.5  # clearly visible
         assert theme.contrast_ratio(palette["hover"], palette["row_alt"]) > 1.1  # a hovered striped row shows
     light = theme.PALETTES["light"]  # darker than the background in the light theme
     assert theme.contrast_ratio(light["header_top"], "#FFFFFF") > theme.contrast_ratio(light["bg"], "#FFFFFF")

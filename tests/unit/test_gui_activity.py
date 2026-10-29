@@ -1,4 +1,4 @@
-"""The activity indicator (stage 5C, V3): the controller's ``Activity`` fed by the worker events, without a
+"""The activity indicator: the controller's ``Activity`` fed by the worker events, without a
 display; the footer bar and the severity colors of the run log with Tk (skipped without a display)."""
 
 import threading

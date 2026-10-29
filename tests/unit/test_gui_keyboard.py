@@ -1,4 +1,4 @@
-"""Keyboard and accessibility of the stage 5C widgets (V4 review M3): the format cards, the themed dialogs,
+"""Keyboard and accessibility of the themed widgets: the format cards, the themed dialogs,
 tooltips, icon shapes, «…» cutting and the fixed text of a failed «Open the output folder». The Tk tests
 are skipped without a display; key events need the keyboard focus, so their windows are shown."""
 

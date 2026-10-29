@@ -381,7 +381,7 @@ def test_tk_window_walk(tmp_path, monkeypatch) -> None:
         tk.Tk().destroy()
     except tk.TclError as error:
         if "no display name" not in str(error) and "connect to display" not in str(error):
-            raise  # only a missing display skips; any other Tk error is a failure (QA8-10)
+            raise  # only a missing display skips; any other Tk error is a failure
         pytest.skip("No display available for Tk.")
     from mri_dataset_tool.presentation.gui.app import App
     from mri_dataset_tool.presentation.gui import dialogs
@@ -421,7 +421,7 @@ def test_tk_window_walk(tmp_path, monkeypatch) -> None:
         labels = views["labels"]
         labels.batch_class.set("CN")
         monkeypatch.setattr(labels, "confirm", lambda question: True)
-        # 5C V8: a complete apply asks «finalize now?»; «Later», so the button below finalizes as in 5B
+        # a complete apply now asks «finalize now?»; «Later», so the button below finalizes as in 5B
         monkeypatch.setattr(dialogs, "ask_ok_cancel", lambda *args, **kwargs: False)
         labels.assign_unlabeled()
         labels.run("apply")

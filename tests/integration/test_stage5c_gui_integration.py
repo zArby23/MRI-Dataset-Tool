@@ -63,7 +63,7 @@ NATIVE_SCALING = _native_scaling()
 
 
 def _reset_scaling() -> None:
-    """Give the next roots the native scaling again (QA8-11): a root inherits the ``tk scaling`` of the
+    """Give the next roots the native scaling again: a root inherits the ``tk scaling`` of the
     previous one in this process and computes its fonts from it while it is created, so only a root created
     after this sees native text sizes (resetting it after creating the root, as conftest does, is too late
     for the fonts)."""
@@ -78,7 +78,7 @@ def _reset_scaling() -> None:
 
 @pytest.fixture
 def native_display():
-    """Native scaling before and after the test (QA8-11); the theme scale is restored by conftest (QA8-07)."""
+    """Native scaling before and after the test; the theme scale module state is restored by conftest."""
     _reset_scaling()
     yield
     _reset_scaling()
@@ -89,7 +89,7 @@ def _display() -> None:
         tk.Tk().destroy()
     except tk.TclError as error:
         if "no display name" not in str(error) and "connect to display" not in str(error):
-            raise  # only a missing display skips; any other Tk error is a failure (QA8-10)
+            raise  # only a missing display skips; any other Tk error is a failure
         pytest.skip("No display available for Tk.")
 
 
@@ -174,7 +174,7 @@ def _settle(app, timeout: float = 600) -> None:
 def walked(tmp_path_factory: pytest.TempPathFactory):
     """Steps 1→6 in the real window on the DICOM input with planted PHI; everything shown is recorded."""
     _display()
-    _reset_scaling()  # built at native scaling whatever ran before (QA8-11)
+    _reset_scaling()  # built at native scaling whatever ran before (the display keeps the last scaling)
     tmp = tmp_path_factory.mktemp("e8")
     record = {"texts": [], "events": [], "activity": [], "dialogs": [], "tooltips": [], "callback_errors": [],
               "location_tips": []}
