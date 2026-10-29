@@ -11,10 +11,79 @@ DEFAULT_LANGUAGE = "es"
 
 CATALOG: dict[str, dict[str, str]] = {
     "es": {
-        "APP_TITLE": "MRI Dataset Tool: asistente",
+        "APP_TITLE_STEP": "MRI Dataset Tool - {header}",
         "MENU_LANGUAGE": "Idioma",
         "LANGUAGE_es": "Español",
         "LANGUAGE_en": "Inglés",
+        "APP_NAME": "MRI Dataset Tool",
+        "WELCOME_SUBTITLE": "Preparación de datasets de resonancia magnética para ML/DL",
+        "VERSION": "Versión {version}",
+        "VERSION_UNKNOWN": "desconocida",
+        "LOADING": "Cargando",
+        "STARTUP_FAILED": "No se pudo iniciar ({error_type}).",
+        "CLOSE": "Cerrar",
+        "CLOSE_CONFIRM_TITLE": "Cerrar la herramienta",
+        "CLOSE_CONFIRM": "¿Cerrar la herramienta?",
+        "PREFIX_error": "Error:",
+        "PREFIX_warning": "Aviso:",
+        "PREFIX_ok": "Listo:",
+        "ACTIVITY_disk_space": "Comprobando el espacio en disco",
+        "ACTIVITY_preview": "Leyendo las series",
+        "ACTIVITY_run": "Creando el dataset",
+        "ACTIVITY_labels": "Guardando las etiquetas",
+        "ACTIVITY_corrections": "Leyendo las correcciones",
+        "ACTIVITY_ml": "Creando los archivos para entrenamiento",
+        "ACTIVITY_report": "Creando el reporte",
+        "ACTIVITY_COUNTS": "Omitidos: {skipped} · Fallidos: {failed} · Ilegibles: {unreadable}",
+        "THEME_LABEL": "Tema",
+        "THEME_light": "Claro",
+        "THEME_dark": "Oscuro",
+        "PRIVACY_BUTTON": "Privacidad y memoria",
+        "PRIVACY_TITLE": "Privacidad y uso de memoria",
+        "DIALOG_OK": "Aceptar",
+        "DIALOG_CANCEL": "Cancelar",
+        "MORE_INFO": "Más información",
+        "FORMAT_HELP_bids": "Carpetas sub-/ses- con NIfTI",
+        "FORMAT_HELP_dicom": "Carpetas con series DICOM",
+        "FORMAT_HELP_nifti": "NIfTI sueltos (.nii, .nii.gz)",
+        "SUMMARY_DONE": (
+            "Dataset terminado con {studies} estudios, {series} series y {participants} participantes. "
+            "Archivos no leídos: {skipped}."
+        ),
+        "OPEN_FAILED": "No se pudo abrir la carpeta ({error_type}).",
+        "PRIVACY_SUMMARY": "Sus datos se quedan en este equipo y los resultados se anonimizan.",
+        "PRIVACY_HEADING": "Aviso de privacidad",
+        "PRIVACY_LEAD": "Sus datos se quedan en este equipo.",
+        "PRIVACY_1": (
+            "• Los estudios se procesan localmente; la herramienta no envía información por la red."
+        ),
+        "PRIVACY_2": (
+            "• Los resultados se anonimizan: los identificadores se reemplazan por seudónimos y solo se conservan"
+            " los metadatos técnicos necesarios (política v1)."
+        ),
+        "PRIVACY_3": (
+            "• La clave que genera los seudónimos no se muestra ni se guarda. Si usted no define una, se crea una"
+            " nueva en cada sesión: los seudónimos cambian y los datasets de sesiones distintas no deben combinar"
+            "se."
+        ),
+        "PRIVACY_4": (
+            "• La anonimización no borra texto incrustado en las imágenes ni elimina los rasgos de la cara (defac"
+            "ing). Revise el resultado antes de compartirlo."
+        ),
+        "MEMORY_1": (
+            "Antes de remuestrear o normalizar, la herramienta estima la memoria que necesitará y la compara con "
+            "la disponible. Si no alcanza, ese estudio se marca como fallido y el lote continúa con los demás."
+        ),
+        "MEMORY_2": (
+            "Puede forzar la ejecución con la casilla «Permitir continuar…», bajo su responsabilidad: el equipo p"
+            "uede volverse muy lento, otros programas pueden cerrarse y el proceso puede terminar sin guardar res"
+            "ultados."
+        ),
+        "MEMORY_3": (
+            "La estimación es de un instante y no incluye otros programas. Los volúmenes 4D grandes, como las dif"
+            "usiones, pueden necesitar varios GB. El tamaño máximo de salida solo se cambia en el archivo de conf"
+            "iguración."
+        ),
         "BACK": "< Atrás",
         "NEXT": "Siguiente >",
         "STEP_HEADER": "Paso {number} de {total}: {title}",
@@ -23,13 +92,13 @@ CATALOG: dict[str, dict[str, str]] = {
         "STEP_mapping": "Mapeo de series",
         "STEP_run": "Ejecución",
         "STEP_labels": "Etiquetas",
-        "STEP_export": "Exportes y reporte",
+        "STEP_export": "Resultados",
         "STEP_PENDING": "Este paso aún no está disponible.",
         "TASK_RUNNING": "Hay una tarea en curso; espere a que termine.",
         "CLOSE_TITLE": "Tarea en curso",
         "CLOSE_WHILE_RUNNING": (
-            "Hay una tarea en curso. Si cierra ahora, la tarea se corta y la salida queda incompleta: "
-            "vacíe o borre la carpeta de salida antes de reintentar. ¿Cerrar de todos modos?"
+            "Hay una tarea en curso. Si cierra ahora se interrumpe y la salida queda incompleta; antes de "
+            "repetir tendrá que vaciar la carpeta de salida. ¿Cerrar de todos modos?"
         ),
         "INVALID_INPUT": "Entrada no válida ({error_type}).",
         "OUTPUT_EXISTS": "La salida ya existe; elija una carpeta nueva.",
@@ -41,54 +110,41 @@ CATALOG: dict[str, dict[str, str]] = {
         "OUTPUT_DIR": "Carpeta de salida (nueva)",
         "BROWSE": "Examinar…",
         "VALIDATE": "Validar",
-        "KEY_DEFINED": "Clave de anonimización: definida en el entorno (MRI_ANON_KEY).",
+        "KEY_DEFINED": "Clave de anonimización: definida por usted (se mantiene entre sesiones).",
         "KEY_GENERATED": (
-            "Clave de anonimización: generada para esta sesión. Los seudónimos cambian cada vez que se abre el "
-            "programa (vea el manual)."
+            "Clave de anonimización: generada para esta sesión; los seudónimos cambian en cada sesión."
         ),
         "INPUT_OK": "Entrada y salida válidas.",
-        "CHECKING_DISK_SPACE": "Comprobando el espacio en disco…",
+        "CHECKING_DISK_SPACE": "Comprobando el espacio en disco.",
         "DISK_SPACE_OK": "Espacio en disco suficiente para la salida estimada.",
         "LOW_DISK_SPACE": (
-            "Aviso: la salida estimada ({required} GiB) alcanza el 90 % del espacio libre del disco de salida "
-            "({free} GiB). Considere otro disco; la ejecución no se bloquea."
+            "La salida puede ocupar unos {required} GiB y el disco solo tiene {free} GiB libres. Puede "
+            "seguir, pero conviene usar otro disco."
         ),
         "INPUT_REQUIRED": "Elija la carpeta de entrada.",
         "OUTPUT_REQUIRED": "Elija la carpeta de salida.",
         "NEW_FOLDER": "Nombre de la carpeta nueva",
         "OUTPUT_NOT_EMPTY": (
-            "La carpeta de salida tiene contenido y no se sobrescribe: escriba el nombre de una carpeta nueva que "
-            "se creará dentro de ella."
+            "La carpeta de salida ya tiene archivos. Escriba el nombre de una carpeta nueva y se creará "
+            "dentro."
         ),
         "INVALID_FOLDER_NAME": (
-            "Nombre de carpeta no válido: un nombre simple, sin / \\ : * ? \" < > |, sin «..» y sin punto ni "
-            "espacio al final."
+            "Nombre de carpeta no válido. Use un nombre simple, sin / \\ : * ? \" < > | ni «..», que no "
+            "termine en punto ni en espacio."
         ),
         "FOLDER_NAME_EXISTS": "Ya existe una carpeta o un archivo con ese nombre; elija otro.",
         "INVALID_OUTPUT_PATH": (
-            "La ruta de salida no se puede crear: una carpeta nueva de la ruta tiene un nombre no válido (sin / \\ "
-            ": * ? \" < > |, sin punto ni espacio al final, de 255 bytes como máximo) o la unidad no existe o no es "
-            "accesible."
+            "No se puede crear la carpeta de salida. Revise que la unidad exista y que los nombres nuevos no "
+            "tengan / \\ : * ? \" < > |, no terminen en punto o espacio y no sean demasiado largos."
         ),
         # step 2: configuration
         "CONFIG_FILE": "Archivo de configuración (preajuste o propio)",
         "MEMORY_TITLE": "Uso de memoria",
-        "MEMORY_NOTICE": (
-            "Antes de remuestrear (resample) o normalizar (normalize), la herramienta estima la memoria que "
-            "necesita el volumen de salida y la compara con la RAM disponible en ese momento. Si no alcanza, el "
-            "estudio se marca como fallido y el lote continúa con los demás. Puede forzar la ejecución con la "
-            "casilla de abajo, que equivale al parámetro allow_insufficient_memory: true de los pasos resample y "
-            "normalize del archivo de configuración; ese consentimiento queda registrado en el manifiesto de la "
-            "corrida. Hágalo bajo su responsabilidad: si la memoria no alcanza, el equipo puede volverse muy lento "
-            "por el uso de disco como memoria, otros programas pueden cerrarse, y el proceso puede terminar "
-            "abruptamente sin guardar resultados (en Linux, el sistema puede finalizarlo). La comprobación es una "
-            "estimación en un instante y no cubre la memoria de otros pasos ni de otros programas que se abran "
-            "durante la ejecución. Volúmenes 4D grandes, como las difusiones, pueden necesitar varios GB. Además, "
-            "resample rechaza cualquier salida de más de max_output_voxels vóxeles (por defecto 2**32, eje temporal "
-            "incluido), aunque haya memoria; ese límite solo se cambia en el archivo de configuración."
-        ),
         "ALLOW_MEMORY": "Permitir continuar aunque la memoria disponible no alcance (bajo mi responsabilidad)",
-        "CLASSES": "Clases de etiqueta, una por línea: NOMBRE o NOMBRE=descripción (vacío = sin etiquetas)",
+        "CLASSES": (
+            "Clases para etiquetar, una por línea. Por ejemplo «AD» o «AD=Alzheimer». Déjelo vacío si no va a "
+            "etiquetar."
+        ),
         "RATIOS": "Proporciones entrenamiento / validación / prueba",
         "SEED": "Semilla de las particiones",
         "CONFIG_OK": "Configuración válida. Pasos del pipeline:",
@@ -98,11 +154,10 @@ CATALOG: dict[str, dict[str, str]] = {
         "LOAD_MAPPING": "Cargar tabla…",
         "SAVE_MAPPING": "Guardar tabla…",
         "MAPPING_HELP": (
-            "Doble clic en una celda de sufijo, participante, sesión o etiqueta para editarla (vacía = automático). "
-            "El sufijo se aplica a la serie; participante, sesión y etiqueta a todo el estudio. Después pulse "
-            "«Vista previa» para comprobar los cambios; sin vista previa válida no se puede seguir. Si los nombres "
-            "de los archivos no indican el sufijo (p. ej. NIfTI con nombres neutros), cargue primero una tabla "
-            "(«Cargar tabla…») y luego pulse «Vista previa»."
+            "Haga clic en una celda de sufijo, participante, sesión o etiqueta para cambiarla. Si la deja "
+            "vacía, se decide sola. El sufijo cambia solo esa serie y lo demás, todo el estudio. Después "
+            "pulse «Vista previa». Sin una vista previa correcta no se puede seguir. Si los nombres de los "
+            "archivos no dicen qué imagen son, cargue antes un archivo de tabla con «Cargar tabla»."
         ),
         "COL_location": "Carpeta o archivo",
         "COL_suffix": "Sufijo",
@@ -115,8 +170,11 @@ CATALOG: dict[str, dict[str, str]] = {
         "CODE_NO_MATCH": "omitida: sin coincidencia",
         "CODE_AMBIGUOUS": "omitida: ambigua",
         "CODE_EXCLUDED": "omitida: excluida",
-        "PREVIEW_RUNNING": "Leyendo cabeceras…",
-        "PREVIEW_OK": "Series: {series}; omitidas: {skipped}; archivos omitidos por el lector: {files}.",
+        "PREVIEW_RUNNING": "Leyendo las series.",
+        "PREVIEW_OK": (
+            "{series} series encontradas: {skipped} sin sufijo (se omitirán) y {files} archivos que no se "
+            "pudieron leer."
+        ),
         "EDIT_PENDING": "Cambios sin comprobar: pulse «Vista previa».",
         "MAPPING_SAVED": "Tabla guardada.",
         "MAPPING_LOADED": "Tabla cargada: pulse «Vista previa».",
@@ -134,27 +192,44 @@ CATALOG: dict[str, dict[str, str]] = {
         # step 4: run
         "RUN": "Ejecutar",
         "RUN_HELP": (
-            "Construye el dataset BIDS anonimizado, las etiquetas, los exportes para ML y el reporte en la carpeta de "
-            "salida. La tarea no se puede cancelar; la ventana sigue respondiendo."
+            "Crea en la carpeta de salida el dataset anonimizado, con sus etiquetas, los archivos para "
+            "entrenar modelos y el reporte. Puede tardar y no se puede cancelar."
         ),
-        "RUN_RUNNING": "Ejecutando…",
+        "RUN_RUNNING": "Creando el dataset.",
         "RUN_DONE": "Terminado.",
-        "RUN_FAILED_HINT": "Vacíe o borre la carpeta de salida antes de reintentar.",
-        "RUN_ERRORS": "Errores por tipo: {counts}.",
-        "RUN_SKIPPED": "Archivos omitidos por el lector: {counts}.",
-        "RUN_REPORT_ERRORS": "Errores de lectura del reporte: {counts}.",
+        "RUN_CLEAN": "Sin errores.",
+        "LABELS_UNAPPLIED": "Cambios sin aplicar: {count}.",
+        "LEAVE_PENDING_TITLE": "Cambios sin aplicar",
+        "LEAVE_PENDING": "Hay {count} cambios de etiquetas sin aplicar. ¿Qué quiere hacer?",
+        "APPLY_AND_CONTINUE": "Aplicar y continuar",
+        "DISCARD": "Descartar",
+        "CLOSE_PENDING": "Hay {count} cambios de etiquetas sin aplicar. ¿Qué quiere hacer antes de cerrar?",
+        "APPLY_AND_CLOSE": "Aplicar y cerrar",
+        "HINT_EDIT_LABEL": "Clic para elegir la clase",
+        "HINT_EDIT_CELL": "Clic para editar",
+        "HINT_NEXT": "Siguiente paso (Alt+→ o Ctrl+Enter)",
+        "HINT_BACK": "Paso anterior (Alt+←)",
+        "RUN_FAILED_HINT": "Antes de repetir, vacíe o borre la carpeta de salida.",
+        "RUN_ERRORS": "Estudios con error, por tipo: {counts}.",
+        "RUN_SKIPPED": "Archivos que no se pudieron leer: {counts}.",
+        "RUN_REPORT_ERRORS": "Archivos que el reporte no pudo leer: {counts}.",
         "NONE": "ninguno",
-        "EV_export": "Exportando el dataset (pipeline)…",
-        "EV_exported": "Estudios escritos: {studies}; series: {series}; participantes: {participants}; errores: {errors}.",
-        "EV_labels_skipped": "Etiquetas: omitidas (sin clases).",
-        "EV_label_template": "Plantilla de etiquetas escrita ({classes} clases).",
-        "EV_mapping_labels_applied": "Etiquetas de la tabla aplicadas: {rows}.",
-        "EV_corrections_skipped": "Correcciones de etiquetas: ninguna.",
-        "EV_corrections_applied": "Correcciones de etiquetas aplicadas: {rows}.",
-        "EV_labels_finalized": "Etiquetas cerradas ({labels} etiquetas).",
-        "EV_ml_exports_skipped": "Exportes para ML: omitidos (etiquetas incompletas; complételas en el paso siguiente).",
-        "EV_ml_exports": "Archivos de exportes para ML escritos: {files}.",
-        "EV_report": "Archivos del reporte escritos: {files}.",
+        "EV_export": "Procesando y anonimizando los estudios.",
+        "EV_exported": (
+            "Estudios guardados: {studies}. Series: {series}. Participantes: {participants}. Con error: "
+            "{errors}."
+        ),
+        "EV_labels_skipped": "Sin etiquetas, porque no se indicaron clases.",
+        "EV_label_template": "Lista de etiquetas preparada con {classes} clases.",
+        "EV_mapping_labels_applied": "Etiquetas tomadas de la tabla: {rows}.",
+        "EV_corrections_applied": "Correcciones aplicadas: {rows}.",
+        "EV_labels_finalized": "Etiquetas cerradas: {labels}.",
+        "EV_ml_exports_skipped": (
+            "Faltan etiquetas, así que aún no se crearon los archivos para entrenamiento. Complételas en el "
+            "paso siguiente."
+        ),
+        "EV_ml_exports": "Archivos para entrenamiento creados: {files}.",
+        "EV_report": "Reporte creado: {files} archivos.",
         "WARN_UNMAPPED_SERIES": "Aviso UNMAPPED_SERIES: series omitidas por código: {codes}.",
         "WARN_NOT_4D_DWI": "Aviso NOT_4D_DWI: {count} series dwi no son 4D y se omitieron.",
         "WARN_MAPPING_UNUSED": "Aviso MAPPING_UNUSED: {count} filas de la tabla no aplican a ninguna serie.",
@@ -165,12 +240,16 @@ CATALOG: dict[str, dict[str, str]] = {
         "WARN_LABELS_INCOMPLETE": "Aviso LABELS_INCOMPLETE: etiquetas incompletas ({codes}).",
         # step 5: labels
         "LABELS_HELP": (
-            "Doble clic en la clase de un par para cambiarla (vacía = sin etiqueta). «Aplicar» guarda los cambios "
-            "(se registran en labels_changes.tsv); «Cerrar» exige todos los pares etiquetados y habilita los "
-            "exportes; «Reabrir» permite volver a editar."
+            "Haga clic en una celda de «Etiqueta» para elegir la clase. Los cambios quedan pendientes hasta "
+            "que pulse «Aplicar», y cada cambio queda registrado. Para «Finalizar etiquetas», todas las filas "
+            "deben tener clase; después podrá crear los archivos para entrenamiento. «Reabrir» permite volver "
+            "a editarlas."
         ),
         "APPLY": "Aplicar",
-        "FINALIZE": "Cerrar",
+        "FINALIZE": "Finalizar etiquetas",
+        "FINALIZE_NOW_TITLE": "Etiquetas completas",
+        "FINALIZE_NOW": "Todas las filas tienen etiqueta. ¿Finalizar las etiquetas ahora?",
+        "LATER": "Más tarde",
         "REOPEN": "Reabrir",
         "RELOAD": "Recargar",
         "COL_defect": "Defecto",
@@ -178,95 +257,104 @@ CATALOG: dict[str, dict[str, str]] = {
         "DEFECT_UNKNOWN_CLASS": "clase desconocida",
         "DEFECT_DUPLICATED": "repetida en la tabla",
         "DEFECT_MISSING": "falta en la tabla",
-        "LABELS_OPEN": "Etiquetas abiertas: {labeled} de {pairs} pares etiquetados.",
-        "LABELS_CLOSED": "Etiquetas cerradas: {labeled} de {pairs} pares etiquetados.",
-        "LABELS_FOREIGN": "Filas de labels.tsv ajenas al dataset: {foreign}; con ids no válidos: {invalid}.",
-        "LABELS_PENDING": "Cambios sin aplicar: {count}.",
+        "LABELS_OPEN": "Etiquetas abiertas: {labeled} de {pairs} filas con clase.",
+        "LABELS_CLOSED": "Etiquetas cerradas: {labeled} de {pairs} filas con clase.",
+        "LABELS_FOREIGN": (
+            "El archivo de etiquetas tiene {foreign} filas de otro dataset y {invalid} con identificadores no "
+            "válidos. No se usan."
+        ),
         "LABELS_APPLIED": "Cambios aplicados: {count}.",
-        "NO_LABELS": "Este dataset no tiene etiquetas (no se dieron clases en el paso 2); puede seguir.",
-        "LABEL_TABLE_NOT_FOUND": "No se encuentra labels.tsv en el dataset.",
+        "NO_LABELS": "Este dataset no tiene etiquetas (no se indicaron clases en el paso 2). Puede seguir.",
+        "LABEL_TABLE_NOT_FOUND": "No se encuentra el archivo de etiquetas del dataset.",
         "LABELS_FINALIZED": "Las etiquetas están cerradas: reábralas para editarlas.",
         "LABELS_NOT_FINALIZED": "Las etiquetas no están cerradas.",
-        "LABELS_INCOMPLETE": "No se puede cerrar: hay pares sin etiqueta o con defectos.",
+        "LABELS_INCOMPLETE": "No se pueden cerrar: hay filas sin clase o con defectos.",
         "LABELS_FIX_BY_HAND": (
-            "labels.tsv tiene filas repetidas, ajenas o no válidas (editado a mano): corríjalo a mano antes de editar."
+            "El archivo de etiquetas se editó fuera de la herramienta y tiene filas repetidas o no válidas. "
+            "Corríjalo antes de seguir."
         ),
-        "LABEL_UNKNOWN_CLASS": "Una clase no está en labels.json.",
+        "LABEL_UNKNOWN_CLASS": "Esa clase no está en la lista de clases.",
         "LABEL_PAIR_UNKNOWN": "Un participante o sesión no está en el dataset.",
         "LABEL_EDIT_INVALID": "Cambio de etiqueta no válido.",
-        "LABEL_FILES_INVALID": "labels.tsv o labels.json no son válidos.",
+        "LABEL_FILES_INVALID": "Los archivos de etiquetas del dataset no son válidos.",
         "LABEL_FILES_IO": "No se pudieron leer o escribir los archivos de etiquetas del dataset.",
         "LABELS_NO_DATASET": "No se encuentra el dataset o no tiene participantes.",
         "LABELS_DISCARDED": "Se descartaron {count} cambios sin aplicar.",
         "LABEL_CORRECTIONS_INVALID": (
-            "El archivo de correcciones no es válido: columnas participant_id, session_id y label (como labels.tsv), "
-            "sin pares repetidos."
+            "El archivo de correcciones no es válido: debe tener las columnas participant_id, session_id y "
+            "label, sin filas repetidas."
         ),
         "CORRECTIONS_UNREADABLE": "No se pudo leer el archivo de correcciones (permisos o no es un archivo).",
         "BATCH_CLASS": "Clase:",
         "ASSIGN_SELECTION": "Asignar a la selección",
         "ASSIGN_UNLABELED": "Asignar a todas las sin etiquetar",
-        "LOAD_CORRECTIONS": "Cargar correcciones desde TSV…",
+        "LOAD_CORRECTIONS": "Cargar correcciones (archivo TSV)…",
         "FILTER": "Mostrar:",
         "FILTER_all": "todas",
         "FILTER_unlabeled": "sin etiquetar",
         "FILTER_defect": "con defecto",
         "NOTHING_SELECTED": "Seleccione una o más filas (Ctrl o Mayús para varias).",
-        "NOTHING_UNLABELED": "No hay pares sin etiquetar.",
+        "NOTHING_UNLABELED": "No hay filas sin clase.",
         "CONFIRM_TITLE": "Confirmar",
-        "CONFIRM_ASSIGN_UNLABELED": "¿Asignar la clase «{label}» a {count} pares sin etiquetar?",
-        "ASSIGNED": "Asignado a {count} pares (pendiente de aplicar).",
+        "CONFIRM_ASSIGN_UNLABELED": "¿Asignar la clase «{label}» a las {count} filas sin clase?",
+        "ASSIGNED": "Clase asignada a {count} filas. Pulse «Aplicar» para guardarla.",
         "CORRECTIONS_LOADED": "Correcciones cargadas como cambios pendientes: {count}. Pulse «Aplicar».",
         "ASSIGN_LABEL_SELECTION": "Asignar etiqueta a la selección",
-        "MAPPING_ASSIGNED": "Etiqueta asignada a {count} series (sus estudios); pulse «Vista previa».",
+        "MAPPING_ASSIGNED": (
+            "Etiqueta asignada a los estudios de {count} series. Pulse «Vista previa» para comprobarlo."
+        ),
         "LABELS_EDITS_PENDING": "Aplique o descarte los cambios antes de cerrar.",
         "LABELS_ERROR": "Error en las etiquetas ({error_type}).",
         # step 6: exports and report
-        "ML_EXPORTS": "Exportes para ML (índice, datalist, particiones por participante)",
-        "WRITE_ML": "Escribir exportes para ML",
-        "REGENERATE_ML": "Regenerar exportes en una carpeta nueva",
-        "ML_WRITTEN_IN": "Exportes para ML escritos en «{folder}»: {files} archivos.",
+        "ML_EXPORTS": "Archivos para entrenar modelos (índice y particiones por participante)",
+        "WRITE_ML": "Crear los archivos para entrenamiento",
+        "REGENERATE_ML": "Crear otro juego en una carpeta nueva",
+        "ML_WRITTEN_IN": "Archivos para entrenamiento creados en «{folder}»: {files}.",
         "ML_REGENERATE_HELP": (
-            "El paso de ejecución escribe los exportes con los valores estándar (70/15/15, semilla 0) en el dataset. "
-            "Aquí puede escribir otro juego con otras proporciones o semilla: va a una carpeta nueva junto al "
-            "dataset (ml_exports_2, ml_exports_3…), con rutas relativas a esa carpeta (../dataset/…). Nunca se "
-            "sobrescribe ni se borra nada."
+            "Al ejecutar se crean los archivos para entrenamiento con los valores estándar (70/15/15, semilla "
+            "0). Aquí puede crear otro juego con otras proporciones o semilla. Se guarda en una carpeta nueva "
+            "junto al dataset."
         ),
-        "ML_DIR_NOT_EMPTY": "La carpeta de los exportes tiene contenido; no se usa.",
-        "ML_DIR_INSIDE_DATASET": "La carpeta de los exportes debe estar fuera del dataset.",
-        "ML_DIR_OTHER_DRIVE": "La carpeta de los exportes debe estar en el mismo disco que el dataset.",
-        "REPORT": "Reporte del dataset (JSON, Markdown, XML y XLSX)",
+        "ML_DIR_NOT_EMPTY": "La carpeta para los archivos de entrenamiento ya tiene contenido. Elija otra.",
+        "ML_DIR_INSIDE_DATASET": "La carpeta para los archivos de entrenamiento debe estar fuera del dataset.",
+        "ML_DIR_OTHER_DRIVE": (
+            "La carpeta para los archivos de entrenamiento debe estar en el mismo disco que el dataset."
+        ),
+        "REPORT": "Reporte del dataset (JSON, Markdown, XML y Excel)",
         "REPORT_DIR": "Carpeta del reporte (nueva o vacía)",
         "WRITE_REPORT": "Generar reporte",
         "OPEN_FOLDER": "Abrir la carpeta de salida",
-        "TASK_STARTED": "En curso…",
-        "ML_PRESENT": "Los exportes para ML ya están en el dataset.",
-        "ML_ABSENT": "Los exportes para ML aún no están escritos.",
-        "REPORT_WRITTEN": "Reporte escrito: {files} archivos.",
+        "TASK_STARTED": "En curso.",
+        "ML_PRESENT": "Los archivos para entrenamiento ya están creados.",
+        "ML_ABSENT": "Los archivos para entrenamiento aún no están creados.",
+        "REPORT_WRITTEN": "Reporte creado: {files} archivos.",
         "FILE_NAME": "  {name}",
-        "REPORT_WARNING": "Aviso del reporte {code}: {count}.",
+        "REPORT_WARNING": "Aviso del reporte {warning}: {count}.",
         "REPORT_WARNING_UNREADABLE_FILES": "Aviso UNREADABLE_FILES: {count} archivos del dataset no se pudieron leer.",
         "REPORT_WARNING_LABELS_UNREADABLE": "Aviso LABELS_UNREADABLE: las etiquetas no se pudieron leer.",
-        "REPORT_WARNING_MANIFEST_UNREADABLE": "Aviso MANIFEST_UNREADABLE: el manifiesto de la corrida no se pudo leer.",
+        "REPORT_WARNING_MANIFEST_UNREADABLE": "Aviso MANIFEST_UNREADABLE: no se pudo leer el registro de la ejecución.",
         "REPORT_DIR_REQUIRED": "Elija la carpeta del reporte.",
         "REPORT_DIR_NOT_EMPTY": "La carpeta del reporte tiene contenido; elija una nueva o vacía.",
         "REPORT_INSIDE_DATASET": "La carpeta del reporte debe estar fuera del dataset.",
         "REPORT_IO": "No se pudo escribir el reporte.",
         "REPORT_NO_STUDIES": "El dataset no tiene estudios legibles: no hay reporte.",
-        "ML_EXPORTS_EXIST": "Los exportes para ML ya existen en el dataset; no se sobrescriben.",
+        "ML_EXPORTS_EXIST": "Los archivos para entrenamiento ya existen. No se sobrescriben.",
         "ML_LABELS_NOT_FINALIZED": (
-            "Las etiquetas no están cerradas: ciérrelas en el paso anterior antes de escribir los exportes."
+            "Las etiquetas no están cerradas: ciérrelas en el paso anterior antes de crear los archivos para "
+            "entrenamiento."
         ),
         "DATASET_NOT_FOUND": "No se encuentra el dataset.",
-        "DATASET_LAYOUT_INVALID": "El dataset tiene archivos fuera de la estructura BIDS.",
+        "DATASET_LAYOUT_INVALID": "El dataset tiene archivos fuera de su estructura (¿se añadieron a mano?).",
         "DATASET_NO_IMAGES": "El dataset no tiene imágenes o participantes que repartir.",
-        "EXPORT_ERROR": "Error en los exportes o el reporte ({error_type}).",
+        "EXPORT_ERROR": "No se pudieron crear los archivos o el reporte ({error_type}).",
         # fixed service messages (``FIXED_MESSAGES``)
         "INPUT_NOT_FOUND": "No se encuentra la carpeta de entrada.",
         "CONFIG_NOT_FOUND": "No se encuentra el archivo de configuración.",
         "CORRECTIONS_NEED_CLASSES": "Las correcciones de etiquetas necesitan clases.",
         "CORRECTIONS_NOT_FOUND": "No se encuentra el archivo de correcciones.",
-        "INVALID_CLASSES": "Clases no válidas (letras y números, sin repetir; la descripción tras «=»).",
+        "INVALID_CLASSES": (
+            "Clases no válidas. Use solo letras y números, sin repetir. La descripción va después de «=»."
+        ),
         "INVALID_FORMAT": "Formato de entrada no válido.",
         "INVALID_MAPPING": "Tabla de mapeo no válida.",
         "INVALID_RATIOS": "Proporciones no válidas: tres números no negativos que sumen 1.",
@@ -282,18 +370,85 @@ CATALOG: dict[str, dict[str, str]] = {
         "MAPPING_LABEL_UNKNOWN": "Una etiqueta de la tabla no es una de las clases.",
         "MAPPING_LABELS_NEED_CLASSES": "Las etiquetas de la tabla necesitan clases.",
         "NO_MAPPED_SERIES": (
-            "Ninguna serie de la entrada tiene un sufijo BIDS: cargue una tabla de mapeo con los sufijos y vuelva a "
-            "pulsar «Vista previa» (en la línea de comandos, --mapping)."
+            "Ninguna serie tiene un sufijo reconocido. Cargue un archivo de tabla con el sufijo de cada serie "
+            "y pulse otra vez «Vista previa»."
         ),
         "NO_INPUT_STUDIES": "No hay estudios válidos en la entrada.",
         "OUTPUT_INSIDE_INPUT": "La carpeta de salida debe estar fuera de la entrada.",
         "PIPELINE_WITHOUT_ANONYMIZE": "El pipeline debe incluir el paso anonymize.",
     },
     "en": {
-        "APP_TITLE": "MRI Dataset Tool: wizard",
+        "APP_TITLE_STEP": "MRI Dataset Tool - {header}",
         "MENU_LANGUAGE": "Language",
         "LANGUAGE_es": "Spanish",
         "LANGUAGE_en": "English",
+        "APP_NAME": "MRI Dataset Tool",
+        "WELCOME_SUBTITLE": "Preparing MRI datasets for ML/DL",
+        "VERSION": "Version {version}",
+        "VERSION_UNKNOWN": "unknown",
+        "LOADING": "Loading",
+        "STARTUP_FAILED": "Could not start ({error_type}).",
+        "CLOSE": "Close",
+        "CLOSE_CONFIRM_TITLE": "Close the tool",
+        "CLOSE_CONFIRM": "Close the tool?",
+        "PREFIX_error": "Error:",
+        "PREFIX_warning": "Warning:",
+        "PREFIX_ok": "Done:",
+        "ACTIVITY_disk_space": "Checking the disk space",
+        "ACTIVITY_preview": "Reading the series",
+        "ACTIVITY_run": "Creating the dataset",
+        "ACTIVITY_labels": "Saving the labels",
+        "ACTIVITY_corrections": "Reading the corrections",
+        "ACTIVITY_ml": "Creating the training files",
+        "ACTIVITY_report": "Creating the report",
+        "ACTIVITY_COUNTS": "Skipped: {skipped} · Failed: {failed} · Unreadable: {unreadable}",
+        "THEME_LABEL": "Theme",
+        "THEME_light": "Light",
+        "THEME_dark": "Dark",
+        "PRIVACY_BUTTON": "Privacy and memory",
+        "PRIVACY_TITLE": "Privacy and memory use",
+        "DIALOG_OK": "OK",
+        "DIALOG_CANCEL": "Cancel",
+        "MORE_INFO": "More information",
+        "FORMAT_HELP_bids": "sub-/ses- folders with NIfTI",
+        "FORMAT_HELP_dicom": "Folders with DICOM series",
+        "FORMAT_HELP_nifti": "Loose NIfTI (.nii, .nii.gz)",
+        "SUMMARY_DONE": (
+            "Dataset finished with {studies} studies, {series} series and {participants} participants. Files "
+            "not read: {skipped}."
+        ),
+        "OPEN_FAILED": "The folder could not be opened ({error_type}).",
+        "PRIVACY_SUMMARY": "Your data stays on this computer and the results are anonymized.",
+        "PRIVACY_HEADING": "Privacy notice",
+        "PRIVACY_LEAD": "Your data stays on this computer.",
+        "PRIVACY_1": (
+            "• Studies are processed locally; the tool sends no information over the network."
+        ),
+        "PRIVACY_2": (
+            "• The results are anonymized: identifiers are replaced by pseudonyms and only the technical metadata"
+            " needed is kept (policy v1)."
+        ),
+        "PRIVACY_3": (
+            "• The key that generates the pseudonyms is never shown or saved. If you do not set one, a new one is"
+            " created every session: pseudonyms change and datasets from different sessions must not be combined."
+        ),
+        "PRIVACY_4": (
+            "• Anonymization does not remove text burned into the images or the facial features (defacing). Revie"
+            "w the result before sharing it."
+        ),
+        "MEMORY_1": (
+            "Before resampling or normalizing, the tool estimates the memory it will need and compares it with th"
+            "e memory available. If it is not enough, that study is marked as failed and the batch goes on with t"
+            "he others."
+        ),
+        "MEMORY_2": (
+            "You can force the run with the «Allow the run to continue…» checkbox, at your own risk: the computer"
+            " may become very slow, other programs may close and the process may end without saving results."
+        ),
+        "MEMORY_3": (
+            "The estimate is a snapshot and does not include other programs. Large 4D volumes, such as diffusion "
+            "scans, may need several GB. The maximum output size can only be changed in the configuration file."
+        ),
         "BACK": "< Back",
         "NEXT": "Next >",
         "STEP_HEADER": "Step {number} of {total}: {title}",
@@ -302,13 +457,13 @@ CATALOG: dict[str, dict[str, str]] = {
         "STEP_mapping": "Series mapping",
         "STEP_run": "Run",
         "STEP_labels": "Labels",
-        "STEP_export": "Exports and report",
+        "STEP_export": "Results",
         "STEP_PENDING": "This step is not available yet.",
         "TASK_RUNNING": "A task is running; wait for it to finish.",
         "CLOSE_TITLE": "Task running",
         "CLOSE_WHILE_RUNNING": (
-            "A task is running. If you close now, the task stops and the output is left incomplete: "
-            "empty or delete the output folder before retrying. Close anyway?"
+            "A task is running. Closing now interrupts it and leaves the output incomplete; before trying "
+            "again you will have to empty the output folder. Close anyway?"
         ),
         "INVALID_INPUT": "Invalid input ({error_type}).",
         "OUTPUT_EXISTS": "The output already exists; choose a new folder.",
@@ -320,54 +475,38 @@ CATALOG: dict[str, dict[str, str]] = {
         "OUTPUT_DIR": "Output folder (new)",
         "BROWSE": "Browse…",
         "VALIDATE": "Validate",
-        "KEY_DEFINED": "Anonymization key: defined in the environment (MRI_ANON_KEY).",
-        "KEY_GENERATED": (
-            "Anonymization key: generated for this session. The pseudonyms change each time the program is "
-            "opened (see the manual)."
-        ),
+        "KEY_DEFINED": "Anonymization key: set by you (kept across sessions).",
+        "KEY_GENERATED": "Anonymization key: generated for this session; pseudonyms change every session.",
         "INPUT_OK": "Valid input and output.",
-        "CHECKING_DISK_SPACE": "Checking the disk space…",
+        "CHECKING_DISK_SPACE": "Checking the disk space.",
         "DISK_SPACE_OK": "Enough disk space for the estimated output.",
         "LOW_DISK_SPACE": (
-            "Warning: the estimated output ({required} GiB) reaches 90 % of the free space of the output drive "
-            "({free} GiB). Consider another drive; the run is not blocked."
+            "The output may take about {required} GiB and the drive has only {free} GiB free. You can go on, "
+            "but another drive is advisable."
         ),
         "INPUT_REQUIRED": "Choose the input folder.",
         "OUTPUT_REQUIRED": "Choose the output folder.",
         "NEW_FOLDER": "Name of the new folder",
         "OUTPUT_NOT_EMPTY": (
-            "The output folder has content and is not overwritten: type the name of a new folder to create "
-            "inside it."
+            "The output folder already has files. Type a name for a new folder and it will be created inside."
         ),
         "INVALID_FOLDER_NAME": (
-            "Invalid folder name: a plain name, without / \\ : * ? \" < > |, without \"..\" and without a "
-            "trailing dot or space."
+            "Invalid folder name. Use a simple name, without / \\ : * ? \" < > | or \"..\", not ending in a "
+            "dot or a space."
         ),
         "FOLDER_NAME_EXISTS": "A folder or file with that name already exists; choose another.",
         "INVALID_OUTPUT_PATH": (
-            "The output path cannot be created: a new folder in the path has an invalid name (without / \\ : * ? "
-            "\" < > |, without a trailing dot or space, 255 bytes at most) or the drive does not exist or is not "
-            "accessible."
+            "The output folder cannot be created. Check that the drive exists and that the new names have no "
+            "/ \\ : * ? \" < > |, do not end in a dot or a space and are not too long."
         ),
         # step 2: configuration
         "CONFIG_FILE": "Configuration file (preset or your own)",
         "MEMORY_TITLE": "Memory use",
-        "MEMORY_NOTICE": (
-            "Before resampling (resample) or normalizing (normalize), the tool estimates the memory the output "
-            "volume needs and compares it with the RAM available at that moment. If it is not enough, the study "
-            "is marked as failed and the batch goes on with the others. You can force the run with the checkbox "
-            "below, which is the same as the allow_insufficient_memory: true parameter of the resample and "
-            "normalize steps in the configuration file; that consent is recorded in the run manifest. Do it at "
-            "your own risk: if the memory is not enough, the computer may become very slow because the disk is "
-            "used as memory, other programs may close, and the process may end abruptly without saving results "
-            "(on Linux, the system may kill it). The check is an estimate at one moment and does not cover the "
-            "memory of other steps or of other programs opened during the run. Large 4D volumes, such as "
-            "diffusion series, may need several GB. Also, resample rejects any output larger than "
-            "max_output_voxels voxels (2**32 by default, time axis included) even with enough memory; that limit "
-            "is changed only in the configuration file."
-        ),
         "ALLOW_MEMORY": "Allow the run to continue even if the available memory is not enough (at my own risk)",
-        "CLASSES": "Label classes, one per line: NAME or NAME=description (empty = no labels)",
+        "CLASSES": (
+            "Classes to label with, one per line. For example \"AD\" or \"AD=Alzheimer\". Leave it empty if "
+            "you will not label."
+        ),
         "RATIOS": "Training / validation / test ratios",
         "SEED": "Split seed",
         "CONFIG_OK": "Valid configuration. Pipeline steps:",
@@ -377,11 +516,10 @@ CATALOG: dict[str, dict[str, str]] = {
         "LOAD_MAPPING": "Load table…",
         "SAVE_MAPPING": "Save table…",
         "MAPPING_HELP": (
-            "Double-click a suffix, participant, session or label cell to edit it (empty = automatic). The suffix "
-            "applies to the series; participant, session and label to the whole study. Then press \"Preview\" "
-            "to check the changes; without a valid preview you cannot go on. If the file names do not give the "
-            "suffix (e.g. NIfTI with neutral names), load a table first (\"Load table…\") and then press "
-            "\"Preview\"."
+            "Click a suffix, participant, session or label cell to change it. If you leave it empty, it is "
+            "decided automatically. The suffix changes only that series and the rest, the whole study. Then "
+            "press \"Preview\". Without a correct preview you cannot go on. If the file names do not say "
+            "which image they are, first load a table file with \"Load table\"."
         ),
         "COL_location": "Folder or file",
         "COL_suffix": "Suffix",
@@ -394,8 +532,11 @@ CATALOG: dict[str, dict[str, str]] = {
         "CODE_NO_MATCH": "skipped: no match",
         "CODE_AMBIGUOUS": "skipped: ambiguous",
         "CODE_EXCLUDED": "skipped: excluded",
-        "PREVIEW_RUNNING": "Reading headers…",
-        "PREVIEW_OK": "Series: {series}; skipped: {skipped}; files skipped by the reader: {files}.",
+        "PREVIEW_RUNNING": "Reading the series.",
+        "PREVIEW_OK": (
+            "{series} series found: {skipped} without a suffix (they will be left out) and {files} files that "
+            "could not be read."
+        ),
         "EDIT_PENDING": "Unchecked changes: press \"Preview\".",
         "MAPPING_SAVED": "Table saved.",
         "MAPPING_LOADED": "Table loaded: press \"Preview\".",
@@ -410,27 +551,43 @@ CATALOG: dict[str, dict[str, str]] = {
         # step 4: run
         "RUN": "Run",
         "RUN_HELP": (
-            "Builds the anonymized BIDS dataset, the labels, the ML exports and the report in the output folder. "
-            "The task cannot be cancelled; the window keeps responding."
+            "Creates the anonymized dataset in the output folder, with its labels, the files to train models "
+            "and the report. It may take a while and cannot be cancelled."
         ),
-        "RUN_RUNNING": "Running…",
+        "RUN_RUNNING": "Creating the dataset.",
         "RUN_DONE": "Done.",
-        "RUN_FAILED_HINT": "Empty or delete the output folder before retrying.",
-        "RUN_ERRORS": "Errors by type: {counts}.",
-        "RUN_SKIPPED": "Input files skipped by the reader: {counts}.",
-        "RUN_REPORT_ERRORS": "Report read errors: {counts}.",
+        "RUN_CLEAN": "No errors.",
+        "LABELS_UNAPPLIED": "Changes not applied: {count}.",
+        "LEAVE_PENDING_TITLE": "Changes not applied",
+        "LEAVE_PENDING": "There are {count} label changes not applied. What do you want to do?",
+        "APPLY_AND_CONTINUE": "Apply and continue",
+        "DISCARD": "Discard",
+        "CLOSE_PENDING": "There are {count} label changes not applied. What do you want to do before closing?",
+        "APPLY_AND_CLOSE": "Apply and close",
+        "HINT_EDIT_LABEL": "Click to choose the class",
+        "HINT_EDIT_CELL": "Click to edit",
+        "HINT_NEXT": "Next step (Alt+→ or Ctrl+Enter)",
+        "HINT_BACK": "Previous step (Alt+←)",
+        "RUN_FAILED_HINT": "Before trying again, empty or delete the output folder.",
+        "RUN_ERRORS": "Studies with errors, by type: {counts}.",
+        "RUN_SKIPPED": "Files that could not be read: {counts}.",
+        "RUN_REPORT_ERRORS": "Files the report could not read: {counts}.",
         "NONE": "none",
-        "EV_export": "Exporting the dataset (pipeline)…",
-        "EV_exported": "Studies written: {studies}; series: {series}; participants: {participants}; errors: {errors}.",
-        "EV_labels_skipped": "Labels: skipped (no classes).",
-        "EV_label_template": "Label template written ({classes} classes).",
-        "EV_mapping_labels_applied": "Table labels applied: {rows}.",
-        "EV_corrections_skipped": "Label corrections: none.",
-        "EV_corrections_applied": "Label corrections applied: {rows}.",
-        "EV_labels_finalized": "Labels finalized ({labels} labels).",
-        "EV_ml_exports_skipped": "ML exports: skipped (labels incomplete; complete them in the next step).",
-        "EV_ml_exports": "ML export files written: {files}.",
-        "EV_report": "Report files written: {files}.",
+        "EV_export": "Processing and anonymizing the studies.",
+        "EV_exported": (
+            "Studies saved: {studies}. Series: {series}. Participants: {participants}. With errors: {errors}."
+        ),
+        "EV_labels_skipped": "No labels, because no classes were given.",
+        "EV_label_template": "Label list ready with {classes} classes.",
+        "EV_mapping_labels_applied": "Labels taken from the table: {rows}.",
+        "EV_corrections_applied": "Corrections applied: {rows}.",
+        "EV_labels_finalized": "Labels closed: {labels}.",
+        "EV_ml_exports_skipped": (
+            "Some labels are missing, so the training files were not created yet. Complete them in the next "
+            "step."
+        ),
+        "EV_ml_exports": "Training files created: {files}.",
+        "EV_report": "Report created: {files} files.",
         "WARN_UNMAPPED_SERIES": "Warning UNMAPPED_SERIES: series skipped by code: {codes}.",
         "WARN_NOT_4D_DWI": "Warning NOT_4D_DWI: {count} dwi series are not 4D and were skipped.",
         "WARN_MAPPING_UNUSED": "Warning MAPPING_UNUSED: {count} table rows apply to no series.",
@@ -441,12 +598,15 @@ CATALOG: dict[str, dict[str, str]] = {
         "WARN_LABELS_INCOMPLETE": "Warning LABELS_INCOMPLETE: incomplete labels ({codes}).",
         # step 5: labels
         "LABELS_HELP": (
-            "Double-click the class of a pair to change it (empty = unlabeled). \"Apply\" saves the changes (logged "
-            "in labels_changes.tsv); \"Finalize\" needs every pair labeled and enables the exports; \"Reopen\" "
-            "allows editing again."
+            "Click a \"Label\" cell to choose the class. Changes stay pending until you press \"Apply\", and "
+            "every change is logged. To \"Finalize labels\", every row must have a class; then you can create "
+            "the training files. \"Reopen\" lets you edit them again."
         ),
         "APPLY": "Apply",
-        "FINALIZE": "Finalize",
+        "FINALIZE": "Finalize labels",
+        "FINALIZE_NOW_TITLE": "Labels complete",
+        "FINALIZE_NOW": "Every row has a label. Finalize the labels now?",
+        "LATER": "Later",
         "REOPEN": "Reopen",
         "RELOAD": "Reload",
         "COL_defect": "Defect",
@@ -454,95 +614,98 @@ CATALOG: dict[str, dict[str, str]] = {
         "DEFECT_UNKNOWN_CLASS": "unknown class",
         "DEFECT_DUPLICATED": "repeated in the table",
         "DEFECT_MISSING": "missing from the table",
-        "LABELS_OPEN": "Labels open: {labeled} of {pairs} pairs labeled.",
-        "LABELS_CLOSED": "Labels finalized: {labeled} of {pairs} pairs labeled.",
-        "LABELS_FOREIGN": "labels.tsv rows foreign to the dataset: {foreign}; with invalid ids: {invalid}.",
-        "LABELS_PENDING": "Changes not applied: {count}.",
+        "LABELS_OPEN": "Labels open: {labeled} of {pairs} rows with a class.",
+        "LABELS_CLOSED": "Labels closed: {labeled} of {pairs} rows with a class.",
+        "LABELS_FOREIGN": (
+            "The label file has {foreign} rows from another dataset and {invalid} with invalid identifiers. "
+            "They are not used."
+        ),
         "LABELS_APPLIED": "Changes applied: {count}.",
-        "NO_LABELS": "This dataset has no labels (no classes were given in step 2); you can go on.",
-        "LABEL_TABLE_NOT_FOUND": "labels.tsv was not found in the dataset.",
+        "NO_LABELS": "This dataset has no labels (no classes were given in step 2). You can go on.",
+        "LABEL_TABLE_NOT_FOUND": "The label file of the dataset is missing.",
         "LABELS_FINALIZED": "The labels are finalized: reopen them to edit.",
         "LABELS_NOT_FINALIZED": "The labels are not finalized.",
-        "LABELS_INCOMPLETE": "Cannot finalize: some pairs are unlabeled or have defects.",
+        "LABELS_INCOMPLETE": "They cannot be closed: some rows have no class or have defects.",
         "LABELS_FIX_BY_HAND": (
-            "labels.tsv has repeated, foreign or invalid rows (hand edited): fix it by hand before editing."
+            "The label file was edited outside the tool and has repeated or invalid rows. Fix it before going "
+            "on."
         ),
-        "LABEL_UNKNOWN_CLASS": "A class is not in labels.json.",
+        "LABEL_UNKNOWN_CLASS": "That class is not in the list of classes.",
         "LABEL_PAIR_UNKNOWN": "A participant or session is not in the dataset.",
         "LABEL_EDIT_INVALID": "Invalid label change.",
-        "LABEL_FILES_INVALID": "labels.tsv or labels.json are not valid.",
+        "LABEL_FILES_INVALID": "The label files of the dataset are not valid.",
         "LABEL_FILES_IO": "The label files of the dataset could not be read or written.",
         "LABELS_NO_DATASET": "The dataset was not found or has no participants.",
         "LABELS_DISCARDED": "{count} changes not applied were discarded.",
         "LABEL_CORRECTIONS_INVALID": (
-            "The corrections file is not valid: columns participant_id, session_id and label (as labels.tsv), "
-            "no repeated pairs."
+            "The corrections file is not valid: it needs the columns participant_id, session_id and label, "
+            "without repeated rows."
         ),
         "CORRECTIONS_UNREADABLE": "The corrections file could not be read (permissions or not a file).",
         "BATCH_CLASS": "Class:",
         "ASSIGN_SELECTION": "Assign to the selection",
         "ASSIGN_UNLABELED": "Assign to all unlabeled",
-        "LOAD_CORRECTIONS": "Load corrections from TSV…",
+        "LOAD_CORRECTIONS": "Load corrections (TSV file)…",
         "FILTER": "Show:",
         "FILTER_all": "all",
         "FILTER_unlabeled": "unlabeled",
         "FILTER_defect": "with a defect",
         "NOTHING_SELECTED": "Select one or more rows (Ctrl or Shift for several).",
-        "NOTHING_UNLABELED": "There are no unlabeled pairs.",
+        "NOTHING_UNLABELED": "No rows without a class.",
         "CONFIRM_TITLE": "Confirm",
-        "CONFIRM_ASSIGN_UNLABELED": "Assign the class \"{label}\" to {count} unlabeled pairs?",
-        "ASSIGNED": "Assigned to {count} pairs (not applied yet).",
+        "CONFIRM_ASSIGN_UNLABELED": "Give the class \"{label}\" to the {count} rows without a class?",
+        "ASSIGNED": "Class given to {count} rows. Press \"Apply\" to save it.",
         "CORRECTIONS_LOADED": "Corrections loaded as pending changes: {count}. Press \"Apply\".",
         "ASSIGN_LABEL_SELECTION": "Assign label to the selection",
-        "MAPPING_ASSIGNED": "Label assigned to {count} series (their studies); press \"Preview\".",
+        "MAPPING_ASSIGNED": "Label set for the studies of {count} series. Press \"Preview\" to check it.",
         "LABELS_EDITS_PENDING": "Apply or discard the changes before finalizing.",
         "LABELS_ERROR": "Label error ({error_type}).",
         # step 6: exports and report
-        "ML_EXPORTS": "ML exports (index, datalist, splits by participant)",
-        "WRITE_ML": "Write ML exports",
-        "REGENERATE_ML": "Regenerate exports in a new folder",
-        "ML_WRITTEN_IN": "ML exports written in \"{folder}\": {files} files.",
+        "ML_EXPORTS": "Files to train models (index and splits by participant)",
+        "WRITE_ML": "Create the training files",
+        "REGENERATE_ML": "Create another set in a new folder",
+        "ML_WRITTEN_IN": "Training files created in \"{folder}\": {files}.",
         "ML_REGENERATE_HELP": (
-            "The run step writes the exports with the standard values (70/15/15, seed 0) in the dataset. Here you "
-            "can write another set with other ratios or seed: it goes to a new folder next to the dataset "
-            "(ml_exports_2, ml_exports_3…), with paths relative to that folder (../dataset/…). Nothing is ever "
-            "overwritten or deleted."
+            "Running creates the training files with the standard values (70/15/15, seed 0). Here you can "
+            "create another set with other ratios or seed. It is saved in a new folder next to the dataset."
         ),
-        "ML_DIR_NOT_EMPTY": "The exports folder has content; it is not used.",
-        "ML_DIR_INSIDE_DATASET": "The exports folder must be outside the dataset.",
-        "ML_DIR_OTHER_DRIVE": "The exports folder must be on the same drive as the dataset.",
-        "REPORT": "Dataset report (JSON, Markdown, XML and XLSX)",
+        "ML_DIR_NOT_EMPTY": "The folder for the training files already has content. Choose another one.",
+        "ML_DIR_INSIDE_DATASET": "The folder for the training files must be outside the dataset.",
+        "ML_DIR_OTHER_DRIVE": "The folder for the training files must be on the same drive as the dataset.",
+        "REPORT": "Dataset report (JSON, Markdown, XML and Excel)",
         "REPORT_DIR": "Report folder (new or empty)",
         "WRITE_REPORT": "Write report",
         "OPEN_FOLDER": "Open the output folder",
-        "TASK_STARTED": "Running…",
-        "ML_PRESENT": "The ML exports are already in the dataset.",
-        "ML_ABSENT": "The ML exports are not written yet.",
-        "REPORT_WRITTEN": "Report written: {files} files.",
+        "TASK_STARTED": "In progress.",
+        "ML_PRESENT": "The training files are already created.",
+        "ML_ABSENT": "The training files are not created yet.",
+        "REPORT_WRITTEN": "Report created: {files} files.",
         "FILE_NAME": "  {name}",
-        "REPORT_WARNING": "Report warning {code}: {count}.",
+        "REPORT_WARNING": "Report warning {warning}: {count}.",
         "REPORT_WARNING_UNREADABLE_FILES": "Warning UNREADABLE_FILES: {count} dataset files could not be read.",
         "REPORT_WARNING_LABELS_UNREADABLE": "Warning LABELS_UNREADABLE: the labels could not be read.",
-        "REPORT_WARNING_MANIFEST_UNREADABLE": "Warning MANIFEST_UNREADABLE: the run manifest could not be read.",
+        "REPORT_WARNING_MANIFEST_UNREADABLE": "Warning MANIFEST_UNREADABLE: the run record could not be read.",
         "REPORT_DIR_REQUIRED": "Choose the report folder.",
         "REPORT_DIR_NOT_EMPTY": "The report folder has content; choose a new or empty one.",
         "REPORT_INSIDE_DATASET": "The report folder must be outside the dataset.",
         "REPORT_IO": "The report could not be written.",
         "REPORT_NO_STUDIES": "The dataset has no readable studies: no report.",
-        "ML_EXPORTS_EXIST": "The ML exports already exist in the dataset; they are not overwritten.",
+        "ML_EXPORTS_EXIST": "The training files already exist. They are not overwritten.",
         "ML_LABELS_NOT_FINALIZED": (
-            "The labels are not finalized: finalize them in the previous step before writing the exports."
+            "The labels are not closed: close them in the previous step before creating the training files."
         ),
         "DATASET_NOT_FOUND": "The dataset was not found.",
-        "DATASET_LAYOUT_INVALID": "The dataset has files outside the BIDS layout.",
+        "DATASET_LAYOUT_INVALID": "The dataset has files outside its structure (were they added by hand?).",
         "DATASET_NO_IMAGES": "The dataset has no images or participants to split.",
-        "EXPORT_ERROR": "Export or report error ({error_type}).",
+        "EXPORT_ERROR": "The files or the report could not be created ({error_type}).",
         # fixed service messages (``FIXED_MESSAGES``)
         "INPUT_NOT_FOUND": "The input folder was not found.",
         "CONFIG_NOT_FOUND": "The configuration file was not found.",
         "CORRECTIONS_NEED_CLASSES": "Label corrections need classes.",
         "CORRECTIONS_NOT_FOUND": "The corrections file was not found.",
-        "INVALID_CLASSES": "Invalid classes (letters and digits, no repeats; the description after \"=\").",
+        "INVALID_CLASSES": (
+            "Invalid classes. Use only letters and digits, without repeats. The description goes after \"=\"."
+        ),
         "INVALID_FORMAT": "Invalid input format.",
         "INVALID_MAPPING": "Invalid mapping table.",
         "INVALID_RATIOS": "Invalid ratios: three non-negative numbers that sum to 1.",
@@ -558,14 +721,41 @@ CATALOG: dict[str, dict[str, str]] = {
         "MAPPING_LABEL_UNKNOWN": "A label of the table is not one of the classes.",
         "MAPPING_LABELS_NEED_CLASSES": "The table labels need classes.",
         "NO_MAPPED_SERIES": (
-            "No input series has a BIDS suffix: load a mapping table with the suffixes and press \"Preview\" "
-            "again (on the command line, --mapping)."
+            "No series has a known suffix. Load a table file with the suffix of each series and press "
+            "\"Preview\" again."
         ),
         "NO_INPUT_STUDIES": "There are no valid studies in the input.",
         "OUTPUT_INSIDE_INPUT": "The output folder must be outside the input.",
         "PIPELINE_WITHOUT_ANONYMIZE": "The pipeline must include the anonymize step.",
     },
 }
+
+
+# The severity of a message, for its color, icon and prefix («Error:», «Aviso:», «Listo:»). Codes not listed
+# are errors: the failures and validation codes.
+OK_CODES = frozenset({
+    "INPUT_OK", "CONFIG_OK", "DISK_SPACE_OK", "PREVIEW_OK", "MAPPING_LOADED", "MAPPING_SAVED", "MAPPING_ASSIGNED",
+    "LABELS_APPLIED", "ASSIGNED", "CORRECTIONS_LOADED", "ML_WRITTEN_IN", "REPORT_WRITTEN", "RUN_DONE", "SUMMARY_DONE", "RUN_CLEAN",
+})
+INFO_CODES = frozenset({
+    "CHECKING_DISK_SPACE", "PREVIEW_RUNNING", "EDIT_PENDING", "TASK_STARTED", "NO_LABELS", "NOTHING_UNLABELED",
+    "RUN_RUNNING", "LABELS_OPEN", "LABELS_CLOSED", "ML_PRESENT", "ML_ABSENT", "FILE_NAME",
+})
+WARNING_CODES = frozenset({
+    "LOW_DISK_SPACE", "LABELS_DISCARDED", "LABELS_FOREIGN", "OUTPUT_NOT_EMPTY", "REPORT_WARNING", "LABELS_UNAPPLIED",
+    "LABELS_FINALIZED", "LABELS_EDITS_PENDING", "TASK_RUNNING", "NOTHING_SELECTED",  # the action was not done
+})
+
+
+def severity(code: str | None) -> str:
+    """``ok``, ``info``, ``warning`` or ``error`` for message *code* (``None`` = no message: ``info``)."""
+    if code is None or code in INFO_CODES:
+        return "info"
+    if code in OK_CODES:
+        return "ok"
+    if code in WARNING_CODES or code.startswith(("WARN_", "REPORT_WARNING_")):
+        return "warning"
+    return "error"
 
 
 def text(code: str, language: str = DEFAULT_LANGUAGE, **values: object) -> str:

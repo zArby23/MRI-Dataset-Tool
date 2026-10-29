@@ -3,8 +3,9 @@ in batch (selection, all unlabeled, a corrections TSV), and the apply / finalize
 Every edit stays pending until «Apply» (all or nothing, logged)."""
 
 import tkinter as tk
-from tkinter import filedialog, messagebox, ttk
+from tkinter import filedialog, ttk
 
+from mri_dataset_tool.presentation.gui import dialogs, messages, theme, widgets
 from mri_dataset_tool.presentation.gui.views import StepView
 from mri_dataset_tool.presentation.gui.worker import Done, Event, Failed
 
@@ -15,48 +16,62 @@ TSV_TYPES = [("TSV", "*.tsv")]
 
 class LabelsStep(StepView):
     def build(self) -> None:
+        self._editor = None
+        self._editing = 0
         buttons = ttk.Frame(self)
         buttons.pack(fill="x")
-        self._reload = ttk.Button(buttons, command=self.reload)
-        self._apply = ttk.Button(buttons, command=lambda: self.run("apply"))
-        self._finalize = ttk.Button(buttons, command=lambda: self.run("finalize"))
-        self._reopen = ttk.Button(buttons, command=lambda: self.run("reopen"))
-        self._corrections = ttk.Button(buttons, command=self._load_corrections)
+        self._reload = widgets.Button(buttons, command=self.reload)
+        self._apply = widgets.Button(buttons, command=lambda: self.run("apply"))
+        self._finalize = widgets.Button(buttons, command=lambda: self.run("finalize"))
+        self._reopen = widgets.Button(buttons, command=lambda: self.run("reopen"))
+        self._corrections = widgets.Button(buttons, command=self._load_corrections)
         for button in (self._reload, self._apply, self._finalize, self._reopen, self._corrections):
-            button.pack(side="left", padx=(0, 6))
+            button.pack(side="left", padx=(0, theme.space("s")))
 
         batch = ttk.Frame(self)
-        batch.pack(fill="x", pady=(6, 0))
+        batch.pack(fill="x", pady=(theme.space("s"), 0))
+        show = ttk.Frame(self)  # its own row: with the class row it did not fit the window
+        show.pack(fill="x", pady=(theme.space("s"), 0))
         self._class_label = ttk.Label(batch)
         self._class_label.pack(side="left")
         self.batch_class = tk.StringVar()
         self._batch_combo = ttk.Combobox(batch, textvariable=self.batch_class, state="readonly", width=16)
-        self._batch_combo.pack(side="left", padx=6)
-        self._assign = ttk.Button(batch, command=self.assign_selection)
-        self._assign.pack(side="left", padx=(0, 6))
-        self._assign_unlabeled = ttk.Button(batch, command=self.assign_unlabeled)
-        self._assign_unlabeled.pack(side="left", padx=(0, 18))
-        self._filter_label = ttk.Label(batch)
+        self._batch_combo.pack(side="left", padx=theme.space("s"))
+        self._assign = widgets.Button(batch, command=self.assign_selection)
+        self._assign.pack(side="left", padx=(0, theme.space("s")))
+        self._assign_unlabeled = widgets.Button(batch, command=self.assign_unlabeled)
+        self._assign_unlabeled.pack(side="left")
+        self._filter_label = ttk.Label(show)
         self._filter_label.pack(side="left")
         self.filter = tk.StringVar(value=self.controller.state.label_filter)
-        self._filter_buttons = [ttk.Radiobutton(batch, value=name, variable=self.filter, command=self._filter_changed)
+        self._filter_buttons = [ttk.Radiobutton(show, value=name, variable=self.filter, command=self._filter_changed)
                                 for name in FILTERS]
         for button in self._filter_buttons:
-            button.pack(side="left", padx=(6, 0))
+            button.pack(side="left", padx=(theme.space("s"), 0))
 
-        self._help = ttk.Label(self, wraplength=680, justify="left")
-        self._help.pack(fill="x", pady=6)
+        self._help = ttk.Label(self, wraplength=theme.wrap(), justify="left")
+        self._help.pack(fill="x", pady=theme.space("s"))
+        # packed before the table: when the window is limited to a small screen, the table yields the room
+        self._status = self.status_line()
+        self._status.pack(side="bottom", fill="x", pady=theme.space("s"))
         table = ttk.Frame(self)
         table.pack(fill="both", expand=True)
-        self.tree = ttk.Treeview(table, columns=COLUMNS, show="headings", height=12, selectmode="extended")
+        self.tree = ttk.Treeview(table, columns=COLUMNS, show="headings", height=8, selectmode="extended")
         scroll = ttk.Scrollbar(table, orient="vertical", command=self.tree.yview)
-        self.tree.configure(yscrollcommand=scroll.set)
-        self.tree.pack(side="left", fill="both", expand=True)
-        scroll.pack(side="right", fill="y")
-        self.tree.bind("<Double-1>", self._start_edit)
-        self._status = ttk.Label(self, wraplength=680, justify="left")
-        self._status.pack(fill="x", pady=6)
-        self._editor = None
+        across = ttk.Scrollbar(table, orient="horizontal", command=self.tree.xview)
+        self.tree.configure(yscrollcommand=lambda *a: (scroll.set(*a), self._follow_editor()),
+                            xscrollcommand=lambda *a: (across.set(*a), self._follow_editor()))
+        self.tree.bind("<Configure>", lambda _: self._follow_editor(), add="+")
+        self.tree.grid(row=0, column=0, sticky="nsew")
+        scroll.grid(row=0, column=1, sticky="ns")
+        across.grid(row=1, column=0, sticky="ew")
+        table.rowconfigure(0, weight=1)
+        table.columnconfigure(0, weight=1)
+        # one click on a «Label» cell opens the list of classes (a double click was not discovered)
+        self._label_under_pointer = widgets.bind_cell_editing(self.tree, ("label",), self._open_editor)
+        widgets.Tooltip(self.tree, lambda: self.controller.text("HINT_EDIT_LABEL") if self._label_under_pointer()
+                        else None)
+        widgets.bind_row_hover(self.tree)
         self._message: tuple[str, dict] | None = None
         self._loaded_for = None  # the dataset whose table is shown
         self._drawn: tuple[int, str] | None = None  # (label_version, language) in the table
@@ -73,7 +88,9 @@ class LabelsStep(StepView):
         usable = state.labels_available and not busy
         editable = "normal" if usable and not state.labels_closed else "disabled"
         self._reload.configure(text=text("RELOAD"), state="normal" if state.dataset_root and not busy else "disabled")
-        self._apply.configure(text=text("APPLY"), state=editable if state.label_edits else "disabled")
+        pending = self.controller.pending_label_edits()
+        # «Apply» stands out while there are edits to apply, so they are not forgotten
+        self._apply.configure(text=text("APPLY"), state=editable if pending else "disabled", primary=bool(pending))
         self._finalize.configure(text=text("FINALIZE"), state=editable)
         self._reopen.configure(text=text("REOPEN"), state="normal" if usable and state.labels_closed else "disabled")
         self._corrections.configure(text=text("LOAD_CORRECTIONS"), state=editable)
@@ -89,7 +106,11 @@ class LabelsStep(StepView):
         lines = self.controller.labels_status_lines()
         if self._message is not None:
             lines.append(text(self._message[0], **self._message[1]))
-        self._status.configure(text="\n".join(lines))
+        if pending:  # the line the warning is about goes first
+            unapplied = text("LABELS_UNAPPLIED", count=pending)
+            lines.sort(key=lambda line: line != unapplied)
+        code = self._message[0] if self._message is not None else "LABELS_UNAPPLIED" if pending else None
+        self._status.configure(text="\n".join(lines), severity=messages.severity(code))
 
     def _draw_table(self) -> None:
         """Rebuild the rows only when they, their edits, the filter or the language changed (thousands of
@@ -100,7 +121,9 @@ class LabelsStep(StepView):
         self._drawn = drawn
         text, rows = self.controller.text, self.controller.state.label_rows
         for column in COLUMNS:
-            self.tree.heading(column, text=text(f"COL_{column}"))
+            mark = f" {theme.EDIT_MARK}" if column == "label" else ""
+            self.tree.heading(column, text=text(f"COL_{column}") + mark)
+        selected, focused = self.tree.selection(), self.tree.focus()  # kept across the rebuild
         self.tree.delete(*self.tree.get_children())
         for index in self.controller.visible_label_rows():
             label, defect = self.controller.effective_label(index)
@@ -108,6 +131,10 @@ class LabelsStep(StepView):
             self.tree.insert("", "end", iid=str(index), values=(
                 row.participant, row.session or "", label, "" if defect is None else text(f"DEFECT_{defect}"),
             ))
+        widgets.stripe(self.tree)
+        self.tree.selection_set([item for item in selected if self.tree.exists(item)])
+        if focused and self.tree.exists(focused):
+            self.tree.focus(focused)
 
     def _say(self, check, ok_code: str | None = None) -> None:
         self._message = (check.code, check.values) if not check.ok else (ok_code, check.values) if ok_code else None
@@ -125,7 +152,7 @@ class LabelsStep(StepView):
         if not check.ok:
             self._say(check)
             return
-        if self.controller.start_task(task, self.controller.labels_failure):
+        if self.controller.start_task(task, self.controller.labels_failure, activity="labels"):
             self._action, self._pending = action, len(self.controller.state.label_edits)
             self._message = ("TASK_STARTED", {})
             self.refresh_texts()
@@ -140,6 +167,8 @@ class LabelsStep(StepView):
                 self._message = (check.code, check.values)
             elif self._action == "apply":
                 self._message = ("LABELS_APPLIED", check.values)
+                if self.controller.offer_finalize():
+                    self.after_idle(self.ask_finalize)  # once the table shows the applied rows
             elif self._action == "load" and self._pending:  # reloading discarded them: say so
                 self._message = ("LABELS_DISCARDED", {"count": self._pending})
             else:
@@ -166,8 +195,15 @@ class LabelsStep(StepView):
         if self.confirm(question):
             self._say(self.controller.assign_labels(indices, label), "ASSIGNED")
 
+    def ask_finalize(self) -> None:
+        """Every row has a class: «Finalize» runs the button's action, «Later» does nothing."""
+        text = self.controller.text
+        if dialogs.ask_ok_cancel(text("FINALIZE_NOW_TITLE"), text("FINALIZE_NOW"), parent=self.winfo_toplevel(),
+                                 ok_text=text("FINALIZE"), cancel_text=text("LATER")):
+            self.run("finalize")
+
     def confirm(self, question: str) -> bool:
-        return messagebox.askokcancel(self.controller.text("CONFIRM_TITLE"), question, parent=self)
+        return self.winfo_toplevel().ask("CONFIRM_TITLE", question)
 
     def _load_corrections(self) -> None:
         if path := filedialog.askopenfilename(parent=self, filetypes=TSV_TYPES):
@@ -177,7 +213,7 @@ class LabelsStep(StepView):
         check, task = self.controller.corrections_task(path)
         if not check.ok:
             self._say(check)
-        elif self.controller.start_task(task, self.controller.labels_failure):
+        elif self.controller.start_task(task, self.controller.labels_failure, activity="corrections"):
             self._action = "corrections"
             self._message = ("TASK_STARTED", {})
             self.refresh_texts()
@@ -185,10 +221,10 @@ class LabelsStep(StepView):
 
     # --- one cell ---------------------------------------------------------------------------------
 
-    def _start_edit(self, event) -> None:
-        item = self.tree.identify_row(event.y)
-        if item and self.tree.identify_column(event.x) == f"#{COLUMNS.index('label') + 1}":
-            self.start_edit(int(item))
+    def _open_editor(self, item: str, column: str) -> None:
+        """One click (or Enter / F2) on a label cell: the editor with its list already open."""
+        if (editor := self.start_edit(int(item))) is not None:
+            widgets.open_list(editor)
 
     def start_edit(self, index: int) -> ttk.Combobox | None:
         """A closed list of the classes over the label cell (``""`` = unlabeled)."""
@@ -210,8 +246,8 @@ class LabelsStep(StepView):
         editor.place(x=x, y=y, width=width, height=height)
         editor.focus_set()
         editor.bind("<<ComboboxSelected>>", lambda _: self.commit_edit(index, editor.get()))
-        editor.bind("<Escape>", lambda _: self._close_editor())
-        self._editor = editor
+        editor.bind("<Escape>", lambda _: self._close_editor(refocus=True))
+        self._editor, self._editing = editor, index
         return editor
 
     def commit_edit(self, index: int, value: str) -> None:
@@ -221,7 +257,23 @@ class LabelsStep(StepView):
         self.refresh_texts()
         self.on_change()
 
-    def _close_editor(self) -> None:
+    def finish_edit(self) -> None:
+        """Step change or close: an open list of classes just goes away (Esc and click elsewhere cancel it)."""
+        self._close_editor()
+
+    def _follow_editor(self) -> None:
+        """The table scrolled, was filtered or resized: the editor goes with its cell, or goes away if it left view."""
+        if self._editor is None:
+            return
+        box = self.tree.bbox(str(self._editing), "label")
+        if box:
+            self._editor.place(x=box[0], y=box[1], width=box[2], height=box[3])
+        else:
+            self._close_editor()
+
+    def _close_editor(self, refocus: bool = False) -> None:
         if self._editor is not None:
-            self._editor.destroy()
-            self._editor = None
+            editor, self._editor = self._editor, None
+            editor.destroy()
+            if refocus:  # Esc: back to the table, with its selection
+                self.tree.focus_set()

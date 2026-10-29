@@ -8,6 +8,7 @@ from collections import Counter
 from pathlib import Path
 from tkinter import filedialog, ttk
 
+from mri_dataset_tool.presentation.gui import theme, widgets
 from mri_dataset_tool.presentation.gui.views import StepView
 from mri_dataset_tool.presentation.gui.worker import Done, Event, Failed, ReportReadError
 
@@ -28,38 +29,49 @@ class ExportStep(StepView):
         self.report_dir = tk.StringVar()
         self.columnconfigure(1, weight=1)
 
-        self._ml = ttk.LabelFrame(self, padding=8)
+        self._ml = ttk.LabelFrame(self, padding=theme.space("s"))
         self._ml.grid(row=0, column=0, columnspan=3, sticky="ew")
         self._ratios_label = ttk.Label(self._ml)
         self._ratios_label.grid(row=0, column=0, sticky="w")
         ratios = ttk.Frame(self._ml)
-        ratios.grid(row=0, column=1, sticky="w", padx=6)
+        ratios.grid(row=0, column=1, sticky="w", padx=theme.space("s"))
         for variable in self.ratios:
-            ttk.Entry(ratios, textvariable=variable, width=6).pack(side="left", padx=(0, 6))
+            ttk.Entry(ratios, textvariable=variable, width=6).pack(side="left", padx=(0, theme.space("s")))
+        # created here: Tab reaches it with the first row, where it is drawn
+        self._ml.columnconfigure(2, weight=1)
+        self._ml_info = widgets.InfoIcon(self._ml, lambda: self.controller.text("ML_REGENERATE_HELP"))
+        self._ml_info.grid(row=0, column=3, sticky="ne")
         self._seed_label = ttk.Label(self._ml)
-        self._seed_label.grid(row=1, column=0, sticky="w", pady=4)
-        ttk.Entry(self._ml, textvariable=self.seed, width=8).grid(row=1, column=1, sticky="w", padx=6)
-        self._write_ml = ttk.Button(self._ml, command=self.write_ml)
-        self._write_ml.grid(row=3, column=0, sticky="w", pady=(6, 0))
-        self._ml_help = ttk.Label(self._ml, wraplength=640, justify="left")
-        self._ml_help.grid(row=4, column=0, columnspan=2, sticky="w", pady=(6, 0))
+        self._seed_label.grid(row=1, column=0, sticky="w", pady=theme.space("xs"))
+        ttk.Entry(self._ml, textvariable=self.seed, width=8).grid(row=1, column=1, sticky="w", padx=theme.space("s"))
+        self._write_ml = widgets.Button(self._ml, command=self.write_ml)
+        self._write_ml.grid(row=1, column=2, sticky="w", padx=theme.space("s"))  # beside the seed: less height
 
-        self._report = ttk.LabelFrame(self, padding=8)
-        self._report.grid(row=1, column=0, columnspan=3, sticky="ew", pady=8)
+        self._report = ttk.LabelFrame(self, padding=theme.space("s"))
+        self._report.grid(row=1, column=0, columnspan=3, sticky="ew", pady=(theme.space("s"), 0))
         self._report.columnconfigure(1, weight=1)
         self._report_label = ttk.Label(self._report)
         self._report_label.grid(row=0, column=0, sticky="w")
-        ttk.Entry(self._report, textvariable=self.report_dir).grid(row=0, column=1, sticky="ew", padx=6)
-        self._browse = ttk.Button(self._report, command=self._choose_report_dir)
+        ttk.Entry(self._report, textvariable=self.report_dir).grid(row=0, column=1, sticky="ew", padx=theme.space("s"))
+        self._browse = widgets.Button(self._report, command=self._choose_report_dir)
         self._browse.grid(row=0, column=2)
-        self._write_report = ttk.Button(self._report, command=self.write_report)
-        self._write_report.grid(row=1, column=0, sticky="w", pady=(6, 0))
+        self._write_report = widgets.Button(self._report, command=self.write_report)
+        self._write_report.grid(row=0, column=3, padx=(theme.space("s"), 0))
 
-        self._open = ttk.Button(self, command=self._open_output)
-        self._open.grid(row=2, column=0, sticky="w")
-        self.log = tk.Listbox(self, height=10)
-        self.log.grid(row=3, column=0, columnspan=3, sticky="nsew", pady=6)
-        self.rowconfigure(3, weight=1)
+        self.log = tk.Listbox(self, height=6)
+        self.log.grid(row=2, column=0, columnspan=3, sticky="nsew")
+        self.rowconfigure(2, weight=1)
+        # the closing summary of a finished run, with opening the output and closing the tool
+        summary = ttk.Frame(self, style="Summary.TFrame", padding=theme.space("m"))
+        summary.grid(row=3, column=0, columnspan=3, sticky="ew")
+        self._summary = self.status_line(summary)
+        self._summary.pack(side="left", fill="x", expand=True)
+        # closes the tool without the window's X; always asks (the window's request_close)
+        self._close = widgets.Button(summary, icon="close",
+                                     command=lambda: self.winfo_toplevel().request_close(confirm=True))
+        self._close.pack(side="right")
+        self._open = widgets.Button(summary, command=self._open_output)
+        self._open.pack(side="right", padx=(0, theme.space("s")))
         self._lines: list[tuple[str, dict]] = []  # (code, values) redrawn in the current language
         self._report_errors: Counter[str] = Counter()
 
@@ -73,12 +85,14 @@ class ExportStep(StepView):
         self._seed_label.configure(text=text("SEED"))
         present = state.dataset_root is not None and self.controller.ml_exports_present()
         self._write_ml.configure(text=text("REGENERATE_ML" if present else "WRITE_ML"), state=busy)
-        self._ml_help.configure(text=text("ML_REGENERATE_HELP"))
         self._report.configure(text=text("REPORT"))
         self._report_label.configure(text=text("REPORT_DIR"))
         self._browse.configure(text=text("BROWSE"))
         self._write_report.configure(text=text("WRITE_REPORT"), state=busy)
         self._open.configure(text=text("OPEN_FOLDER"), state="normal" if state.output_dir else "disabled")
+        self._close.configure(text=text("CLOSE"))
+        summary = self.controller.summary_text()
+        self._summary.configure(text=summary or "", severity="ok" if summary else None)
         self.log.delete(0, "end")
         for line in self.controller.export_status_lines():
             self.log.insert("end", line)
@@ -89,10 +103,10 @@ class ExportStep(StepView):
         if chosen := filedialog.askdirectory(parent=self, mustexist=False):
             self.report_dir.set(chosen)
 
-    def _start(self, check, task) -> None:
+    def _start(self, check, task, activity: str) -> None:
         if not check.ok:
             self._lines.append((check.code, check.values))
-        elif self.controller.start_task(task, self.controller.export_failure):
+        elif self.controller.start_task(task, self.controller.export_failure, activity=activity):
             self._lines.append(("TASK_STARTED", {}))
         self.refresh_texts()
         self.on_change()
@@ -100,10 +114,10 @@ class ExportStep(StepView):
     def write_ml(self) -> None:
         self._start(*self.controller.ml_exports_task(
             [variable.get() for variable in self.ratios], self.seed.get()
-        ))
+        ), "ml")
 
     def write_report(self) -> None:
-        self._start(*self.controller.report_task(self.report_dir.get()))
+        self._start(*self.controller.report_task(self.report_dir.get()), "report")
 
     def on_event(self, event: Event) -> None:
         if isinstance(event, ReportReadError):
@@ -120,4 +134,8 @@ class ExportStep(StepView):
         self.refresh_texts()
 
     def _open_output(self) -> None:
-        open_folder(self.controller.state.output_dir)
+        try:
+            open_folder(self.controller.state.output_dir)
+        except Exception as error:  # the file manager failed: its type only (the message may name the folder)
+            self._lines.append(("OPEN_FAILED", {"error_type": type(error).__name__}))
+            self.refresh_texts()

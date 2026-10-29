@@ -164,7 +164,7 @@ def test_valid_steps_fill_the_state_and_unlock_the_next_step(project):
     assert check.ok and controller.go_next() == "mapping"
     state = controller.state
     assert state.classes == {"AD": "Alzheimer", "CN": ""} and state.ratios == (0.6, 0.2, 0.2) and state.seed == 7
-    assert controller.pipeline_summary() == ['validate {"modalities": null}', 'anonymize {"policy_version": "1"}']
+    assert controller.pipeline_summary() == ["validate", "anonymize"]
     assert not (project / "out").exists()
     texts = [repr(state), *controller.pipeline_summary(), controller.check_text(check, "CONFIG_OK")]
     assert not [text for text in texts if KEY in text or "Planted" in text]
@@ -192,7 +192,7 @@ def test_disk_space_task_and_text(project, monkeypatch):
     assert done.summary == {"required": 0, "free": 2**30, "insufficient": 0}
     assert controller.disk_space_text(done.summary) == controller.text("DISK_SPACE_OK")
     low = {"required": 2**30, "free": 2**30, "insufficient": 1}
-    assert controller.disk_space_text(low).startswith("Aviso: la salida estimada (1.0 GiB)")
+    assert controller.disk_space_text(low) == controller.text("LOW_DISK_SPACE", required="1.0", free="1.0")
 
 
 def test_key_text_follows_the_state():

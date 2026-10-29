@@ -3,7 +3,7 @@
 Guía para sustentar el proyecto: por cada bloque, qué hace, por qué se diseñó así y qué alternativas se descartaron. El detalle técnico de cada módulo está en `docs/` (enlazado en cada sección).
 
 ## 1. Arquitectura en capas
-- **Qué:** `domain` (modelos), `infrastructure` (formatos, procesamiento, dataset), `application` (servicios y pipeline) y `presentation` (CLI; GUI pendiente).
+- **Qué:** `domain` (modelos), `infrastructure` (formatos, procesamiento, dataset), `application` (servicios y pipeline) y `presentation` (CLI y GUI).
 - **Por qué:** los modelos `MRIStudy`/`MRISeries` no dependen de `pydicom` ni `nibabel`; cualquier formato de entrada termina en ellos y cualquier escritor los consume. Se pueden cambiar lectores y escritores sin tocar el procesamiento.
 - **Descartado:** funciones sueltas por formato (cada paso tendría que conocer DICOM y NIfTI) y lógica de negocio en la CLI.
 
@@ -61,8 +61,14 @@ Guía para sustentar el proyecto: por cada bloque, qué hace, por qué se diseñ
 - **Límites declarados:** la consola no muestra rutas (el usuario ya conoce las que pasó). Los errores de `argparse` repiten lo tecleado. Las rutas de la configuración son relativas al directorio actual. `--verify` es opcional porque duplica el tiempo.
 - **Descartado:** duplicar la orquestación de los scripts en la CLI, hacer importable `scripts/` y añadir dependencias como `click` o `typer` (RNF12).
 
+## 12. Interfaz gráfica
+- **Qué:** asistente Tkinter de seis pasos (`mri-dataset-gui`) sobre los mismos servicios de la CLI, con tema propio (`ttk` estándar, sin dependencias nuevas), pantalla de bienvenida, indicador de actividad, edición de celdas con un clic, navegación por teclado y escalado de pantalla. (`docs/architecture/gui.md`, `docs/user_manual/gui.md`)
+- **Por qué:** el controlador no usa Tk y la ventana solo pinta y delega; así la lógica se prueba sin pantalla y los mensajes, validaciones y salidas son los de la CLI. Los colores, fuentes y espacios salen de un solo módulo de tema, con el contraste calculado en una prueba. Tras «Aplicar», si todas las filas tienen etiqueta, la GUI ofrece finalizarlas en el momento, porque exigir un botón aparte no era intuitivo.
+- **Límites declarados:** la escala de pantalla se lee al arrancar (hay que reabrir el programa para cambiarla). Las pruebas con foco real del sistema pueden fallar de forma intermitente si otro programa tiene el foco; las de escala heredan las fuentes de la raíz Tk anterior (`docs/testing/qa_etapa8.md`). Falta verificar Linux.
+- **Descartado:** un marco de interfaz externo (dependencia nueva, RNF12) y mensajes con texto de excepciones (podrían filtrar rutas o datos).
+
 ## Qué no cubre el proyecto (para declararlo con honestidad)
 - Defacing y texto quemado en los píxeles.
-- Interfaz gráfica (GUI) y revisión interactiva de etiquetas.
+- Verificación de la GUI en Linux y en pantallas reales de 125/150 % (las pruebas simulan la escala).
 - Validación con `bids-validator` oficial sin avisos, y verificación en Linux.
 - Medición de rendimiento formal (RNF01).

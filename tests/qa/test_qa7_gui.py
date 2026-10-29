@@ -326,7 +326,9 @@ def test_label_filter_and_language_change_during_a_labels_task(base, key):
 def _tk_app():
     try:
         tk.Tk().destroy()
-    except tk.TclError:
+    except tk.TclError as error:  # only a missing display skips; any other Tk failure must fail the test
+        if "no display name" not in str(error):
+            raise
         pytest.skip("No display available for Tk.")
     from mri_dataset_tool.presentation.gui.app import App
 
@@ -554,7 +556,7 @@ CLOSE_SCRIPT = r"""
 import sys, time, logging
 from pathlib import Path
 import numpy as np, nibabel as nib
-from tkinter import messagebox
+from mri_dataset_tool.presentation.gui import dialogs
 logging.basicConfig(level=logging.DEBUG)
 base = Path(sys.argv[1])
 from mri_dataset_tool.application.services.session_key import ensure_session_key
@@ -569,7 +571,7 @@ cfg.write_text("pipeline:\n  steps:\n    - name: validate\n    - name: anonymize
 controller = Controller(); controller.state.key_defined = ensure_session_key()
 app = App(controller); app.withdraw()
 asked = []
-messagebox.askokcancel = lambda *a, **k: asked.append(1) or True
+dialogs.ask_ok_cancel = lambda *a, **k: asked.append(1) or True
 assert controller.set_input(str(src), "bids", str(base / "out")).ok
 assert controller.set_config(str(cfg), False, "AD\nCN").ok
 controller.go_next(); controller.go_next()
