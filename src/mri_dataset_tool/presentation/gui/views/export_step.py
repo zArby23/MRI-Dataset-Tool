@@ -45,10 +45,10 @@ class ExportStep(StepView):
         self._seed_label.grid(row=1, column=0, sticky="w", pady=theme.space("xs"))
         ttk.Entry(self._ml, textvariable=self.seed, width=8).grid(row=1, column=1, sticky="w", padx=theme.space("s"))
         self._write_ml = widgets.Button(self._ml, command=self.write_ml)
-        self._write_ml.grid(row=3, column=0, sticky="w", pady=(theme.space("s"), 0))
+        self._write_ml.grid(row=1, column=2, sticky="w", padx=theme.space("s"))  # beside the seed: less height
 
         self._report = ttk.LabelFrame(self, padding=theme.space("s"))
-        self._report.grid(row=1, column=0, columnspan=3, sticky="ew", pady=theme.space("s"))
+        self._report.grid(row=1, column=0, columnspan=3, sticky="ew", pady=(theme.space("s"), 0))
         self._report.columnconfigure(1, weight=1)
         self._report_label = ttk.Label(self._report)
         self._report_label.grid(row=0, column=0, sticky="w")
@@ -56,10 +56,10 @@ class ExportStep(StepView):
         self._browse = widgets.Button(self._report, command=self._choose_report_dir)
         self._browse.grid(row=0, column=2)
         self._write_report = widgets.Button(self._report, command=self.write_report)
-        self._write_report.grid(row=1, column=0, sticky="w", pady=(theme.space("s"), 0))
+        self._write_report.grid(row=0, column=3, padx=(theme.space("s"), 0))
 
         self.log = tk.Listbox(self, height=6)
-        self.log.grid(row=2, column=0, columnspan=3, sticky="nsew", pady=theme.space("s"))
+        self.log.grid(row=2, column=0, columnspan=3, sticky="nsew")
         self.rowconfigure(2, weight=1)
         # the closing summary of a finished run, with opening the output and closing the tool
         summary = ttk.Frame(self, style="Summary.TFrame", padding=theme.space("m"))

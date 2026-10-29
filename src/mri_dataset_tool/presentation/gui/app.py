@@ -80,6 +80,7 @@ class App(tk.Tk):
         self.controller: Controller | None = None
         self._after_id: str | None = None
         self._closed = False  # set by destroy: nothing is redrawn or scheduled after it
+        self._asking_close = False  # a close question is open (see request_close)
         self.views: dict = {}
         self._language = tk.StringVar(value=messages.DEFAULT_LANGUAGE if controller is None else controller.language)
         self._theme = theme.DEFAULT_THEME
@@ -370,6 +371,7 @@ class App(tk.Tk):
 
     def _leave(self, move: Callable[[], object]) -> None:
         """Leave the step with *move*; label edits not applied ask first: apply and continue, discard, or stay."""
+        self.views[self.controller.step].finish_edit()
         count = self.controller.leave_question()
         if count is not None:
             choice = dialogs.ask_choice(
@@ -427,6 +429,16 @@ class App(tk.Tk):
         if self.controller is None:
             self.destroy()
             return
+        if self._asking_close:  # a second X while the question is open: the one on screen is enough
+            return
+        self._asking_close = True
+        try:
+            self._request_close(confirm)
+        finally:
+            self._asking_close = False
+
+    def _request_close(self, confirm: bool) -> None:
+        self.views[self.controller.step].finish_edit()
         question = self.controller.close_question(confirm)
         if question is not None and question[1] == "CLOSE_PENDING":  # label edits not applied: never lost silently
             choice = dialogs.ask_choice(

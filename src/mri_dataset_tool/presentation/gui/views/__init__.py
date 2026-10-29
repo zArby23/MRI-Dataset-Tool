@@ -29,6 +29,9 @@ class StepView(ttk.Frame):
     def on_event(self, event: Event) -> None:
         """A worker event while this step is shown."""
 
+    def finish_edit(self) -> None:
+        """The step is about to be left or closed: a cell editor still open is finished (free text is kept)."""
+
     def focus_first(self) -> None:
         """Give the keyboard focus to the first control of the step (the next in Tab order after the step)."""
         self.update_idletasks()  # Tab order skips widgets not mapped yet: finish laying out the step first

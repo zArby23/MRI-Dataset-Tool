@@ -11,7 +11,7 @@ DEFAULT_LANGUAGE = "es"
 
 CATALOG: dict[str, dict[str, str]] = {
     "es": {
-        "APP_TITLE_STEP": "MRI Dataset Tool — {header}",
+        "APP_TITLE_STEP": "MRI Dataset Tool - {header}",
         "MENU_LANGUAGE": "Idioma",
         "LANGUAGE_es": "Español",
         "LANGUAGE_en": "Inglés",
@@ -326,7 +326,7 @@ CATALOG: dict[str, dict[str, str]] = {
         "ML_ABSENT": "Los archivos para entrenamiento aún no están creados.",
         "REPORT_WRITTEN": "Reporte creado: {files} archivos.",
         "FILE_NAME": "  {name}",
-        "REPORT_WARNING": "Aviso del reporte {code}: {count}.",
+        "REPORT_WARNING": "Aviso del reporte {warning}: {count}.",
         "REPORT_WARNING_UNREADABLE_FILES": "Aviso UNREADABLE_FILES: {count} archivos del dataset no se pudieron leer.",
         "REPORT_WARNING_LABELS_UNREADABLE": "Aviso LABELS_UNREADABLE: las etiquetas no se pudieron leer.",
         "REPORT_WARNING_MANIFEST_UNREADABLE": "Aviso MANIFEST_UNREADABLE: no se pudo leer el registro de la ejecución.",
@@ -375,7 +375,7 @@ CATALOG: dict[str, dict[str, str]] = {
         "PIPELINE_WITHOUT_ANONYMIZE": "El pipeline debe incluir el paso anonymize.",
     },
     "en": {
-        "APP_TITLE_STEP": "MRI Dataset Tool — {header}",
+        "APP_TITLE_STEP": "MRI Dataset Tool - {header}",
         "MENU_LANGUAGE": "Language",
         "LANGUAGE_es": "Spanish",
         "LANGUAGE_en": "English",
@@ -675,7 +675,7 @@ CATALOG: dict[str, dict[str, str]] = {
         "ML_ABSENT": "The training files are not created yet.",
         "REPORT_WRITTEN": "Report created: {files} files.",
         "FILE_NAME": "  {name}",
-        "REPORT_WARNING": "Report warning {code}: {count}.",
+        "REPORT_WARNING": "Report warning {warning}: {count}.",
         "REPORT_WARNING_UNREADABLE_FILES": "Warning UNREADABLE_FILES: {count} dataset files could not be read.",
         "REPORT_WARNING_LABELS_UNREADABLE": "Warning LABELS_UNREADABLE: the labels could not be read.",
         "REPORT_WARNING_MANIFEST_UNREADABLE": "Warning MANIFEST_UNREADABLE: the run record could not be read.",

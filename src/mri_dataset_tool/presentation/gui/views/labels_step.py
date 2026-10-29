@@ -16,6 +16,8 @@ TSV_TYPES = [("TSV", "*.tsv")]
 
 class LabelsStep(StepView):
     def build(self) -> None:
+        self._editor = None
+        self._editing = 0
         buttons = ttk.Frame(self)
         buttons.pack(fill="x")
         self._reload = widgets.Button(buttons, command=self.reload)
@@ -49,12 +51,17 @@ class LabelsStep(StepView):
 
         self._help = ttk.Label(self, wraplength=theme.wrap(), justify="left")
         self._help.pack(fill="x", pady=theme.space("s"))
+        # packed before the table: when the window is limited to a small screen, the table yields the room
+        self._status = self.status_line()
+        self._status.pack(side="bottom", fill="x", pady=theme.space("s"))
         table = ttk.Frame(self)
         table.pack(fill="both", expand=True)
         self.tree = ttk.Treeview(table, columns=COLUMNS, show="headings", height=8, selectmode="extended")
         scroll = ttk.Scrollbar(table, orient="vertical", command=self.tree.yview)
         across = ttk.Scrollbar(table, orient="horizontal", command=self.tree.xview)
-        self.tree.configure(yscrollcommand=scroll.set, xscrollcommand=across.set)
+        self.tree.configure(yscrollcommand=lambda *a: (scroll.set(*a), self._follow_editor()),
+                            xscrollcommand=lambda *a: (across.set(*a), self._follow_editor()))
+        self.tree.bind("<Configure>", lambda _: self._follow_editor(), add="+")
         self.tree.grid(row=0, column=0, sticky="nsew")
         scroll.grid(row=0, column=1, sticky="ns")
         across.grid(row=1, column=0, sticky="ew")
@@ -65,9 +72,6 @@ class LabelsStep(StepView):
         widgets.Tooltip(self.tree, lambda: self.controller.text("HINT_EDIT_LABEL") if self._label_under_pointer()
                         else None)
         widgets.bind_row_hover(self.tree)
-        self._status = self.status_line()
-        self._status.pack(fill="x", pady=theme.space("s"))
-        self._editor = None
         self._message: tuple[str, dict] | None = None
         self._loaded_for = None  # the dataset whose table is shown
         self._drawn: tuple[int, str] | None = None  # (label_version, language) in the table
@@ -234,7 +238,7 @@ class LabelsStep(StepView):
         editor.focus_set()
         editor.bind("<<ComboboxSelected>>", lambda _: self.commit_edit(index, editor.get()))
         editor.bind("<Escape>", lambda _: self._close_editor(refocus=True))
-        self._editor = editor
+        self._editor, self._editing = editor, index
         return editor
 
     def commit_edit(self, index: int, value: str) -> None:
@@ -244,9 +248,23 @@ class LabelsStep(StepView):
         self.refresh_texts()
         self.on_change()
 
+    def finish_edit(self) -> None:
+        """Step change or close: an open list of classes just goes away (Esc and click elsewhere cancel it)."""
+        self._close_editor()
+
+    def _follow_editor(self) -> None:
+        """The table scrolled, was filtered or resized: the editor goes with its cell, or goes away if it left view."""
+        if self._editor is None:
+            return
+        box = self.tree.bbox(str(self._editing), "label")
+        if box:
+            self._editor.place(x=box[0], y=box[1], width=box[2], height=box[3])
+        else:
+            self._close_editor()
+
     def _close_editor(self, refocus: bool = False) -> None:
         if self._editor is not None:
-            self._editor.destroy()
-            self._editor = None
+            editor, self._editor = self._editor, None
+            editor.destroy()
             if refocus:  # Esc: back to the table, with its selection
                 self.tree.focus_set()

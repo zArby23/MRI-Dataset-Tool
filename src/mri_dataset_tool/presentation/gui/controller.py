@@ -8,7 +8,8 @@ holds only what the user chose (paths, format, options), never ids, paths or val
 
 from collections.abc import Callable, Sequence
 from dataclasses import dataclass, field
-from pathlib import Path
+import posixpath
+from pathlib import Path, PurePosixPath
 from typing import Any
 
 from mri_dataset_tool.application.pipeline.runner import Pipeline
@@ -115,6 +116,31 @@ class Activity:
     skipped: int = 0
     failed: int = 0
     unreadable: int = 0
+
+
+def _label_edits(preview: Sequence[PreviewRow], input_format: str, indices: Sequence[int]):
+    """``(index, rows)`` pairs for ``apply_edit`` of a label: DICOM labels belong to the study, so one pair per
+    study, with only the rows ``apply_edit`` needs for that study (its own series, plus one series that shares
+    its folder, if any, so the same error is raised). Walking all rows per selected series is quadratic."""
+    if input_format != "dicom":
+        return [(index, preview) for index in indices]
+    studies: dict[tuple[str, str], list[int]] = {}
+    where: dict[PurePosixPath, set[tuple[str, str]]] = {}  # folder -> studies with a series in or under it
+    for i, row in enumerate(preview):
+        key = (row.participant, row.session)
+        studies.setdefault(key, []).append(i)
+        for folder in (row.location, *row.location.parents):
+            where.setdefault(folder, set()).add(key)
+    edits = []
+    for key in dict.fromkeys((preview[i].participant, preview[i].session) for i in indices):
+        own = studies[key]
+        rows = [preview[i] for i in own]
+        folder = PurePosixPath(posixpath.commonpath([row.location.as_posix() for row in rows]))
+        other = next(iter(where.get(folder, set()) - {key}), None)
+        if other is not None:
+            rows.append(preview[studies[other][0]])
+        edits.append((0, rows))
+    return edits
 
 
 def _check(validate: Callable[[], object]) -> tuple[Check, object]:
@@ -311,9 +337,9 @@ class Controller:
         if not indices:
             return Check("NOTHING_SELECTED")
         mapping = list(self.state.mapping)
-        for index in indices:
+        for index, rows in _label_edits(self.state.preview, self.state.input_format, indices):
             check, mapping = _check(lambda: apply_edit(
-                mapping, self.state.preview, self.state.input_format, index, "label", value, self.state.classes
+                mapping, rows, self.state.input_format, index, "label", value, self.state.classes
             ))
             if not check.ok:
                 return check
@@ -678,7 +704,7 @@ class Controller:
         for code, count in sorted(warnings.items()):
             specific = f"REPORT_WARNING_{code}"
             lines.append((specific, {"count": count}) if specific in messages.CATALOG[self.language]
-                         else ("REPORT_WARNING", {"code": code, "count": count}))
+                         else ("REPORT_WARNING", {"warning": code, "count": count}))
         return lines
 
     def export_status_lines(self) -> list[str]:
