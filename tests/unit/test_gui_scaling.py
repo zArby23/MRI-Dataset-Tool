@@ -2,6 +2,7 @@
 focus, shortcuts and the Windows DPI declaration. The Tk tests are skipped without a display; the window is
 shown because keyboard focus and real geometry need it."""
 
+import time
 import tkinter as tk
 
 import pytest
@@ -136,9 +137,22 @@ def test_a_new_step_starts_with_the_keyboard_on_its_first_control(monkeypatch):
             app.refresh()
             app.update()
             first = _tab_chain(app, app.views[step])[0]
-            assert app.focus_get() is first, step
+            # the widget the window gives the keyboard to: kept by Tk even while another program has the focus
+            assert app.focus_lastfor() is first, step
     finally:
         app.destroy()
+
+
+def _take_focus(app, limit: float = 1.0) -> None:
+    """Generated keys reach the window only while it has the system focus: ask for it, and skip (a limit of the
+    test machine, not of the GUI) if another program keeps it."""
+    end = time.monotonic() + limit
+    while app.focus_get() is None:
+        if time.monotonic() > end:
+            pytest.skip("Another program holds the system focus: generated keys would not reach the window.")
+        app.focus_force()
+        app.update()
+        time.sleep(0.02)
 
 
 def test_shortcuts_move_like_the_buttons_and_ctrl_enter_does_nothing_in_the_classes_box(monkeypatch):
@@ -148,8 +162,7 @@ def test_shortcuts_move_like_the_buttons_and_ctrl_enter_does_nothing_in_the_clas
     try:
         controller.complete("input")
         app.refresh()
-        app.focus_force()
-        app.update()
+        _take_focus(app)
         app.event_generate("<Alt-Right>")
         app.update()
         assert controller.step == "config"

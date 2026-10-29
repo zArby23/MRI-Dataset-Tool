@@ -264,10 +264,10 @@ def walked(tmp_path_factory: pytest.TempPathFactory):
             app._go_next()  # pending edits: the three-button question (answered «Cancel»: stays)
             assert controller.step == "labels"
             app.request_close()  # the window's X with pending edits: the same question, the window stays
-            labels.run("apply")
+            labels.run("apply")  # complete now: «finalize now?» (recorded, accepted) runs the button's action
             _settle(app)
-            labels.run("finalize")
-            _settle(app)
+            _settle(app)  # the finalize started from the question
+            assert controller.state.labels_closed
             shown()
             app._next.invoke()
             assert controller.step == "export"

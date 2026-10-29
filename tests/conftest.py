@@ -14,7 +14,8 @@ from mri_dataset_tool.presentation.gui import theme
 TK_LOAD_ERRORS = ("usable tk.tcl", "usable init.tcl", "tcl_findLibrary", "couldn't read file")
 ATTEMPTS, PAUSE_S = 3, 0.2
 # `tk scaling` belongs to the display and survives one Tk root: a test that simulates 125 % would hand it to the
-# next root, whose default fonts are computed from it. Every root starts from the first one's value.
+# next root. Every root gets the first one's value back, but only once it is created: its default fonts were
+# already computed from the inherited value, so a test that measures fonts first creates a root at native scaling.
 DEFAULT_TK_SCALING: list[float] = []
 
 
