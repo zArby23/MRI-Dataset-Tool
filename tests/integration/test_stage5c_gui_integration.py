@@ -19,6 +19,7 @@ import subprocess
 import sys
 import tkinter as tk
 from pathlib import Path
+from tkinter import font as tkfont
 from tkinter import ttk
 
 import pytest
@@ -41,14 +42,54 @@ PLACEHOLDERS = {
     "classes", "code", "codes", "count", "counts", "error_type", "errors", "failed", "files", "folder", "foreign",
     "free", "header", "invalid", "label", "labeled", "labels", "name", "number", "pairs", "participants",
     "required", "rows", "series", "skipped", "stage", "studies", "title", "total", "unreadable", "version",
+    "warning",  # a fixed code of the dataset report (UNREADABLE_FILES...), never text read from the data
 }
 CODE = re.compile(r"[A-Za-z_][A-Za-z0-9_]*")
+
+
+def _native_scaling() -> float | None:
+    """Tk's scaling of a fresh root, read at import (collection runs before any test scales a root)."""
+    try:
+        root = tk.Tk()
+    except tk.TclError:  # no display: the Tk tests skip
+        return None
+    try:
+        return float(root.tk.call("tk", "scaling"))
+    finally:
+        root.destroy()
+
+
+NATIVE_SCALING = _native_scaling()
+
+
+def _reset_scaling() -> None:
+    """Give the next roots the native scaling again (QA8-11): a root inherits the ``tk scaling`` of the
+    previous one in this process and computes its fonts from it while it is created, so only a root created
+    after this sees native text sizes (resetting it after creating the root, as conftest does, is too late
+    for the fonts)."""
+    if NATIVE_SCALING is None:
+        return
+    root = tk.Tk()
+    try:
+        root.tk.call("tk", "scaling", NATIVE_SCALING)
+    finally:
+        root.destroy()
+
+
+@pytest.fixture
+def native_display():
+    """Native scaling before and after the test (QA8-11); the theme scale is restored by conftest (QA8-07)."""
+    _reset_scaling()
+    yield
+    _reset_scaling()
 
 
 def _display() -> None:
     try:
         tk.Tk().destroy()
-    except tk.TclError:
+    except tk.TclError as error:
+        if "no display name" not in str(error) and "connect to display" not in str(error):
+            raise  # only a missing display skips; any other Tk error is a failure (QA8-10)
         pytest.skip("No display available for Tk.")
 
 
@@ -133,6 +174,7 @@ def _settle(app, timeout: float = 600) -> None:
 def walked(tmp_path_factory: pytest.TempPathFactory):
     """Steps 1→6 in the real window on the DICOM input with planted PHI; everything shown is recorded."""
     _display()
+    _reset_scaling()  # built at native scaling whatever ran before (QA8-11)
     tmp = tmp_path_factory.mktemp("e8")
     record = {"texts": [], "events": [], "activity": [], "dialogs": [], "tooltips": [], "callback_errors": [],
               "location_tips": []}
@@ -259,7 +301,9 @@ def walked(tmp_path_factory: pytest.TempPathFactory):
                         _settle(app, 60)
                         record["texts"] += _texts(app, app.views["mapping"].tree)
                         record["redraw_overflow"] += [(name, language, step, w) for w in _overflow(app)]
-            record["window"] = (app.winfo_width(), app.winfo_height(), app.resizable())
+            record["window"] = (app.winfo_width(), app.winfo_height(), app.resizable(),
+                                (theme.px(theme.WINDOW[0]), theme.px(theme.WINDOW[1])))  # px() of this window
+            record["linespace"] = tkfont.nametofont("TkDefaultFont", root=app).metrics("linespace")
         finally:
             app.destroy()
     return {"tmp": tmp, "output": output, "source": source, "controller": controller, **record}
@@ -331,22 +375,29 @@ def test_the_queue_and_the_activity_hold_only_codes_and_integers(walked):
 
 def test_both_themes_and_languages_redraw_every_step_inside_the_fixed_window(walked):
     assert walked["redraw_overflow"] == []
-    width, height, resizable = walked["window"]
-    assert (width, height) == (theme.px(theme.WINDOW[0]), theme.px(theme.WINDOW[1])) and resizable == (False, False)
+    width, height, resizable, expected = walked["window"]
+    assert (width, height) == expected and resizable == (False, False)
 
 
 @pytest.mark.parametrize("factor", [1.25, 1.5])
-def test_the_finished_wizard_fits_at_each_display_scaling(walked, monkeypatch, factor):
-    """At 125 and 150 % (Tk scaling as Windows gives it, a 1920x1080 screen) nothing passes the window."""
+def test_the_finished_wizard_fits_at_each_display_scaling(walked, native_display, monkeypatch, factor):
+    """At 125 and 150 % of the native scaling (a 1920x1080 screen) the text really grows and nothing passes
+    the window."""
     real = theme.apply_theme
     monkeypatch.setattr(theme, "apply_theme", lambda root, name=theme.DEFAULT_THEME: (
-        root.tk.call("tk", "scaling", 96 / 72 * factor), real(root, name))[1])
+        root.tk.call("tk", "scaling", NATIVE_SCALING * factor), real(root, name))[1])
     monkeypatch.setattr(app_module.App, "winfo_screenwidth", lambda self: 1920)
     monkeypatch.setattr(app_module.App, "winfo_screenheight", lambda self: 1080)
     controller = walked["controller"]
     app = app_module.App(controller)
     try:
         assert app.winfo_height() <= 1080 - theme.px(theme.TASKBAR) and app.winfo_width() <= 1920
+        assert theme.px(100) == round(100 * factor)
+        # the text grows with the scaling (inside the suite too: a root recomputes its fonts at creation)
+        linespace = tkfont.nametofont("TkDefaultFont", root=app).metrics("linespace")
+        # measured at 100/125/150/200 %: 14, 18, 22, 29 px, so never below native * factor; the 1 px is for the
+        # whole-point rounding of other platforms' fonts, and the text must grow whatever the rounding
+        assert walked["linespace"] < linespace >= walked["linespace"] * factor - 1, (linespace, walked["linespace"], factor)
         overflow = []
         for step in STEPS:
             controller.step = step

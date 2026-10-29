@@ -326,7 +326,9 @@ def test_label_filter_and_language_change_during_a_labels_task(base, key):
 def _tk_app():
     try:
         tk.Tk().destroy()
-    except tk.TclError:
+    except tk.TclError as error:  # only a missing display skips; any other Tk failure must fail the test
+        if "no display name" not in str(error):
+            raise
         pytest.skip("No display available for Tk.")
     from mri_dataset_tool.presentation.gui.app import App
 

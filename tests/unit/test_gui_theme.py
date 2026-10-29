@@ -138,7 +138,9 @@ def test_no_visible_text_names_internal_settings(language):
 def _display() -> None:
     try:
         tk.Tk().destroy()
-    except tk.TclError:
+    except tk.TclError as error:
+        if "no display name" not in str(error) and "connect to display" not in str(error):
+            raise  # only a missing display skips; any other Tk error is a failure
         pytest.skip("No display available for Tk.")
 
 

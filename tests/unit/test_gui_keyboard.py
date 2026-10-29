@@ -15,7 +15,9 @@ from mri_dataset_tool.presentation.gui import dialogs, messages, theme, widgets
 def _root() -> tk.Tk:
     try:
         root = tk.Tk()
-    except tk.TclError:
+    except tk.TclError as error:
+        if "no display name" not in str(error) and "connect to display" not in str(error):
+            raise  # only a missing display skips; any other Tk error is a failure
         pytest.skip("No display available for Tk.")
     theme.apply_theme(root)
     return root

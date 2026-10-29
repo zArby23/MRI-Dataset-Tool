@@ -79,7 +79,9 @@ def test_every_task_of_the_views_has_an_activity_text():
 def test_footer_bar_runs_only_while_a_task_runs():
     try:
         tk.Tk().destroy()
-    except tk.TclError:
+    except tk.TclError as error:
+        if "no display name" not in str(error) and "connect to display" not in str(error):
+            raise  # only a missing display skips; any other Tk error is a failure
         pytest.skip("No display available for Tk.")
     from mri_dataset_tool.presentation.gui.app import App
 
@@ -105,7 +107,9 @@ def test_footer_bar_runs_only_while_a_task_runs():
 def test_run_log_colors_and_prefixes_failures():
     try:
         tk.Tk().destroy()
-    except tk.TclError:
+    except tk.TclError as error:
+        if "no display name" not in str(error) and "connect to display" not in str(error):
+            raise  # only a missing display skips; any other Tk error is a failure
         pytest.skip("No display available for Tk.")
     from mri_dataset_tool.presentation.gui.app import App
 

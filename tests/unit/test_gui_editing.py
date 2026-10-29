@@ -64,7 +64,9 @@ def test_label_status_lines_count_the_changes_not_applied():
 def _display() -> None:
     try:
         tk.Tk().destroy()
-    except tk.TclError:
+    except tk.TclError as error:
+        if "no display name" not in str(error) and "connect to display" not in str(error):
+            raise  # only a missing display skips; any other Tk error is a failure
         pytest.skip("No display available for Tk.")
 
 

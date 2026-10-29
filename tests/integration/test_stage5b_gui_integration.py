@@ -379,7 +379,9 @@ def _settle(app, timeout: float = 600) -> None:
 def test_tk_window_walk(tmp_path, monkeypatch) -> None:
     try:
         tk.Tk().destroy()
-    except tk.TclError:
+    except tk.TclError as error:
+        if "no display name" not in str(error) and "connect to display" not in str(error):
+            raise  # only a missing display skips; any other Tk error is a failure (QA8-10)
         pytest.skip("No display available for Tk.")
     from mri_dataset_tool.presentation.gui.app import App
 
