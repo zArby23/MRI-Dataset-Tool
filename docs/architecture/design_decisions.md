@@ -67,6 +67,12 @@ Guía para sustentar el proyecto: por cada bloque, qué hace, por qué se diseñ
 - **Límites declarados:** la escala de pantalla se lee al arrancar (hay que reabrir el programa para cambiarla). Las pruebas con foco real del sistema pueden fallar de forma intermitente si otro programa tiene el foco; las de escala heredan las fuentes de la raíz Tk anterior (`docs/testing/qa_etapa8.md`). Falta verificar Linux.
 - **Descartado:** un marco de interfaz externo (dependencia nueva, RNF12) y mensajes con texto de excepciones (podrían filtrar rutas o datos).
 
+## 13. Ejecutable portable de Windows
+- **Qué:** la GUI se distribuye como carpeta `onedir` en un `.zip`, generada con `packaging/build_exe.py` (PyInstaller solo como herramienta de build, instalado a mano; no es dependencia del paquete). `project_config_dir()` lee los YAML de `sys._MEIPASS/config` cuando el programa está congelado.
+- **Por qué:** `onefile` se autoextrae en `%TEMP%` (poco espacio en `C:`), arranca más lento y levanta más avisos de antivirus. Los metadatos de los paquetes viajan en el bundle para que el manifiesto registre versiones reales y no `unknown`, y con ellos las licencias de terceros.
+- **Límites declarados:** solo Windows, sin firma de código (SmartScreen puede avisar), ruta de descompresión corta (límite de 260 caracteres), sin actualización automática; `build/` y `spec/` llevan rutas absolutas y no se distribuyen.
+- **Descartado:** `onefile`, instalador MSI, ejecutable de la CLI y binario de Linux.
+
 ## Qué no cubre el proyecto (para declararlo con honestidad)
 - Defacing y texto quemado en los píxeles.
 - Verificación de la GUI en Linux y en pantallas reales de 125/150 % (las pruebas simulan la escala).
