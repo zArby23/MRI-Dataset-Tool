@@ -172,4 +172,4 @@ Algoritmo (`resample.py`), decisiones de diseño:
   preguntar.
 - **Memoria de `resample`:** el pico es la salida 4D completa en `float32` más un volumen 3D de
   entrada y sus copias de trabajo (≈ 5 GiB para una difusión 144×144×78×140 a 1 mm); no hay salida en
-  disco ni por trozos, ni recorte o relleno a matriz fija (etapa 4).
+  disco ni por trozos, ni recorte o relleno a matriz fija.

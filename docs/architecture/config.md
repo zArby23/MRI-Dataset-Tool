@@ -37,8 +37,19 @@ Solo existen estas claves; cualquier otra lanza `ValueError`.
   (`application/pipeline/step.py`); los pasos corren en el orden de la lista.
 - `report.path` se devuelve tal cual, sin resolver. Lo interpreta el manifiesto de corrida.
 
-Cómo usa estos valores el pipeline: [pipeline.md](pipeline.md). `config/example_run.yaml` es el
-archivo de corrida de `scripts/run_example_pipeline.py`.
+Cómo usa estos valores el pipeline: [pipeline.md](pipeline.md).
+
+## Archivos de `config/`
+
+| Archivo | Uso |
+|---|---|
+| `default.yaml` | Base obligatoria (tabla anterior). |
+| `development.yaml` | Sobrescritura de desarrollo (`environment="development"`): `logging.level: DEBUG`. |
+| `stage3_example.yaml` | Pipeline para NIfTI sueltos: validate → anonymize → reorient → resample (1 mm) → normalize. |
+| `stage3_bids.yaml` | Pipeline para BIDS: igual, con `resample` a 1 mm para anatómicas y `fmap` y a 2 mm para `dwi`. Solo remuestrea las modalidades que lista; no sirve para NIfTI sueltos (su `modality` es `None`). Es la configuración por defecto de la GUI. |
+| `example_run.yaml` | Archivo de corrida de `scripts/run_example_pipeline.py`. |
+
+La CLI y la GUI exigen que el pipeline incluya el paso `anonymize` al construir un dataset.
 
 Ejemplo de archivo de corrida:
 
@@ -74,5 +85,7 @@ configuración que se ejecutó realmente, así que conviene revisarlo cuando un 
    `FileNotFoundError`.
 2. `pipeline.steps` es una lista de `{name, params}`; al fusionar, las listas se reemplazan enteras y
    los mapeos se fusionan clave por clave.
-3. `config_dir` es `Path("config")` relativo al directorio actual (los comandos se ejecutan desde la
-   raíz del repositorio). Los valores por defecto son los de la tabla.
+3. `config_dir` es `Path("config")` relativo al directorio actual: la línea de comandos se ejecuta desde la
+   raíz del repositorio. La GUI no depende del directorio actual: usa `project_config_dir()`
+   (`application/services/inputs.py`), que apunta a la carpeta `config/` del proyecto o, en el ejecutable
+   portable de Windows, a la `config/` empaquetada junto al programa. Los valores por defecto son los de la tabla.

@@ -1,6 +1,6 @@
 # Decisiones de diseño y su justificación
 
-Guía para sustentar el proyecto: por cada bloque, qué hace, por qué se diseñó así y qué alternativas se descartaron. El detalle técnico de cada módulo está en `docs/` (enlazado en cada sección).
+Guía para sustentar el proyecto: por cada bloque, qué hace, por qué se diseñó así y qué alternativas se descartaron. El detalle técnico de cada módulo está en `docs/` (enlazado en cada sección); la visión de conjunto de las capas está en [`overview.md`](overview.md).
 
 ## 1. Arquitectura en capas
 - **Qué:** `domain` (modelos), `infrastructure` (formatos, procesamiento, dataset), `application` (servicios y pipeline) y `presentation` (CLI y GUI).
@@ -75,6 +75,8 @@ Guía para sustentar el proyecto: por cada bloque, qué hace, por qué se diseñ
 
 ## Qué no cubre el proyecto (para declararlo con honestidad)
 - Defacing y texto quemado en los píxeles.
-- Verificación de la GUI en Linux y en pantallas reales de 125/150 % (las pruebas simulan la escala).
-- Validación con `bids-validator` oficial sin avisos, y verificación en Linux.
+- Verificación de la GUI en pantallas reales de 125/150 % (las pruebas simulan la escala) y del ejecutable en una máquina Windows limpia sin Python.
+- Validación con `bids-validator` oficial sin avisos: quedan los de `dwi` (sin `.bval`/`.bvec`) y `phasediff` (sin `EchoTime1/2`).
+- DICOM con sintaxis de transferencia comprimida (corridas reales pendientes).
+- Ejecutable para Linux y macOS (allí se instala desde el código fuente) y firma de código del ejecutable de Windows.
 - Medición de rendimiento formal (RNF01).

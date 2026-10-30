@@ -168,6 +168,8 @@ replay_reports = replay.run(NIfTIBatchReader().iter_studies(batch_dir), on_resul
 assert RunManifest.from_run(saved.config, replay, replay_reports) == saved
 ```
 
+> **Datos de los scripts.** Los scripts de este documento leen `data/raw/nifti_test_studies`, una carpeta que git ignora y que no viene en el repositorio. Las muestras públicas equivalentes están en `data/samples/nifti_test_studies`: cópielas a `data/raw/nifti_test_studies` o pase otra carpeta cuando el script la acepte (`memory_check_nifti_batch.py` y `run_stage3_bids_pipeline.py` reciben la ruta como argumento). Con la línea de comandos `mri-dataset` no hace falta ninguna carpeta fija.
+
 ## Verificación manual
 
 Desde la raíz del repositorio:

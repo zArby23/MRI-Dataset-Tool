@@ -94,6 +94,6 @@ borran los ya escritos y se puede reintentar). Los parámetros se validan antes 
 - Los archivos de exportación y las etiquetas están en la raíz del dataset; el `bids-validator` puede
   reportarlos como archivos desconocidos: el exportador no escribe `.bidsignore`. Si molesta, crear en la
   raíz un `.bidsignore` con `dataset_index.csv`, `datalist.json`, `splits.*` y `labels*` (una línea cada
-  uno). Verificación manual (pendiente) con el `bids-validator`.
+  uno). Se comprobó con el `bids-validator`: solo marca estos archivos de la raíz.
 - Las particiones dependen del algoritmo de `random.Random(seed).shuffle` de Python; una versión de
   Python que lo cambiara daría otras particiones con la misma semilla (por eso se guarda `splits.tsv`).

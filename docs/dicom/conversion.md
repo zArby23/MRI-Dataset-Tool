@@ -15,7 +15,7 @@ Los helpers `lps_to_ras` / `ras_to_lps` (en `volume_builder.py`) convierten entr
 - `output_dir` dentro de `input_dir` → `ValueError`. No sobrescribe salidas (`FileExistsError` por serie, reportado vía `on_error`).
 - Una serie que falla se reporta con `on_error(primer_archivo, error)` y el resto continúa.
 - Un volumen a la vez: el resultado devuelve series con `volume=None`, `files=[ruta escrita]`, geometría y `metadata["provenance"]`.
-- Límite: `convert_dicom_to_nifti` no pasa `on_error` a `DICOMBatchReader`, así que los archivos DICOM ilegibles se omiten sin reportarse.
+- `on_error` también se reenvía a `DICOMBatchReader`: recibe además los archivos del árbol que el lector omite (no DICOM, ilegibles, sin UIDs; p. ej. `DICOMDIR`, un `README` o un `.json`). Esas llamadas no son errores de conversión y no deben presentarse al usuario como series fallidas.
 
 ## `convert_nifti_to_dicom(input_path, output_dir, on_error=None) -> list[MRIStudy]`
 

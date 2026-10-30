@@ -93,6 +93,6 @@ todo o nada: si falla un archivo, borra los de nivel superior que ya había escr
 - **Ids que solo difieren en mayúsculas** (`AB` y `ab`): en Windows (sistema de archivos sin
   distinción de mayúsculas) comparten carpeta y el dataset queda incoherente (`write_ml_exports` falla con
   "outside the BIDS layout"). Solo puede pasar sin el paso `anonymize`: los seudónimos son hex en minúsculas
-  y el lanzador de la etapa 4 exige `anonymize`. No se detecta al escribir.
-- La validación con el `bids-validator` oficial es una verificación manual pendiente (requiere Node).
+  y la CLI, la GUI y el lanzador de la etapa 4 exigen `anonymize` al construir un dataset. No se detecta al escribir.
+- Con el `bids-validator` oficial (requiere Node) solo aparecen los avisos esperados de `dwi` y `phasediff` y los de los archivos de exportación de la raíz.
 - Riesgo residual heredado de la etapa 3: cuasi-identificadores en la imagen (rostro, texto quemado).

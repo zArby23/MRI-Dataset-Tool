@@ -8,8 +8,10 @@ conteos, códigos y tipos de error: **nunca** identificadores de pacientes, UIDs
 rutas que aparecen son las que usted elige y, en la tabla de mapeo (paso 3), las rutas relativas a la carpeta de
 entrada.
 
-> Estado: en desarrollo. Las pruebas automáticas usan datos sintéticos. **Pendiente de verificación manual:**
-> el recorrido completo con datos reales, la escala de pantalla real de Windows (125 y 150 %).
+> Estado: versión 0.1.0, proyecto académico en desarrollo. Las pruebas automáticas usan datos sintéticos; el recorrido
+> completo se comprobó a mano con las muestras públicas de `data/samples/` en Windows (ejecutable y código fuente) y en
+> Linux. **Pendiente de verificación manual:** la escala de pantalla real de Windows (125 y 150 %), una máquina Windows
+> limpia sin Python y el comportamiento de SmartScreen y del antivirus.
 
 ## 1. Instalación y lanzamiento
 
@@ -38,22 +40,24 @@ Requisitos: Windows 10 u 11 de 64 bits. La memoria y el disco que hacen falta de
   del programa, en la carpeta temporal de Windows ni en la carpeta actual. No guarda preferencias.
 - Para actualizarlo, borre la carpeta anterior y descomprima la nueva; sus datasets no están ahí.
 
-En Linux no hay ejecutable: use la instalación desde el código fuente (abajo).
+En Linux y macOS no hay ejecutable: use la instalación desde el código fuente (abajo).
 
 ### Desde el código fuente (Windows y Linux)
 
-Requisitos: Python 3.14 o superior con Tkinter (incluido en el instalador de Python para Windows; en Linux,
-según la distribución, el paquete `python3-tk`).
+Requisitos: Python 3.14 o superior con Tkinter y una sesión gráfica. Tkinter viene en el instalador de Python para
+Windows; en Linux es un paquete del sistema que depende de la distribución (`python3-tk` en Debian/Ubuntu,
+`python3-tkinter` en Fedora, `tk` en Arch/CachyOS). Instale dentro de un entorno virtual; los pasos por sistema y por
+distribución, con los paquetes extra (`xdg-utils`, una fuente DejaVu), están en el [`README.md`](../../README.md).
 
-```powershell
-# desde la raíz del repositorio
+```bash
+# desde la raíz del repositorio, con el entorno virtual activo
 python -m pip install -e .
 mri-dataset-gui
 ```
 
 Si `mri-dataset-gui` no está en el `PATH`, use el módulo:
 
-```powershell
+```bash
 python -m mri_dataset_tool.presentation.gui
 ```
 
@@ -142,9 +146,8 @@ seudónimos y una lista blanca de metadatos; la anonimización no borra texto in
 
 La GUI lee `config/default.yaml` y el preajuste `config/stage3_bids.yaml` de la **raíz del proyecto** (la carpeta
 que contiene `src/`), desde donde sea que se abra; el ejecutable portable, de su carpeta `_internal\config`. Solo si
-allí no existen los busca en la carpeta actual. La CLI,
-en cambio, los busca en la carpeta actual. Un archivo de configuración propio (paso 2) puede estar en cualquier
-lugar.
+allí no existen los busca en la carpeta actual. La CLI, en cambio, los busca siempre en la carpeta actual. Un archivo
+de configuración propio (paso 2) puede estar en cualquier lugar.
 
 ## 3. Los seis pasos
 
@@ -302,7 +305,7 @@ Los datos no se alteran; solo cambia cómo se ve.
 | El ejecutable no arranca, muestra «Failed to load Python DLL» o Windows dice que el nombre de archivo es demasiado largo | La carpeta está demasiado profunda: mueva la carpeta `MRI-Dataset-Tool` a una ruta corta (`C:\MRI-Dataset-Tool`) (sección 1). |
 | «Windows protegió su PC» al abrir el ejecutable, o el antivirus lo bloquea | El ejecutable no está firmado: «Más información» → «Ejecutar de todas formas», o restáurelo desde el antivirus (sección 1). |
 | El ejecutable dice «No se encuentra el archivo de configuración» en el paso 1 | Falta `_internal\config`: vuelva a descomprimir el `.zip` completo. |
-| La bienvenida muestra «No se pudo iniciar (TclError)» o la ventana no abre | Reinstale Python con la opción Tcl/Tk (Windows) o instale `python3-tk` (Linux); en Linux necesita una sesión gráfica. |
+| La bienvenida muestra «No se pudo iniciar (TclError)», falta `tkinter` o la ventana no abre | Reinstale Python con la opción Tcl/Tk (Windows). En Linux instale el paquete de Tk de su distribución (`python3-tk`, `python3-tkinter` o `tk`, ver el `README.md`) y abra la GUI desde una sesión gráfica (X11 o Wayland). |
 | En Linux, la letra no es Verdana | Es lo esperado si Verdana no está instalada: la GUI usa DejaVu Sans y, si tampoco está, la del sistema. Instalar el paquete de DejaVu (p. ej. `fonts-dejavu`) da el aspecto previsto. |
 | La ventana se ve borrosa en Windows | Abra la GUI con `MRI-Dataset-Tool.exe`, `mri-dataset-gui` o `python -m mri_dataset_tool.presentation.gui`: las tres declaran la escala de pantalla. Si aun así se ve borrosa, revise en las propiedades del programa (pestaña Compatibilidad) que no esté activada una opción que reemplace el escalado de DPI. |
 | «Abrir la carpeta de salida» no hace nada en Linux | Necesita `xdg-open` (paquete `xdg-utils`). |

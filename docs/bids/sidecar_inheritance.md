@@ -18,4 +18,4 @@
 
 - Modo flexible en el lote: sin `dataset_description.json` igualmente se usa `dataset_root` como raíz. Un `T1w.json` ajeno e inválido en la raíz hace fallar todas las T1w, cada una reportada por `on_error`.
 - Rendimiento: cada imagen vuelve a leer y parsear los JSON heredados. Si resulta lento en datasets grandes, cachear por directorio.
-- Los valores del sidecar se conservan tal cual en `metadata`, incluso si contienen campos que parecen PHI; decisión de anonimización pendiente (RF09/RF14).
+- Los valores del sidecar se conservan tal cual en `metadata`, incluso si contienen campos que parecen PHI. Nunca se registran y la exportación y el resumen los filtran con la lista blanca `SIDECAR_WHITELIST` (`docs/anonymization/policy.md`).

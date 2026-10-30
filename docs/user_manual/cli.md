@@ -4,15 +4,18 @@ La CLI prepara datasets de resonancia magnética (DICOM, NIfTI, BIDS) para ML/DL
 anonimiza, procesa con un pipeline configurable, etiqueta, exporta y genera reportes. Todo lo que imprime son
 conteos y tipos de error: **nunca** rutas, identificadores de pacientes, UIDs ni valores de cabecera.
 
-> Estado: en desarrollo. Las pruebas automáticas usan datos sintéticos. **Pendiente de verificación
-> manual:** instalación en un entorno limpio, un recorrido real con una carpeta de datos y la ejecución en Linux.
+> Estado: versión 0.1.0, proyecto académico en desarrollo. Las pruebas automáticas usan datos sintéticos; la CLI se
+> ejecutó a mano en Linux con las muestras públicas de `data/samples/` (BIDS, NIfTI y DICOM). **Pendiente de
+> verificación manual:** corridas con DICOM comprimido y con conjuntos de datos reales de gran tamaño.
 
 ## 1. Instalación
 
-Requisitos: Python 3.14 o superior, en Windows o Linux.
+Requisitos: Python 3.14 o superior, en Windows o Linux. Instale dentro de un entorno virtual (en Linux es
+obligatorio: la mayoría de las distribuciones bloquean `pip` fuera de uno). Los pasos por sistema y distribución
+están en el [`README.md`](../../README.md) de la raíz; la CLI no necesita Tkinter.
 
-```powershell
-# desde la raíz del repositorio
+```bash
+# desde la raíz del repositorio, con el entorno virtual activo
 python -m pip install -e .
 mri-dataset --help
 ```
@@ -43,7 +46,8 @@ $env:MRI_ANON_KEY = "<secreto de 32 caracteres o más>"     # PowerShell
 ```
 
 ```bash
-export MRI_ANON_KEY="<secreto de 32 caracteres o más>"     # bash
+export MRI_ANON_KEY="<secreto de 32 caracteres o más>"     # bash/zsh; fish: set -x MRI_ANON_KEY "..."
+export MRI_ANON_KEY=$(openssl rand -hex 32)                # o una clave aleatoria nueva
 ```
 
 Sin la clave (o si es corta) el comando termina con código 2 sin crear nada.

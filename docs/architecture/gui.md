@@ -48,8 +48,8 @@ la App con la pantalla de bienvenida (ver «Arranque»).
   - `session_key.py`: `ensure_session_key()` (clave `sha256(secrets.token_bytes(32))` solo en `os.environ` si
     falta o es corta), `key_is_set()`.
   - `inputs.py`: lo que la presentación necesita de la infraestructura (la CLI también lo importa de aquí,
-    salvo `inspect.py`, deuda conocida). `project_config_dir()` es el único punto que ubica `config/` (raíz del
-    proyecto; respaldo, el cwd), `check_input_paths()`, `with_memory_consent()`, `is_valid_folder_name()`.
+    salvo `inspect.py`, deuda conocida). `project_config_dir()` es el único punto que ubica `config/` (`sys._MEIPASS/config` en el
+    ejecutable portable; si no, la raíz del proyecto; respaldo, el cwd), `check_input_paths()`, `with_memory_consent()`, `is_valid_folder_name()`.
   - `ingest_preview.py`: `preview_ingest` (las `decisions` de `plan_ingest`), `apply_edit` (edición de la tabla →
     filas de `--mapping`), `write_mapping` (TSV nuevo, releído con `load_mapping`).
   - `labels_table.py`: `read_label_sheet`/`read_label_rows` (filas con defecto, una sola revisión),

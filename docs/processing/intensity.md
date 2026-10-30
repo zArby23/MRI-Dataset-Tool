@@ -88,7 +88,7 @@ for study in NIfTIBatchReader().iter_studies(root, lazy=True):
 | eager (`float64`) | 97,3 MB |
 | `lazy=True` | 1,3 MB |
 
-Pendiente (verificación manual): medir sobre la sesión con difusión de BIDS ds005299.
+Medido después con la sesión de difusión real de BIDS ds005299 (144×144×78×140): carga eager ≈ 2,2 GB de pico frente a ≈ 85 MB con `lazy=True`.
 
 ## Paso `validate` (RF03, I1)
 
@@ -187,7 +187,7 @@ Algoritmos en `infrastructure/processing/normalize.py` (`normalize_volume`, `che
 ## Resumen de metadatos: `summarize_study` (RF04, I2)
 
 `application/services/summary.py`: `summarize_study(study) -> dict`, determinista y con solo tipos
-básicos JSON (sin NaN). Es la parte «extraer» de RF04; «mostrar» es de la etapa 5.
+básicos JSON (sin NaN). Es la parte «extraer» de RF04; «mostrar» lo hacen `mri-dataset inspect` y la GUI.
 
 ```
 {"series_count": n,
