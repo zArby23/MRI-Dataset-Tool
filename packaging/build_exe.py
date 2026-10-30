@@ -19,8 +19,9 @@ import PyInstaller.__main__
 
 ROOT = Path(__file__).resolve().parents[1]
 NAME = "MRI-Dataset-Tool"
-# Versions shown by the GUI and written to the run manifest (importlib.metadata), not "unknown".
-METADATA = ("mri-dataset-tool", "numpy", "nibabel", "pydicom")
+# Versions shown by the GUI and written to the run manifest (importlib.metadata), not "unknown"; the
+# other runtime dependencies so that their licenses (in their dist-info) travel with the bundle.
+METADATA = ("mri-dataset-tool", "numpy", "nibabel", "pydicom", "scipy", "PyYAML", "psutil", "openpyxl")
 # Optional imports of the dependencies (plots, notebooks, tests) the GUI never uses.
 EXCLUDES = (
     "matplotlib", "PIL", "IPython", "ipykernel", "ipywidgets", "jupyter_client", "jupyter_core", "notebook",
