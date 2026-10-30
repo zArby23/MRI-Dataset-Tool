@@ -118,6 +118,8 @@ python -m pytest
 - [Configuration](/docs/architecture/config.md)
 - [Processing steps: geometry](/docs/processing/geometry.md) and [intensity](/docs/processing/intensity.md)
 - [Anonymization policy](/docs/anonymization/policy.md)
+- [NIfTI studies](/docs/nifti/nifti.md)
+- Test samples: `data/samples/` (public BIDS, NIfTI and DICOM data, about 88 MB)
 - [GUI user manual](/docs/user_manual/gui.md) and [GUI architecture](/docs/architecture/gui.md)
 - [Stage 3 QA report](/docs/testing/qa_etapa3.md)
 
@@ -293,6 +295,8 @@ python -m pytest
 - [Configuración](/docs/architecture/config.md)
 - [Pasos de procesamiento: geometría](/docs/processing/geometry.md) e [intensidad](/docs/processing/intensity.md)
 - [Política de anonimización](/docs/anonymization/policy.md)
+- [Estudios NIfTI](/docs/nifti/nifti.md)
+- Muestras de prueba: `data/samples/` (datos públicos BIDS, NIfTI y DICOM, unos 88 MB)
 - [Informe de QA de la etapa 3](/docs/testing/qa_etapa3.md)
 
 ## Estado
