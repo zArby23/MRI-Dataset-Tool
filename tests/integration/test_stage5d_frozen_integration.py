@@ -145,7 +145,7 @@ def test_the_build_script_bundles_config_and_metadata_and_drops_the_repository_p
     arguments = calls[0]
     assert {"--windowed", "--onedir", "--log-level=WARN"} <= set(arguments)
     assert f"{REPO / 'config' / '*.yaml'}:config" in arguments
-    assert {f"--copy-metadata={name}" for name in ("mri-dataset-tool", "numpy", "nibabel", "pydicom")} <= set(arguments)
+    assert {f"--copy-metadata={name}" for name in ("mri-dataset-tool", "numpy", "nibabel", "pydicom", "scipy", "PyYAML", "psutil", "openpyxl")} <= set(arguments)
     for flag in ("--workpath", "--distpath", "--specpath"):
         assert Path(arguments[arguments.index(flag) + 1]).is_relative_to(tmp_path)
     assert not list((tmp_path / "dist").rglob("direct_url.json"))
