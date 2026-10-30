@@ -27,8 +27,8 @@ src/mri_dataset_tool/presentation/gui/
     └── export_step.py # paso 6 «Resultados» (y open_folder)
 ```
 
-Puntos de entrada: `mri-dataset-gui` (`[project.gui-scripts]` → `presentation.gui.app:main`) y
-`python -m mri_dataset_tool.presentation.gui`. `main()` declara el proceso consciente del DPI en Windows y abre
+Puntos de entrada: `mri-dataset-gui` (`[project.gui-scripts]` → `presentation.gui.app:main`),
+`python -m mri_dataset_tool.presentation.gui` y, en Windows, `MRI-Dataset-Tool.exe` (ver «Ejecutable portable»). `main()` declara el proceso consciente del DPI en Windows y abre
 la App con la pantalla de bienvenida (ver «Arranque»).
 
 ## Capas
@@ -269,6 +269,58 @@ y el texto se ve nítido a 125 y 150 % (sin la declaración, Windows estira la v
   con filas nuevas o un ancho de columna nuevo (un `<Configure>` de la ventana: ~0,1 ms); cambiar a mano el ancho de
   la columna de rutas tarda ~1,9 s (se recortan todas).
 
+## Ejecutable portable (Windows)
+
+La GUI se distribuye para Windows como una carpeta `onedir` de PyInstaller comprimida en `MRI-Dataset-Tool.zip`
+(~58 MB; ~134 MB y ~1170 archivos descomprimida): `MRI-Dataset-Tool.exe` (sin consola) y `_internal/` con el
+intérprete, las bibliotecas, `config/*.yaml` y los `dist-info` de los paquetes. No es `onefile`: ese formato se
+descomprime en la carpeta temporal en cada arranque, tarda más y lo bloquean más antivirus. En Linux se ejecuta
+desde el código fuente.
+
+**Rutas congeladas.** `inputs.project_config_dir()` es el único punto que localiza `config/`: con
+`sys.frozen` y `sys._MEIPASS` (el `_internal/` del bundle) usa `<_MEIPASS>/config`; desde el código fuente, la raíz
+del proyecto. Si esa carpeta no tiene `default.yaml`, recurre en silencio a `config/` del directorio de trabajo (el
+mismo respaldo que desde el código fuente). Con el bundle intacto, la de `_internal` siempre gana; sin ella, el paso 1
+se detiene con `CONFIG_NOT_FOUND` sin crear nada, salvo que haya una `config/` en el directorio de trabajo, que se
+usaría. `check_input_paths` comprueba la entrada y la salida pasando `project_config_dir()/"default.yaml"` como
+archivo de configuración a `check_build_args` (antes usaba el propio `.py` del módulo, que en el bundle no existe:
+los módulos van compilados dentro del archivo PYZ). Ningún otro módulo usa `__file__` ni escribe junto al
+ejecutable; la clave de sesión vive solo en memoria.
+
+**Versiones y licencias.** `--copy-metadata` incluye los `dist-info` de `mri-dataset-tool`, `numpy`, `nibabel` y
+`pydicom` (las versiones que muestra la bienvenida y que registra `code/run_manifest.json` vía
+`importlib.metadata`; sin ellos saldría «unknown») y de `scipy`, `PyYAML`, `psutil` y `openpyxl`, cuyos `dist-info`
+llevan el texto de su licencia. El script borra `direct_url.json` de los `dist-info`: una instalación editable anota
+ahí la carpeta del repositorio. Los nombres de archivo de los módulos compilados son relativos al paquete
+(`mri_dataset_tool\application\services\inputs.py`).
+
+**Compilación** (`packaging/build_exe.py`, solo Windows). PyInstaller es una herramienta de build, no una
+dependencia del paquete: se instala a mano en el entorno virtual, sin tocar `pyproject.toml`.
+
+```powershell
+python -m pip install pyinstaller==6.22.3   # trae pyinstaller-hooks-contrib, altgraph, pefile, pywin32-ctypes
+python packaging/build_exe.py --out D:/build/mri-dataset-tool   # cualquier carpeta fuera del repositorio
+```
+
+`--out` es obligatorio y debe estar fuera del repositorio (el script lo rechaza dentro); conviene un disco con
+espacio (~1 GB entre todo; en el equipo de desarrollo, `E:`, no `C:`). Allí quedan `build/` (temporales), `spec/` (el `.spec` que genera PyInstaller),
+`dist/MRI-Dataset-Tool/` y `MRI-Dataset-Tool.zip`. Tarda 1–2 minutos. El script pasa a PyInstaller la entrada
+`presentation/gui/__main__.py`, `--windowed --onedir --name MRI-Dataset-Tool`, `--paths src`, los YAML de `config/`
+como datos y las exclusiones de paquetes opcionales que la GUI no usa (matplotlib, PIL, IPython/Jupyter, pytest,
+pandas, h5py…). Los argumentos que no reconoce van a PyInstaller tal cual (por ejemplo `--debug=imports` para
+diagnosticar un import que falta). **Solo se distribuye el `.zip`**: `build/` y `spec/` llevan rutas absolutas del
+equipo donde se compiló y nunca se comparten. `build/`, `dist/` y `*.spec` están en `.gitignore`.
+
+Medidas en el equipo de desarrollo: la ventana aparece en ~0,6–1 s, los servicios están listos a los ~3,5 s y
+la memoria ronda los 100 MB al arrancar.
+
+**Límites.** Solo Windows de 64 bits; sin firma de código (SmartScreen y algunos antivirus avisan la primera vez);
+sin instalador ni actualización automática; sin ejecutable de la CLI. La ruta del `.exe` y la de los archivos de
+`_internal` deben caber en 260 caracteres si Windows no tiene habilitadas las rutas largas: el manual pide
+descomprimir en una ruta corta. El bundle incluye algunos módulos que la GUI no usa y que entran por imports
+opcionales de las dependencias (p. ej. `requests` por `pydicom.data`); excluirlos ahorraría unos MB a cambio del
+riesgo de romper un import perezoso.
+
 ## Pruebas
 
 Lo que se puede probar sin pantalla se prueba sin pantalla; las pruebas de Tk se omiten si no hay pantalla.
@@ -283,7 +335,10 @@ Lo que se puede probar sin pantalla se prueba sin pantalla; las pruebas de Tk se
 Archivos: `tests/unit/test_gui_*.py` (entre ellos `test_gui_theme.py`, `test_gui_activity.py`,
 `test_gui_keyboard.py`, `test_gui_editing.py` y `test_gui_scaling.py`), las pruebas de las fachadas
 `test_service_{session_key,inputs,ingest_preview,labels_table,dataset_outputs}.py`, la integración
-`tests/integration/test_stage5b_gui_integration.py` y la auditoría `tests/qa/test_qa7_gui.py`.
+`tests/integration/test_stage5b_gui_integration.py` y la auditoría `tests/qa/test_qa7_gui.py`. El modo congelado
+se prueba sin PyInstaller simulando `sys.frozen`/`sys._MEIPASS` (`test_service_inputs.py`,
+`tests/integration/test_stage5d_frozen_integration.py`, también el script de compilación con PyInstaller simulado)
+y el bundle compilado se audita en `tests/qa/test_qa9_bundle.py`.
 
 **Intermitencia de Tk en la suite completa**: en Windows, con la máquina cargada, un intérprete de Tk nuevo a veces
 no logra leer sus propios archivos de biblioteca, que existen («couldn't read file …/tk8.6/panedwindow.tcl», «invalid
@@ -307,8 +362,10 @@ igual y, tras el último intento, el error original. En las corridas completas a
   sin logotipo.
 - Controlador sin Tk: todo lo que se puede probar sin pantalla se prueba sin pantalla.
 - Clave por sesión: sin pedir la clave; consecuencias en el manual.
-- La configuración se resuelve desde la raíz del proyecto en un solo punto (`project_config_dir`), para que un
-  ejecutable portable lo apunte a sus YAML incluidos.
+- La configuración se resuelve en un solo punto (`project_config_dir`): la raíz del proyecto o, en el ejecutable
+  portable, sus YAML incluidos en `_internal/config`.
+- Ejecutable portable `onedir` en `.zip`, solo Windows, con PyInstaller como herramienta de build fuera de las
+  dependencias del paquete.
 - La GUI exige etiquetas cerradas para los exportes ML (la CLI tiene `--allow-unfinalized`).
 - Ventana fija, barra de actividad indeterminada, diálogos propios salvo los selectores de archivos, edición de un
   clic e iconos solo en estados y navegación.

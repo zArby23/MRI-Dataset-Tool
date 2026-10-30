@@ -118,12 +118,14 @@ python -m pytest
 - [Configuration](/docs/architecture/config.md)
 - [Processing steps: geometry](/docs/processing/geometry.md) and [intensity](/docs/processing/intensity.md)
 - [Anonymization policy](/docs/anonymization/policy.md)
+- [NIfTI studies](/docs/nifti/nifti.md)
+- Test samples: `data/samples/` (public BIDS, NIfTI and DICOM data, about 88 MB)
 - [GUI user manual](/docs/user_manual/gui.md) and [GUI architecture](/docs/architecture/gui.md)
 - [Stage 3 QA report](/docs/testing/qa_etapa3.md)
 
 ## Status
 
-In development. Stages 1 to 4 (loading, conversion, pipeline, processing, anonymization and dataset) are complete. Stage 5A adds the `mri-dataset` command line (inspect, convert, anonymize, process, labels, dataset); see `docs/user_manual/cli.md` and `docs/architecture/cli.md`. Stage 5B adds the `mri-dataset-gui` graphical wizard (six steps: input, configuration, series mapping, run, labels, ML exports and report); see `docs/user_manual/gui.md` and `docs/architecture/gui.md`. Stage 5C gives the GUI its visual style (theme, welcome screen, activity indicator, one-click editing, keyboard support, display scaling) and was audited (`docs/testing/qa_etapa8.md`). Pending: a portable Windows executable (stage 5D) and closing (stage 6).
+In development. Stages 1 to 4 (loading, conversion, pipeline, processing, anonymization and dataset) are complete. Stage 5A adds the `mri-dataset` command line (inspect, convert, anonymize, process, labels, dataset); see `docs/user_manual/cli.md` and `docs/architecture/cli.md`. Stage 5B adds the `mri-dataset-gui` graphical wizard (six steps: input, configuration, series mapping, run, labels, ML exports and report); see `docs/user_manual/gui.md` and `docs/architecture/gui.md`. Stage 5C gives the GUI its visual style (theme, welcome screen, activity indicator, one-click editing, keyboard support, display scaling) and was audited (`docs/testing/qa_etapa8.md`). Stage 5D packages the GUI as a portable Windows executable (`.zip` with a folder, no Python needed; build with `python packaging/build_exe.py --out <folder outside the repository>`, see `docs/user_manual/gui.md` and `docs/architecture/gui.md`) and was audited (`docs/testing/qa_etapa9.md`). Pending: checks on a clean Windows machine, SmartScreen and antivirus, and closing (stage 6).
 
 **Implemented** (library code under `src/mri_dataset_tool`)
 - Loading of DICOM, NIfTI and BIDS studies, and DICOM <-> NIfTI conversion.
@@ -169,7 +171,7 @@ In development. Stages 1 to 4 (loading, conversion, pipeline, processing, anonym
 - Files that are git-annex pointers without downloaded content are skipped as unreadable.
 
 **Not implemented yet**
-- A portable executable for Windows (stage 5D).
+- Executable for Linux/macOS (the GUI runs from the source code there); code signing of the Windows executable.
 
 ---
 
@@ -293,11 +295,13 @@ python -m pytest
 - [Configuración](/docs/architecture/config.md)
 - [Pasos de procesamiento: geometría](/docs/processing/geometry.md) e [intensidad](/docs/processing/intensity.md)
 - [Política de anonimización](/docs/anonymization/policy.md)
+- [Estudios NIfTI](/docs/nifti/nifti.md)
+- Muestras de prueba: `data/samples/` (datos públicos BIDS, NIfTI y DICOM, unos 88 MB)
 - [Informe de QA de la etapa 3](/docs/testing/qa_etapa3.md)
 
 ## Estado
 
-En desarrollo. Las etapas 1 a 4 (carga, conversión, pipeline, procesamiento, anonimización y dataset) están completas. La etapa 5A añade la línea de comandos `mri-dataset` (inspect, convert, anonymize, process, labels, dataset); ver `docs/user_manual/cli.md` y `docs/architecture/cli.md`. La etapa 5B añade el asistente gráfico `mri-dataset-gui` (seis pasos: entrada, configuración, mapeo de series, ejecución, etiquetas, exportes para ML y reporte); ver `docs/user_manual/gui.md` y `docs/architecture/gui.md`. La etapa 5C da a la GUI su estilo visual (tema, pantalla de bienvenida, indicador de actividad, edición con un clic, teclado y escalado de pantalla) y se auditó (`docs/testing/qa_etapa8.md`). Pendiente: ejecutable portable de Windows (etapa 5D) y cierre (etapa 6).
+En desarrollo. Las etapas 1 a 4 (carga, conversión, pipeline, procesamiento, anonimización y dataset) están completas. La etapa 5A añade la línea de comandos `mri-dataset` (inspect, convert, anonymize, process, labels, dataset); ver `docs/user_manual/cli.md` y `docs/architecture/cli.md`. La etapa 5B añade el asistente gráfico `mri-dataset-gui` (seis pasos: entrada, configuración, mapeo de series, ejecución, etiquetas, exportes para ML y reporte); ver `docs/user_manual/gui.md` y `docs/architecture/gui.md`. La etapa 5C da a la GUI su estilo visual (tema, pantalla de bienvenida, indicador de actividad, edición con un clic, teclado y escalado de pantalla) y se auditó (`docs/testing/qa_etapa8.md`). La etapa 5D empaqueta la GUI como ejecutable portable de Windows (`.zip` con una carpeta, sin necesitar Python; se compila con `python packaging/build_exe.py --out <carpeta fuera del repositorio>`, ver `docs/user_manual/gui.md` y `docs/architecture/gui.md`) y se auditó (`docs/testing/qa_etapa9.md`). Pendiente: comprobaciones en una máquina Windows limpia, SmartScreen y antivirus, y cierre (etapa 6).
 
 **Implementado** (código de biblioteca en `src/mri_dataset_tool`)
 - Carga de estudios DICOM, NIfTI y BIDS, y conversión DICOM <-> NIfTI.
@@ -343,4 +347,4 @@ En desarrollo. Las etapas 1 a 4 (carga, conversión, pipeline, procesamiento, an
 - Con árboles DICOM muy grandes, la vista previa y la ejecución de la GUI pueden tardar más de 15 minutos, sin cancelación.
 
 **Todavía no implementado**
-- Ejecutable portable de Windows (etapa 5D).
+- Ejecutable para Linux/macOS (allí la GUI se ejecuta desde el código fuente); firma de código del ejecutable de Windows.

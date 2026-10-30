@@ -16,4 +16,8 @@ Estos requisitos establecen las características de calidad y las condiciones ba
 | RNF10 | El proyecto debe incluir documentación técnica y de usuario que describa la instalación, configuración, ejecución, arquitectura y funcionalidades principales del sistema. | Documentación |
 | RNF11 | El sistema debe registrar las configuraciones y transformaciones aplicadas durante el procesamiento para permitir reproducir el proceso sobre los mismos datos y parámetros. | Reproducibilidad |
 | RNF12 | El sistema debe priorizar el uso de tecnologías y bibliotecas de código abierto compatibles con el carácter académico del proyecto. | Licenciamiento |
+| RNF13 | El sistema no debe sobrescribir los datos de entrada ni las salidas existentes: escribe en carpetas nuevas o vacías, de forma atómica y sin dejar archivos parciales. | Integridad |
+| RNF14 | El sistema debe avisar, sin bloquear, cuando la salida estimada pueda agotar el espacio libre del disco o la memoria disponible, y pedir consentimiento explícito para continuar sin memoria suficiente. | Usabilidad |
+| RNF15 | La anonimización debe ser determinista y reproducible con una clave secreta que nunca se guarda ni se registra, y las salidas no deben incluir rutas, identificadores originales ni valores de cabeceras. | Seguridad |
+| RNF16 | El ejecutable portable de Windows debe escribir solo en las carpetas indicadas por el usuario e incluir las licencias de los componentes de terceros que distribuye. | Distribución |
 ---

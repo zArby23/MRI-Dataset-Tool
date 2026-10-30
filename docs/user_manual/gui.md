@@ -13,6 +13,35 @@ entrada.
 
 ## 1. Instalación y lanzamiento
 
+### Ejecutable portable (solo Windows)
+
+En Windows la GUI también se distribuye como un archivo `MRI-Dataset-Tool.zip` (unos 58 MB; unos 135 MB una vez
+descomprimido) que no necesita Python ni instalación.
+
+1. **Descomprima** el `.zip` completo (clic derecho → «Extraer todo…») en una **ruta corta**, por ejemplo
+   `C:\MRI-Dataset-Tool` o el Escritorio. Windows no abre un programa cuya ruta pasa de 260 caracteres, y la
+   carpeta `_internal` contiene archivos con nombres largos: en una carpeta muy profunda el programa no arranca o
+   muestra «Failed to load Python DLL». No lo ejecute desde dentro del `.zip` sin descomprimir.
+2. **Ejecute** `MRI-Dataset-Tool\MRI-Dataset-Tool.exe` (doble clic). Puede crear un acceso directo al `.exe`; no lo
+   mueva fuera de su carpeta: necesita `_internal` a su lado.
+3. **Aviso de SmartScreen o del antivirus.** El ejecutable no está firmado, así que la primera vez Windows puede
+   mostrar «Windows protegió su PC». Si obtuvo el `.zip` de una fuente de confianza, pulse «Más información» →
+   «Ejecutar de todas formas». Un antivirus puede analizarlo o ponerlo en cuarentena la primera vez; en ese caso,
+   restáurelo o añada una excepción para la carpeta.
+
+Requisitos: Windows 10 u 11 de 64 bits. La memoria y el disco que hacen falta dependen de los datos (sección 2).
+
+- No modifique ni borre `_internal\config`: ahí están `default.yaml` y el preajuste del paso 2. Sin ellos, el paso 1
+  dice «No se encuentra el archivo de configuración» y, en ese caso, el programa usaría en silencio una carpeta
+  `config` de la carpeta actual (por ejemplo, una junto al `.exe`).
+- El ejecutable solo escribe en las carpetas que usted elige (salida, tabla de mapeo, reporte): nada en la carpeta
+  del programa, en la carpeta temporal de Windows ni en la carpeta actual. No guarda preferencias.
+- Para actualizarlo, borre la carpeta anterior y descomprima la nueva; sus datasets no están ahí.
+
+En Linux no hay ejecutable: use la instalación desde el código fuente (abajo).
+
+### Desde el código fuente (Windows y Linux)
+
 Requisitos: Python 3.14 o superior con Tkinter (incluido en el instalador de Python para Windows; en Linux,
 según la distribución, el paquete `python3-tk`).
 
@@ -112,7 +141,8 @@ seudónimos y una lista blanca de metadatos; la anonimización no borra texto in
 ### Configuración
 
 La GUI lee `config/default.yaml` y el preajuste `config/stage3_bids.yaml` de la **raíz del proyecto** (la carpeta
-que contiene `src/`), desde donde sea que se abra. Solo si allí no existen los busca en la carpeta actual. La CLI,
+que contiene `src/`), desde donde sea que se abra; el ejecutable portable, de su carpeta `_internal\config`. Solo si
+allí no existen los busca en la carpeta actual. La CLI,
 en cambio, los busca en la carpeta actual. Un archivo de configuración propio (paso 2) puede estar en cualquier
 lugar.
 
@@ -269,9 +299,12 @@ Los datos no se alteran; solo cambia cómo se ve.
 
 | Síntoma | Qué hacer |
 |---|---|
+| El ejecutable no arranca, muestra «Failed to load Python DLL» o Windows dice que el nombre de archivo es demasiado largo | La carpeta está demasiado profunda: mueva la carpeta `MRI-Dataset-Tool` a una ruta corta (`C:\MRI-Dataset-Tool`) (sección 1). |
+| «Windows protegió su PC» al abrir el ejecutable, o el antivirus lo bloquea | El ejecutable no está firmado: «Más información» → «Ejecutar de todas formas», o restáurelo desde el antivirus (sección 1). |
+| El ejecutable dice «No se encuentra el archivo de configuración» en el paso 1 | Falta `_internal\config`: vuelva a descomprimir el `.zip` completo. |
 | La bienvenida muestra «No se pudo iniciar (TclError)» o la ventana no abre | Reinstale Python con la opción Tcl/Tk (Windows) o instale `python3-tk` (Linux); en Linux necesita una sesión gráfica. |
 | En Linux, la letra no es Verdana | Es lo esperado si Verdana no está instalada: la GUI usa DejaVu Sans y, si tampoco está, la del sistema. Instalar el paquete de DejaVu (p. ej. `fonts-dejavu`) da el aspecto previsto. |
-| La ventana se ve borrosa en Windows | Abra la GUI con `mri-dataset-gui` o `python -m mri_dataset_tool.presentation.gui`: las dos declaran la escala de pantalla. Si aun así se ve borrosa, revise en las propiedades del programa (pestaña Compatibilidad) que no esté activada una opción que reemplace el escalado de DPI. |
+| La ventana se ve borrosa en Windows | Abra la GUI con `MRI-Dataset-Tool.exe`, `mri-dataset-gui` o `python -m mri_dataset_tool.presentation.gui`: las tres declaran la escala de pantalla. Si aun así se ve borrosa, revise en las propiedades del programa (pestaña Compatibilidad) que no esté activada una opción que reemplace el escalado de DPI. |
 | «Abrir la carpeta de salida» no hace nada en Linux | Necesita `xdg-open` (paquete `xdg-utils`). |
 | Los diálogos de elegir carpetas y archivos salen claros con el tema oscuro | Son los del sistema: no siguen el tema. |
 
@@ -299,7 +332,10 @@ Los datos no se alteran; solo cambia cómo se ve.
 
 ## 7. Límites conocidos
 
-- La configuración se lee de la raíz del proyecto; la CLI, de la carpeta actual (sección 2).
+- La configuración se lee de la raíz del proyecto (o de `_internal\config` en el ejecutable); la CLI, de la carpeta
+  actual (sección 2).
+- El ejecutable portable es solo para Windows, no está firmado (SmartScreen), es una carpeta (no un único `.exe`)
+  y no se actualiza solo. No incluye la CLI (`mri-dataset`), que se usa desde el código fuente.
 - La vista previa del paso 3 y la ejecución del paso 4 leen todas las cabeceras cada una: con árboles DICOM muy
   grandes (decenas de miles de archivos) cada una puede tardar **más de 15 minutos**, sin indicar cuánto falta y
   sin cancelación.

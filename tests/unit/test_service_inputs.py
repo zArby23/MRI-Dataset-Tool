@@ -2,16 +2,20 @@
 
 import ast
 import os
+import sys
 from pathlib import Path
 
 import pytest
 
 from mri_dataset_tool.application.pipeline.manifest import pipeline_from_config
+from mri_dataset_tool.application.services import inputs
 from mri_dataset_tool.application.services.dataset_build import InvalidBuildInput, check_build_args
 from mri_dataset_tool.application.services.inputs import (
+    DEFAULT_CONFIG_DIR,
     check_input_paths,
     is_valid_folder_name,
     new_folders_valid,
+    project_config_dir,
     with_memory_consent,
 )
 
@@ -90,3 +94,41 @@ def test_new_folders_of_an_output_path(tmp_path):
     if os.name == "nt":
         assert not new_folders_valid(Path(f"{tmp_path}/x/a:b"))  # an NTFS stream
         assert not new_folders_valid(Path("a:b"))  # drive A:, relative: a drive that is not there
+
+
+def _frozen(monkeypatch, tmp_path, with_config=True):
+    """A portable build: ``sys.frozen``, the unpacked folder in ``sys._MEIPASS`` and no ``.py`` files."""
+    bundle = tmp_path / "bundle"
+    (bundle / "config").mkdir(parents=True)
+    if with_config:
+        (bundle / "config" / "default.yaml").write_text("pipeline: {}\n", encoding="utf-8")
+    monkeypatch.setattr(sys, "frozen", True, raising=False)
+    monkeypatch.setattr(sys, "_MEIPASS", str(bundle), raising=False)
+    monkeypatch.setattr(inputs, "__file__", str(bundle / "mri_dataset_tool" / "inputs.pyc"))  # inside the PYZ
+    monkeypatch.chdir(tmp_path)  # no config/ in the working directory
+    return bundle
+
+
+def test_frozen_build_reads_its_bundled_config(tmp_path, monkeypatch):
+    bundle = _frozen(monkeypatch, tmp_path)
+    assert project_config_dir() == bundle / "config"
+
+
+def test_frozen_build_without_bundled_config_falls_back_to_the_working_directory(tmp_path, monkeypatch):
+    _frozen(monkeypatch, tmp_path, with_config=False)
+    assert project_config_dir() == DEFAULT_CONFIG_DIR
+
+
+def test_frozen_build_checks_input_paths_as_from_source(tmp_path, monkeypatch):
+    _frozen(monkeypatch, tmp_path)
+    (tmp_path / "in").mkdir()
+    assert check_input_paths(tmp_path / "in", tmp_path / "out") is None
+    assert not (tmp_path / "out").exists()
+    with pytest.raises(InvalidBuildInput, match="^Output directory must be outside the dataset directory.$"):
+        check_input_paths(tmp_path / "in", tmp_path / "in" / "out")
+    with pytest.raises(InvalidBuildInput, match="^Dataset directory not found.$"):
+        check_input_paths(tmp_path / "missing", tmp_path / "out")
+
+
+def test_source_run_reads_the_project_config():
+    assert project_config_dir() == Path(__file__).resolve().parents[2] / "config"

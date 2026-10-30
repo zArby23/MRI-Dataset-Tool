@@ -3,6 +3,7 @@
 """
 
 import re
+import sys
 from pathlib import Path
 from typing import Any
 
@@ -52,18 +53,23 @@ def new_folders_valid(path: Path) -> bool:
 
 def project_config_dir() -> Path:
     """The ``config/`` folder the GUI reads (``default.yaml`` and the presets): the project's, next to
-    ``src/``, whatever the working directory; ``config`` of the working directory if it is not there.
-    The only place that locates it (a portable build points it to its bundled YAML files)."""
-    bundled = Path(__file__).resolve().parents[4] / "config"
+    ``src/``, whatever the working directory, or the bundled one of a portable build (PyInstaller unpacks
+    its resources in ``sys._MEIPASS``); ``config`` of the working directory if it is not there.
+    The only place that locates it."""
+    if getattr(sys, "frozen", False) and hasattr(sys, "_MEIPASS"):
+        root = Path(sys._MEIPASS)
+    else:
+        root = Path(__file__).resolve().parents[4]
+    bundled = root / "config"
     return bundled if (bundled / "default.yaml").is_file() else DEFAULT_CONFIG_DIR
 
 
 def check_input_paths(dataset_root: Path, output_dir: Path) -> None:
     """The input and output checks of ``check_build_args`` (same order and messages), for a step that
     has no config yet; the config is checked with everything else later."""
-    # shortcut: this module file stands for an existing config file (check_build_args checks it before the
-    # output); it does not exist if the package runs without .py files (zip, frozen build): a portable build must check it.
-    check_build_args(dataset_root, output_dir, Path(__file__))
+    # default.yaml stands for the config (check_build_args checks one before the output); without it the
+    # step fails with "Config file not found.", as the config step would.
+    check_build_args(dataset_root, output_dir, project_config_dir() / "default.yaml")
 
 
 def with_memory_consent(config: dict[str, Any]) -> tuple[dict[str, Any], Pipeline]:
