@@ -30,6 +30,28 @@ This tool automates the loading, validation, conversion, processing, anonymizati
 - pip
 - Virtual environment support
 
+### Dependencies
+
+Installed automatically by `python -m pip install -e ".[dev]"` (declared in `pyproject.toml`; versions in the right column are the ones the tests were run with on Windows):
+
+| Package | Minimum | Tested | Used for |
+|---|---|---|---|
+| `pydicom` | 3.0 | 3.0.2 | DICOM reading and writing |
+| `nibabel` | 5.0 | 5.4.2 | NIfTI reading and writing |
+| `numpy` | 2.0 | 2.5.2 | volumes |
+| `scipy` | 1.0 | 1.18.0 | resampling |
+| `pyyaml` | 6.0 | 6.0.3 | configuration files |
+| `psutil` | 5.9 | 7.2.2 | free memory and disk checks |
+| `openpyxl` | 3.1 | 3.1.5 | XLSX report |
+| `pytest` (only with `[dev]`) | 9.1 | 9.1.1 | tests |
+
+System requirements (not installed by pip):
+
+- **Windows:** Python 3.14 from python.org (64-bit). Tkinter (the GUI) is included in the standard installer; leave "tcl/tk and IDLE" checked.
+- **Linux:** Python 3.14 with `venv`, plus the Tkinter package of your distribution (needed only for `mri-dataset-gui`): Debian/Ubuntu `sudo apt install python3-tk`, Fedora `sudo dnf install python3-tkinter`, Arch `sudo pacman -S tk`. If your distribution does not ship Python 3.14, install it with `pyenv` or `uv`, making sure Tk is available when it is built. The wheels of `numpy`, `scipy` and the others come from PyPI; a C compiler should not be needed. A desktop session (X11 or Wayland) is required for the GUI; the command line (`mri-dataset`) works without it.
+- **Linux status:** the project is designed for Windows and Linux, but it has only been run and tested on Windows so far; report any problem you find on Linux.
+- All outputs of real runs need free disk space: the tool warns when the estimate reaches 90 % of the free space.
+
 ## Installation
 
 1. Clone the repository:
@@ -65,7 +87,7 @@ source .venv/bin/activate
 
 Linux:
 ```bash
-source .venv/bin/activate.fish
+source .venv/bin/activate   # bash/zsh (fish: activate.fish)
 ```
 
 3. Install the project and development dependencies:
@@ -183,6 +205,28 @@ La herramienta automatiza la carga, validación, conversión, procesamiento, ano
 - pip
 - Soporte para entornos virtuales
 
+### Dependencias
+
+Se instalan solas con `python -m pip install -e ".[dev]"` (declaradas en `pyproject.toml`; la columna «Probada» son las versiones con las que se corrieron las pruebas en Windows):
+
+| Paquete | Mínima | Probada | Para qué |
+|---|---|---|---|
+| `pydicom` | 3.0 | 3.0.2 | lectura y escritura DICOM |
+| `nibabel` | 5.0 | 5.4.2 | lectura y escritura NIfTI |
+| `numpy` | 2.0 | 2.5.2 | volúmenes |
+| `scipy` | 1.0 | 1.18.0 | remuestreo |
+| `pyyaml` | 6.0 | 6.0.3 | archivos de configuración |
+| `psutil` | 5.9 | 7.2.2 | comprobaciones de memoria y disco libres |
+| `openpyxl` | 3.1 | 3.1.5 | reporte XLSX |
+| `pytest` (solo con `[dev]`) | 9.1 | 9.1.1 | pruebas |
+
+Requisitos del sistema (pip no los instala):
+
+- **Windows:** Python 3.14 de python.org (64 bits). Tkinter (la GUI) viene en el instalador estándar; deja marcado «tcl/tk and IDLE».
+- **Linux:** Python 3.14 con `venv`, más el paquete de Tkinter de tu distribución (solo para `mri-dataset-gui`): Debian/Ubuntu `sudo apt install python3-tk`, Fedora `sudo dnf install python3-tkinter`, Arch `sudo pacman -S tk`. Si tu distribución no trae Python 3.14, instálalo con `pyenv` o `uv` y asegúrate de que Tk esté disponible al compilarlo. Las ruedas de `numpy`, `scipy` y las demás vienen de PyPI; no debería hacer falta un compilador de C. La GUI necesita una sesión de escritorio (X11 o Wayland); la línea de comandos (`mri-dataset`) funciona sin ella.
+- **Estado en Linux:** el proyecto está pensado para Windows y Linux, pero hasta ahora solo se ha ejecutado y probado en Windows; avisa de cualquier problema que encuentres en Linux.
+- Las salidas de corridas reales necesitan espacio libre en disco: la herramienta avisa cuando la estimación alcanza el 90 % del espacio libre.
+
 ## Instalación
 
 1. Clona el repositorio:
@@ -218,7 +262,7 @@ source .venv/bin/activate
 
 Linux:
 ```bash
-source .venv/bin/activate.fish
+source .venv/bin/activate   # bash/zsh (fish: activate.fish)
 ```
 
 3. Instala las dependencias del proyecto:
