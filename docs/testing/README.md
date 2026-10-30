@@ -45,6 +45,8 @@ logs, los reportes y todos los archivos de salida buscándolos. Una salida con u
 
 ## Informes de auditoría
 
+Cada informe es una instantánea de su fecha: describe lo que se encontró y su estado tras las correcciones de esa etapa. Los números de pruebas y las verificaciones manuales «pendientes» son los de ese momento; el estado vigente está en el `README.md` de la raíz y en `docs/user_manual/`.
+
 | Informe | Alcance |
 |---|---|
 | [`qa_etapa3.md`](qa_etapa3.md) | Etapas 1 a 3: carga, conversión, pipeline, procesamiento y anonimización. |

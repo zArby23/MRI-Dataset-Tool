@@ -1,7 +1,7 @@
 # QA1 — Auditoría adversarial de las etapas 1–3
 
 > Fecha: 2026-10-21 · Rama `etapa-3-procesamiento`, HEAD `ff0769b`
-> Alcance: `tasks/etapa-3/todo.md` (QA1) y `.claude/roles/qa.md`. No se editó código de producción.
+> Alcance: el plan de la etapa 3 (QA1). No se editó código de producción.
 
 ## Resumen
 
@@ -332,7 +332,7 @@ Huecos reales relevantes:
 1. La difusión normalizada ya se verificó a 2 mm con `config/stage3_bids.yaml` (QA3, §3.2). A 1 mm necesita
    ≥ 11–12 GiB de RAM libres. El BIDS completo, la anonimización completa y su reconversión ya se verificaron en
    QA2 y QA3.
-2. Las del checkpoint final de `tasks/etapa-3/todo.md`:
+2. Las del cierre de la etapa 3:
    1. abrir en un visor un volumen antes y después de reorientar, remuestrear y normalizar;
    2. revisar el `AnonymizationReport` y buscar identificadores en las salidas (las de QA2 están en
       `E:/qa_runs/qa2_anon/`);

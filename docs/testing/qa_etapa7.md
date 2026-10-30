@@ -2,7 +2,7 @@
 
 Esta auditoría se hizo sobre la rama `etapa-5b-gui` (commit `52f73ec`, GUI completa de seis pasos) el 2026-10-26.
 Cubre `presentation/gui/` (controlador, trabajador, cola de eventos, vistas Tk) y las fachadas que usa. Las
-pruebas están en `tests/qa/test_qa7_gui.py`. Tras los arreglos de @gui (QA7-01 a 04) pasan las 74, sin `xfail`. QA no
+pruebas están en `tests/qa/test_qa7_gui.py`. Tras las correcciones (QA7-01 a 04) pasan las 74, sin `xfail`. QA no
 tocó código de producción. Las pruebas y este informe no contienen datos reales: los valores plantados son sintéticos y
 contienen `Planted`.
 
@@ -12,14 +12,14 @@ No hay bloqueantes.
 
 | Id | Severidad | Qué pasa | Reproducción mínima (sin PHI) | Esperado | Archivo / dueño | Estado |
 |---|---|---|---|---|---|---|
-| QA7-01 | menor (RNF06) | Si una vista lanza en `on_event`, `App._poll` no vuelve a programarse: `self.after(POLL_MS, self._poll)` está después del bucle. `report_callback_exception` muestra el tipo, pero la ventana deja de sondear la cola **para siempre**: la tarea siguiente nunca se drena, `busy` queda en `True`, todo queda deshabilitado y cerrar pide confirmar siempre. No encontré ningún disparador real (los textos de todos los códigos alcanzables reciben sus campos), así que es un endurecimiento | `test_the_window_keeps_polling_after_a_view_fails_on_an_event`: una vista cuyo `on_event` lanza `KeyError`; después, una tarea vacía queda «en curso» | Reprogramar el sondeo en un `finally` (o al principio de `_poll`) | `presentation/gui/app.py` (@gui) | **Corregido** (@gui): el sondeo se reprograma aunque una vista falle; la prueba pasa |
-| QA7-02 | menor (RNF03) | Dos salidas pasaban los pasos 1 y 2 y solo fallaban al ejecutar (`STAGE_FAILED` en `export`, sin crear nada). La primera era un nombre de carpeta nueva de más de 255 caracteres, porque `is_valid_folder_name` no miraba la longitud. La segunda, una salida con `:` en Windows. **Corrección del informe** (señalada por @gui): la prueba original construía `base / "o" / "a:b"`, que pathlib convierte en la ruta relativa a la unidad `a:b` (unidad A:), no en un flujo NTFS. El caso real del flujo es el texto `.../o/a:b`, y una unidad inexistente se comporta igual. La CLI tiene el mismo comportamiento con `--output-dir` | `test_a_new_folder_name_is_limited_to_255_utf8_bytes`, `test_an_output_with_a_colon_or_a_missing_drive_is_refused_at_step_1` | Rechazarlas en el paso 1 (`INVALID_FOLDER_NAME`), o aceptarlo como está | `application/services/inputs.py` (@gui) | **Corregido** (@gui): límite de 255 bytes UTF-8 (`INVALID_FOLDER_NAME`); flujo NTFS, ruta relativa a una unidad y unidad inexistente → `INVALID_OUTPUT_PATH` en el paso 1 (`inputs.new_folders_valid`). Las pruebas pasan |
-| QA7-03 | menor (RNF03) | «Guardar tabla…» con una ruta que es una carpeta o cuyo padre no existe lanza un `OSError` crudo desde `save_mapping_file` (solo captura `FileExistsError` e `InvalidBuildInput`). La ventana lo muestra como `UNEXPECTED(<tipo>)` en la barra inferior, sin ruta. El diálogo de archivos casi nunca da esas rutas, pero un disco de solo lectura sí (`PermissionError`) | `test_saving_the_mapping_table` | Un código propio (p. ej. `MAPPING_FILE_IO`) | `presentation/gui/controller.py` (@gui) | **Corregido** (@gui): `Check("MAPPING_FILE_UNWRITABLE")`; la prueba pasa |
-| QA7-04 | menor (RNF03) | En el paso 3, cambiar de idioma redibuja la tabla desde la última vista previa y **oculta las ediciones pendientes** (la celda vuelve al valor anterior). El estado (`state.mapping`) las conserva y «Siguiente» sigue deshabilitado hasta la próxima vista previa, que las muestra. Así que no hay pérdida de datos, pero la tabla engaña | `test_a_language_change_keeps_the_pending_mapping_edits_on_screen` | Volver a aplicar las ediciones pendientes al redibujar, o redibujar solo los encabezados | `presentation/gui/views/mapping_step.py` (@gui) | **Corregido** (@gui); la prueba pasa |
-| QA7-05 | observación | La descripción de una clase puede empezar por `= + - @` (`AD==x`, `AD=@cmd`): `labels._check_classes` solo aplica los prefijos de fórmula al nombre. La descripción solo va a `labels.json`, nunca a una celda TSV o XLSX, así que no hay riesgo de inyección. Pero `MEMORY.md` §3 dice «clases (y descripciones) … sin inicio `= + - @`». Igual en la CLI (código congelado) | `test_hostile_classes` | Corregir la frase de `MEMORY.md`, o validar también la descripción | `MEMORY.md` (@orquestador) | Documentado aquí |
-| QA7-06 | observación | Las rutas relativas escritas a mano (entrada, salida, carpeta del reporte) se resuelven contra la carpeta actual del proceso, que en un acceso directo o en el ejecutable portable (G9) puede ser cualquiera. El diálogo siempre da rutas absolutas | Revisión del código (`Path(texto)` sin `resolve` en `set_input` y `report_task`); sin prueba | Avisarlo en el manual, o exigir rutas absolutas en la GUI | `docs/user_manual/gui.md` (@gui) | Documentado aquí |
-| QA7-07 | observación | Intermitencia de Tk en la suite completa: un `TclError` aislado en `test_gui_labels_batch.py::test_labels_view_batch_tools` (1 de 3 corridas) y una omisión de más en otra corrida, sin identificar | Ver la §2, «Intermitencias» | Aislar la causa: un `tk.Tk()` por prueba con `destroy` garantizado, o un fixture de sesión | `tests/unit/test_gui_*.py` (@gui) | Abierto |
-| QA7-08 | menor (RNF01/RNF03) | Con árboles DICOM muy grandes, la vista previa del paso 3 tarda más de 10 minutos (ver la §3), y el paso 4 vuelve a leer todas las cabeceras. El manual solo dice «tarda minutos». La barra de progreso es indeterminada y no hay cancelación | Corrida real, §3 | Decir en el manual que puede tardar **más de 15 minutos** (recomendación del humano), y quizá mostrar un contador de archivos leídos | `docs/user_manual/gui.md` (@gui) | Abierto |
+| QA7-01 | menor (RNF06) | Si una vista lanza en `on_event`, `App._poll` no vuelve a programarse: `self.after(POLL_MS, self._poll)` está después del bucle. `report_callback_exception` muestra el tipo, pero la ventana deja de sondear la cola **para siempre**: la tarea siguiente nunca se drena, `busy` queda en `True`, todo queda deshabilitado y cerrar pide confirmar siempre. No encontré ningún disparador real (los textos de todos los códigos alcanzables reciben sus campos), así que es un endurecimiento | `test_the_window_keeps_polling_after_a_view_fails_on_an_event`: una vista cuyo `on_event` lanza `KeyError`; después, una tarea vacía queda «en curso» | Reprogramar el sondeo en un `finally` (o al principio de `_poll`) | `presentation/gui/app.py` | **Corregido**: el sondeo se reprograma aunque una vista falle; la prueba pasa |
+| QA7-02 | menor (RNF03) | Dos salidas pasaban los pasos 1 y 2 y solo fallaban al ejecutar (`STAGE_FAILED` en `export`, sin crear nada). La primera era un nombre de carpeta nueva de más de 255 caracteres, porque `is_valid_folder_name` no miraba la longitud. La segunda, una salida con `:` en Windows. **Corrección del informe** (señalada en la revisión): la prueba original construía `base / "o" / "a:b"`, que pathlib convierte en la ruta relativa a la unidad `a:b` (unidad A:), no en un flujo NTFS. El caso real del flujo es el texto `.../o/a:b`, y una unidad inexistente se comporta igual. La CLI tiene el mismo comportamiento con `--output-dir` | `test_a_new_folder_name_is_limited_to_255_utf8_bytes`, `test_an_output_with_a_colon_or_a_missing_drive_is_refused_at_step_1` | Rechazarlas en el paso 1 (`INVALID_FOLDER_NAME`), o aceptarlo como está | `application/services/inputs.py` | **Corregido**: límite de 255 bytes UTF-8 (`INVALID_FOLDER_NAME`); flujo NTFS, ruta relativa a una unidad y unidad inexistente → `INVALID_OUTPUT_PATH` en el paso 1 (`inputs.new_folders_valid`). Las pruebas pasan |
+| QA7-03 | menor (RNF03) | «Guardar tabla…» con una ruta que es una carpeta o cuyo padre no existe lanza un `OSError` crudo desde `save_mapping_file` (solo captura `FileExistsError` e `InvalidBuildInput`). La ventana lo muestra como `UNEXPECTED(<tipo>)` en la barra inferior, sin ruta. El diálogo de archivos casi nunca da esas rutas, pero un disco de solo lectura sí (`PermissionError`) | `test_saving_the_mapping_table` | Un código propio (p. ej. `MAPPING_FILE_IO`) | `presentation/gui/controller.py` | **Corregido**: `Check("MAPPING_FILE_UNWRITABLE")`; la prueba pasa |
+| QA7-04 | menor (RNF03) | En el paso 3, cambiar de idioma redibuja la tabla desde la última vista previa y **oculta las ediciones pendientes** (la celda vuelve al valor anterior). El estado (`state.mapping`) las conserva y «Siguiente» sigue deshabilitado hasta la próxima vista previa, que las muestra. Así que no hay pérdida de datos, pero la tabla engaña | `test_a_language_change_keeps_the_pending_mapping_edits_on_screen` | Volver a aplicar las ediciones pendientes al redibujar, o redibujar solo los encabezados | `presentation/gui/views/mapping_step.py` | **Corregido**; la prueba pasa |
+| QA7-05 | observación | La descripción de una clase puede empezar por `= + - @` (`AD==x`, `AD=@cmd`): `labels._check_classes` solo aplica los prefijos de fórmula al nombre. La descripción solo va a `labels.json`, nunca a una celda TSV o XLSX, así que no hay riesgo de inyección. Pero `MEMORY.md` §3 dice «clases (y descripciones) … sin inicio `= + - @`». Igual en la CLI (código congelado) | `test_hostile_classes` | Corregir la frase de `MEMORY.md`, o validar también la descripción | `MEMORY.md` | Documentado aquí |
+| QA7-06 | observación | Las rutas relativas escritas a mano (entrada, salida, carpeta del reporte) se resuelven contra la carpeta actual del proceso, que en un acceso directo o en el ejecutable portable (G9) puede ser cualquiera. El diálogo siempre da rutas absolutas | Revisión del código (`Path(texto)` sin `resolve` en `set_input` y `report_task`); sin prueba | Avisarlo en el manual, o exigir rutas absolutas en la GUI | `docs/user_manual/gui.md` | Documentado aquí |
+| QA7-07 | observación | Intermitencia de Tk en la suite completa: un `TclError` aislado en `test_gui_labels_batch.py::test_labels_view_batch_tools` (1 de 3 corridas) y una omisión de más en otra corrida, sin identificar | Ver la §2, «Intermitencias» | Aislar la causa: un `tk.Tk()` por prueba con `destroy` garantizado, o un fixture de sesión | `tests/unit/test_gui_*.py` | Mitigado: `tests/conftest.py` reintenta `tk.Tk()` ante ese error de carga (`docs/architecture/gui.md`) |
+| QA7-08 | menor (RNF01/RNF03) | Con árboles DICOM muy grandes, la vista previa del paso 3 tarda más de 10 minutos (ver la §3), y el paso 4 vuelve a leer todas las cabeceras. El manual solo dice «tarda minutos». La barra de progreso es indeterminada y no hay cancelación | Corrida real, §3 | Decir en el manual que puede tardar **más de 15 minutos** (recomendación del usuario), y quizá mostrar un contador de archivos leídos | `docs/user_manual/gui.md` | Documentado en el manual como límite conocido |
 
 ## 2. Qué se probó (pasa)
 
@@ -68,7 +68,7 @@ No hay bloqueantes.
 - **Intermitencias**: `tests/unit/test_gui_*.py`, la integración E7 (incluido su recorrido Tk), `test_qa7_gui.py` y
   `test_qa5_disk_space.py`, cinco veces seguidas: 178 pasan en las cinco (61 a 69 s cada una), sin fallos ni
   omisiones aisladas. La única omisión es la de enlaces simbólicos (sin privilegios en este Windows). La prueba de
-  la otra unidad de QA5 se omite ahora con un motivo cuando `tmp_path` está en `E:` (pedido de @orquestador).
+  la otra unidad de QA5 se omite ahora con un motivo cuando `tmp_path` está en `E:` (por decisión del proyecto).
   En la **suite completa**, tres corridas seguidas dieron:
   1. 1 fallo aislado: `test_gui_labels_batch.py::test_labels_view_batch_tools` con un `TclError` (6 min 36 s).
   2. Verde, con una omisión de más (3 en lugar de 2) que no se identificó porque la corrida no pedía `-rs`
@@ -76,15 +76,15 @@ No hay bloqueantes.
   3. Verde con las 2 omisiones habituales, las dos de enlaces simbólicos (4 min 38 s).
 
   La prueba del primer caso pasa sola, junto con `test_qa7_gui.py` y en las cinco repeticiones de las pruebas de
-  la GUI. Coincide con la intermitencia que anotó @gui (Tk compartido entre pruebas en el mismo proceso). Queda
-  como **QA7-07** (observación, dueño @gui): no se pudo reproducir ni aislar la causa.
+  la GUI. Coincide con la intermitencia que ya se había anotado (Tk compartido entre pruebas en el mismo proceso). Queda
+  como **QA7-07** (observación, módulo de la GUI): no se pudo reproducir ni aislar la causa.
 - **Humo de Tk con pantalla**: en este Windows hay pantalla, así que las pruebas Tk corrieron sin omitirse (la
-  ventana con `withdraw()`). Verlas a mano sigue siendo del humano.
+  ventana con `withdraw()`). Verlas a mano sigue siendo una verificación manual.
 
 ## 3. Corrida real acotada del controlador
 
 Se hizo con el controlador (sin Tk), como lo usa la ventana. La entrada fue `data/raw`, en modo solo lectura, y las
-salidas fueron a `E:/qa7_real`, borradas al terminar. Como no había una `MRI_ANON_KEY` del humano, se usó la clave
+salidas fueron a `E:/qa7_real`, borradas al terminar. Como no había una `MRI_ANON_KEY` del usuario, se usó la clave
 de sesión (`ensure_session_key`). La consola solo mostró conteos, códigos y tipos. Cada flujo recorrió los pasos
 1 a 6: espacio en disco, configuración, vista previa (DICOM y NIfTI), ejecución, carga de etiquetas, asignación
 en lote, aplicar, cerrar, dos juegos de exportes ML y un reporte. stderr quedó vacío en todas.
@@ -103,15 +103,15 @@ los textos y logs DEBUG. Solo aparecieron palabras genéricas que la herramienta
 archivo fijos, el manifiesto y los mensajes), ningún identificador. Una primera búsqueda por subcadenas dio falsos
 positivos: ids cortos de la entrada contenidos dentro de seudónimos hexadecimales.
 
-**Recomendación (pedida por el humano).** El manual debe decir que, con árboles DICOM muy grandes (decenas de miles
+**Recomendación.** El manual debe decir que, con árboles DICOM muy grandes (decenas de miles
 de archivos), una tarea puede tardar **más de 15 minutos** sin que la ventana se haya colgado. Afecta a la vista
 previa del paso 3 y a la ejecución del paso 4, que vuelve a leer todas las cabeceras antes de convertir. Hoy
 `docs/user_manual/gui.md` §6 solo dice «tarda minutos». Además, la barra de progreso es indeterminada y no hay
-cancelación: el usuario no sabe cuánto falta. Dueño: @gui.
+cancelación: el usuario no sabe cuánto falta. Módulo: GUI.
 
 ## 4. Pendiente y no verificado
 
-- **Verificaciones manuales del humano** (las del plan): recorrer la ventana con un BIDS y un DICOM reales; revisar
+- **Verificaciones manuales** (las del plan): recorrer la ventana con un BIDS y un DICOM reales; revisar
   el aspecto y la usabilidad; `pytest` en Linux (las pruebas de uniones y de `:` se omiten allí); leer el manual.
 - **No probado**:
   - El cierre durante una vista previa DICOM grande o durante el reporte (mismo hilo daemon que la ejecución;
