@@ -110,6 +110,19 @@ mri-dataset-gui
 python -m pytest
 ```
 
+## Troubleshooting
+
+| Problem | Cause and fix |
+|---|---|
+| `error: externally-managed-environment` (Arch, CachyOS, Debian 12+, Ubuntu 23.04+) | The system Python refuses `pip install` outside a virtual environment. Create and activate one first: `python -m venv .venv`, then `source .venv/bin/activate` (the prompt starts with `(.venv)`). Repeat the `source` in every new terminal. Do not use `--break-system-packages`. To only use the program, `pipx install .` or `uv tool install .` also work (not verified yet). |
+| `requires a different Python` or `No matching distribution` | The project needs Python 3.14 or newer (`python --version`). Install it with `uv venv --python 3.14` or `pyenv`, or from python.org on Windows. |
+| `ModuleNotFoundError: No module named 'tkinter'` or the window does not open (`TclError`) | Tkinter is a system package on Linux: Debian/Ubuntu `python3-tk`, Fedora `python3-tkinter`, Arch/CachyOS `tk`. The GUI also needs a graphical session. On Windows, reinstall Python with "tcl/tk and IDLE" checked. |
+| `.venv` copied from another operating system does not work | A virtual environment is not portable between Windows and Linux. Delete it (`rm -rf .venv`) and create it again. |
+| `fish` does not accept `source .venv/bin/activate` | Use `source .venv/bin/activate.fish`. |
+| "Anonymization key is not set or too short" in the command line | Set `MRI_ANON_KEY` to at least 32 characters (`export MRI_ANON_KEY=...`). The GUI creates a session key by itself. |
+| "Open output folder" does nothing on Linux, or the font is not Verdana | Install `xdg-utils` and a DejaVu font package (`fonts-dejavu` on Debian/Ubuntu). |
+| Windows executable: SmartScreen warning, `Failed to load Python DLL` | Click "More info" then "Run anyway" (the executable is not signed). Unzip it in a short path such as `C:\MRI-Dataset-Tool`: very deep folders exceed the 260-character limit. See `docs/user_manual/gui.md`. |
+
 ## Documentation
 
 - [Functional requirements](/docs/requierments/functional_requierments.md)
@@ -286,6 +299,19 @@ mri-dataset-gui
 ```bash
 python -m pytest
 ```
+
+## Solución de problemas
+
+| Problema | Causa y solución |
+|---|---|
+| `error: externally-managed-environment` (Arch, CachyOS, Debian 12+, Ubuntu 23.04+) | El Python del sistema no permite `pip install` fuera de un entorno virtual. Crea y activa uno antes: `python -m venv .venv` y luego `source .venv/bin/activate` (el prompt empieza con `(.venv)`). Repite el `source` en cada terminal nueva. No uses `--break-system-packages`. Si solo quieres usar el programa, también sirven `pipx install .` o `uv tool install .` (aún sin verificar). |
+| `requires a different Python` o `No matching distribution` | El proyecto necesita Python 3.14 o superior (`python --version`). Instálalo con `uv venv --python 3.14` o `pyenv`, o desde python.org en Windows. |
+| `ModuleNotFoundError: No module named 'tkinter'` o la ventana no abre (`TclError`) | En Linux, Tkinter es un paquete del sistema: Debian/Ubuntu `python3-tk`, Fedora `python3-tkinter`, Arch/CachyOS `tk`. La GUI también necesita una sesión gráfica. En Windows, reinstala Python con «tcl/tk and IDLE» marcado. |
+| Un `.venv` copiado de otro sistema operativo no funciona | Un entorno virtual no es portable entre Windows y Linux. Bórralo (`rm -rf .venv`) y créalo de nuevo. |
+| `fish` no acepta `source .venv/bin/activate` | Usa `source .venv/bin/activate.fish`. |
+| «Anonymization key is not set or too short» en la línea de comandos | Define `MRI_ANON_KEY` con al menos 32 caracteres (`export MRI_ANON_KEY=...`). La GUI crea una clave de sesión por sí sola. |
+| «Abrir la carpeta de salida» no hace nada en Linux, o la letra no es Verdana | Instala `xdg-utils` y un paquete de fuentes DejaVu (`fonts-dejavu` en Debian/Ubuntu). |
+| Ejecutable de Windows: aviso de SmartScreen, `Failed to load Python DLL` | Pulsa «Más información» y «Ejecutar de todas formas» (el ejecutable no está firmado). Descomprímelo en una ruta corta como `C:\MRI-Dataset-Tool`: las carpetas muy profundas superan el límite de 260 caracteres. Ver `docs/user_manual/gui.md`. |
 
 ## Documentación
 
