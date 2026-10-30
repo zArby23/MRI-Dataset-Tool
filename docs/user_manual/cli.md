@@ -414,7 +414,7 @@ pipeline:
 
 ## 8. Límites conocidos
 
-- No hay interfaz gráfica ni revisión interactiva de etiquetas: la revisión es por archivos.
+- La CLI no tiene revisión interactiva de etiquetas: la revisión es por archivos (o con la tabla de etiquetas de la GUI, `docs/user_manual/gui.md`).
 - `inspect --format dicom` solo lee cabeceras (sin intensidades).
 - `nifti-to-dicom` rechaza volúmenes 4D; el DICOM escrito no es conforme estricto al IOD MR (`docs/dicom/writer.md`).
 - La anonimización no borra caras ni texto quemado en los píxeles y conserva cuasi-identificadores

@@ -57,7 +57,7 @@ Guía para sustentar el proyecto: por cada bloque, qué hace, por qué se diseñ
 
 ## 11. Línea de comandos
 - **Qué:** `mri-dataset` (`argparse`) con un subcomando por caso de uso; cada comando valida, llama a un servicio y muestra conteos. La orquestación de los scripts se extrajo a `pipeline_run` y `dataset_build`, con eventos de estado y excepciones tipadas (`StageFailed`, `InvalidBuildInput`). (`docs/architecture/cli.md`)
-- **Por qué:** sin lógica de negocio en la presentación, la futura GUI reutilizará los mismos servicios. Los códigos 0/1/2 se deciden por tipo de excepción, no comparando mensajes. Toda la validación ocurre antes de crear nada, así un error no deja salidas a medias.
+- **Por qué:** sin lógica de negocio en la presentación, la GUI reutiliza los mismos servicios. Los códigos 0/1/2 se deciden por tipo de excepción, no comparando mensajes. Toda la validación ocurre antes de crear nada, así un error no deja salidas a medias.
 - **Límites declarados:** la consola no muestra rutas (el usuario ya conoce las que pasó). Los errores de `argparse` repiten lo tecleado. Las rutas de la configuración son relativas al directorio actual. `--verify` es opcional porque duplica el tiempo.
 - **Descartado:** duplicar la orquestación de los scripts en la CLI, hacer importable `scripts/` y añadir dependencias como `click` o `typer` (RNF12).
 

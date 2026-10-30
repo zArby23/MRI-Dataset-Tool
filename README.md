@@ -146,11 +146,11 @@ mri-dataset dataset build data/samples/bids_test_studies \
 |---|---|
 | Requirements | [Functional](/docs/requierments/functional_requierments.md) · [Non-functional](/docs/requierments/non_functional_requirements.md) |
 | User manuals | [GUI](/docs/user_manual/gui.md) · [Command line](/docs/user_manual/cli.md) |
-| Architecture | [Pipeline](/docs/architecture/pipeline.md) · [Configuration](/docs/architecture/config.md) · [GUI](/docs/architecture/gui.md) · [Command line](/docs/architecture/cli.md) · [Design decisions](/docs/architecture/design_decisions.md) |
-| Formats | [NIfTI](/docs/nifti/nifti.md) · [DICOM conversion](/docs/dicom/conversion.md) · [BIDS sidecars](/docs/bids/sidecar_inheritance.md) |
+| Architecture | [Overview](/docs/architecture/overview.md) · [Pipeline](/docs/architecture/pipeline.md) · [Configuration](/docs/architecture/config.md) · [GUI](/docs/architecture/gui.md) · [Command line](/docs/architecture/cli.md) · [Design decisions](/docs/architecture/design_decisions.md) |
+| Formats | [NIfTI](/docs/nifti/nifti.md) · [DICOM conversion](/docs/dicom/conversion.md) · [BIDS readers](/docs/bids/reader.md) and [sidecars](/docs/bids/sidecar_inheritance.md) |
 | Processing and anonymization | [Geometry](/docs/processing/geometry.md) · [Intensity](/docs/processing/intensity.md) · [Anonymization policy](/docs/anonymization/policy.md) |
 | Dataset | [Structure](/docs/dataset/structure.md) · [Unified input](/docs/dataset/ingest.md) · [Labels](/docs/dataset/labels.md) · [ML exports](/docs/dataset/export.md) · [Report](/docs/dataset/report.md) |
-| Quality audits | [Stage 3](/docs/testing/qa_etapa3.md) · [Stage 9: Windows bundle](/docs/testing/qa_etapa9.md) |
+| Tests and quality audits | [Test guide](/docs/testing/README.md) · [Stage 3](/docs/testing/qa_etapa3.md) · [Stage 9: Windows bundle](/docs/testing/qa_etapa9.md) · [Index of all docs](/docs/README.md) |
 
 ## Status
 
@@ -331,11 +331,11 @@ mri-dataset dataset build data/samples/bids_test_studies \
 |---|---|
 | Requisitos | [Funcionales](/docs/requierments/functional_requierments.md) · [No funcionales](/docs/requierments/non_functional_requirements.md) |
 | Manuales de usuario | [GUI](/docs/user_manual/gui.md) · [Línea de comandos](/docs/user_manual/cli.md) |
-| Arquitectura | [Pipeline](/docs/architecture/pipeline.md) · [Configuración](/docs/architecture/config.md) · [GUI](/docs/architecture/gui.md) · [Línea de comandos](/docs/architecture/cli.md) · [Decisiones de diseño](/docs/architecture/design_decisions.md) |
-| Formatos | [NIfTI](/docs/nifti/nifti.md) · [Conversión DICOM](/docs/dicom/conversion.md) · [Sidecars BIDS](/docs/bids/sidecar_inheritance.md) |
+| Arquitectura | [Visión general](/docs/architecture/overview.md) · [Pipeline](/docs/architecture/pipeline.md) · [Configuración](/docs/architecture/config.md) · [GUI](/docs/architecture/gui.md) · [Línea de comandos](/docs/architecture/cli.md) · [Decisiones de diseño](/docs/architecture/design_decisions.md) |
+| Formatos | [NIfTI](/docs/nifti/nifti.md) · [Conversión DICOM](/docs/dicom/conversion.md) · [Lectores BIDS](/docs/bids/reader.md) y [sidecars](/docs/bids/sidecar_inheritance.md) |
 | Procesamiento y anonimización | [Geometría](/docs/processing/geometry.md) · [Intensidad](/docs/processing/intensity.md) · [Política de anonimización](/docs/anonymization/policy.md) |
 | Dataset | [Estructura](/docs/dataset/structure.md) · [Entrada unificada](/docs/dataset/ingest.md) · [Etiquetas](/docs/dataset/labels.md) · [Exportes para ML](/docs/dataset/export.md) · [Reporte](/docs/dataset/report.md) |
-| Auditorías de calidad | [Etapa 3](/docs/testing/qa_etapa3.md) · [Etapa 9: bundle de Windows](/docs/testing/qa_etapa9.md) |
+| Pruebas y auditorías de calidad | [Guía de pruebas](/docs/testing/README.md) · [Etapa 3](/docs/testing/qa_etapa3.md) · [Etapa 9: bundle de Windows](/docs/testing/qa_etapa9.md) · [Índice de toda la documentación](/docs/README.md) |
 
 ## Estado
 

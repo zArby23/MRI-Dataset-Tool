@@ -1,5 +1,7 @@
 # Lanzador de la etapa 4 (`scripts/run_stage4_dataset.py`)
 
+> Este script es un envoltorio fino que quedó superado por `mri-dataset dataset build` (ver `docs/user_manual/cli.md`). Se conserva como verificación manual de extremo a extremo.
+
 Verificación manual de extremo a extremo: entrada BIDS → pipeline de la etapa 3 → dataset BIDS,
 etiquetas, exportaciones para ML/DL y reporte. Solo llama servicios de `application/`.
 
