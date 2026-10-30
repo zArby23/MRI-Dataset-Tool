@@ -57,6 +57,10 @@ Cada informe es una instantánea de su fecha: describe lo que se encontró y su 
 | [`qa_etapa8.md`](qa_etapa8.md) | Aspecto visual de la GUI. |
 | [`qa_etapa9.md`](qa_etapa9.md) | Ejecutable portable de Windows. |
 
+## Rendimiento
+
+Los tiempos y el pico de memoria de la línea de comandos sobre las muestras y sobre datos reales grandes están en [`rendimiento.md`](rendimiento.md) (RNF01).
+
 ## Verificaciones manuales
 
 Las pruebas automáticas no sustituyen estas, que se hacen a mano: abrir un volumen convertido en un visor, el recorrido de la
