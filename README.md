@@ -49,7 +49,7 @@ System requirements (not installed by pip):
 
 - **Windows:** Python 3.14 from python.org (64-bit). Tkinter (the GUI) is included in the standard installer; leave "tcl/tk and IDLE" checked.
 - **Linux:** Python 3.14 with `venv`, plus the Tkinter package of your distribution (needed only for `mri-dataset-gui`): Debian/Ubuntu `sudo apt install python3-tk`, Fedora `sudo dnf install python3-tkinter`, Arch `sudo pacman -S tk`. If your distribution does not ship Python 3.14, install it with `pyenv` or `uv`, making sure Tk is available when it is built. The wheels of `numpy`, `scipy` and the others come from PyPI; a C compiler should not be needed. A desktop session (X11 or Wayland) is required for the GUI; the command line (`mri-dataset`) works without it.
-- **Linux status:** the project is designed for Windows and Linux, but it has only been run and tested on Windows so far; report any problem you find on Linux.
+- **Linux status:** the GUI and the command line have been run by hand on Linux (CachyOS, from source) with the public samples; report any problem you find on other distributions.
 - All outputs of real runs need free disk space: the tool warns when the estimate reaches 90 % of the free space.
 
 ## Installation
@@ -167,7 +167,7 @@ In development. Stages 1 to 4 (loading, conversion, pipeline, processing, anonym
 - Stages 3 to 5A were audited with synthetic data and with the local test datasets; the command line has its own adversarial audit and end-to-end integration tests.
 - The unified input (DICOM and loose NIfTI) has integration tests but no independent adversarial audit yet.
 - The NIfTI output was checked in a viewer.
-- Still pending: runs on Linux and with compressed DICOM.
+- Still pending: runs with compressed DICOM.
 
 **Limits**
 - Anonymization does not remove faces or text burned into the pixels.
@@ -178,7 +178,7 @@ In development. Stages 1 to 4 (loading, conversion, pipeline, processing, anonym
 - The exported dataset has no `.bval`/`.bvec` for `dwi` and no `EchoTime1/2` for `phasediff`: the official BIDS validator will flag them.
 - Labels are assigned through files, the `--mapping` table or the label table of the GUI (with batch tools).
 - The GUI generates a new anonymization key per session unless `MRI_ANON_KEY` is set: pseudonyms change between sessions and datasets from different sessions must not be combined.
-- The GUI reads the display scale at startup: reopen the program after changing it. It has not been checked on Linux yet.
+- The GUI reads the display scale at startup: reopen the program after changing it.
 - With very large DICOM trees the GUI preview and run steps can take more than 15 minutes, without cancellation.
 - The BIDS suffix of DICOM and loose NIfTI series is deduced with conservative rules: doubtful series are skipped with a warning and can be fixed with the `--mapping` table.
 - Files that are git-annex pointers without downloaded content are skipped as unreadable.
@@ -239,7 +239,7 @@ Requisitos del sistema (pip no los instala):
 
 - **Windows:** Python 3.14 de python.org (64 bits). Tkinter (la GUI) viene en el instalador estándar; deja marcado «tcl/tk and IDLE».
 - **Linux:** Python 3.14 con `venv`, más el paquete de Tkinter de tu distribución (solo para `mri-dataset-gui`): Debian/Ubuntu `sudo apt install python3-tk`, Fedora `sudo dnf install python3-tkinter`, Arch `sudo pacman -S tk`. Si tu distribución no trae Python 3.14, instálalo con `pyenv` o `uv` y asegúrate de que Tk esté disponible al compilarlo. Las ruedas de `numpy`, `scipy` y las demás vienen de PyPI; no debería hacer falta un compilador de C. La GUI necesita una sesión de escritorio (X11 o Wayland); la línea de comandos (`mri-dataset`) funciona sin ella.
-- **Estado en Linux:** el proyecto está pensado para Windows y Linux, pero hasta ahora solo se ha ejecutado y probado en Windows; avisa de cualquier problema que encuentres en Linux.
+- **Estado en Linux:** la GUI y la línea de comandos se han ejecutado a mano en Linux (CachyOS, desde el código fuente) con las muestras públicas; avisa de cualquier problema que encuentres en otras distribuciones.
 - Las salidas de corridas reales necesitan espacio libre en disco: la herramienta avisa cuando la estimación alcanza el 90 % del espacio libre.
 
 ## Instalación
@@ -356,7 +356,7 @@ En desarrollo. Las etapas 1 a 4 (carga, conversión, pipeline, procesamiento, an
 - Las etapas 3 a 5A se auditaron con datos sintéticos y con los datasets locales de prueba; la línea de comandos tiene su propia auditoría adversarial y pruebas de integración de punta a punta.
 - La entrada unificada (DICOM y NIfTI sueltos) tiene pruebas de integración pero todavía no una auditoría adversarial independiente.
 - La salida NIfTI se revisó en un visor.
-- Siguen pendientes las corridas en Linux y con DICOM comprimido.
+- Siguen pendientes las corridas con DICOM comprimido.
 
 **Límites**
 - La anonimización no borra caras ni texto quemado en los píxeles.
@@ -369,7 +369,7 @@ En desarrollo. Las etapas 1 a 4 (carga, conversión, pipeline, procesamiento, an
 - El sufijo BIDS de las series DICOM y NIfTI sueltas se deduce con reglas conservadoras: las series dudosas se omiten con un aviso y se corrigen con la tabla `--mapping`.
 - Los archivos que son punteros de git-annex sin contenido descargado se omiten como ilegibles.
 - La GUI genera una clave de anonimización nueva por sesión salvo que `MRI_ANON_KEY` esté definida: los seudónimos cambian entre sesiones y los datasets de sesiones distintas no deben combinarse.
-- La GUI lee la escala de pantalla al arrancar: reábrela tras cambiarla. Todavía no se ha probado en Linux.
+- La GUI lee la escala de pantalla al arrancar: reábrela tras cambiarla.
 - Con árboles DICOM muy grandes, la vista previa y la ejecución de la GUI pueden tardar más de 15 minutos, sin cancelación.
 
 **Todavía no implementado**

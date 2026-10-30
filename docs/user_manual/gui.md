@@ -9,7 +9,7 @@ rutas que aparecen son las que usted elige y, en la tabla de mapeo (paso 3), las
 entrada.
 
 > Estado: en desarrollo. Las pruebas automáticas usan datos sintéticos. **Pendiente de verificación manual:**
-> el recorrido completo con datos reales, la escala de pantalla real de Windows (125 y 150 %) y la ventana en Linux.
+> el recorrido completo con datos reales, la escala de pantalla real de Windows (125 y 150 %).
 
 ## 1. Instalación y lanzamiento
 

@@ -349,7 +349,7 @@ igual y, tras el último intento, el error original. En las corridas completas a
 ## Límites conocidos
 
 - La barra de título y los selectores de archivos y carpetas son los del sistema: con el tema oscuro siguen claros.
-- La escala real de Windows (125 y 150 %) y la ventana en Linux están pendientes de verificación manual; las
+- La escala real de Windows (125 y 150 %) está pendiente de verificación manual; las
   pruebas simulan la escala.
 - Tabla de mapeo con miles de series: cambiar a mano el ancho de la columna de rutas tarda unos segundos.
 - Sin cancelación de tareas: los servicios no son cancelables.
