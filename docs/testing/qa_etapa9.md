@@ -1,8 +1,8 @@
 # QA9: auditoría del ejecutable portable de Windows (etapa 5D)
 
-Esta auditoría se hizo el 2026-10-30 sobre la rama `etapa-5d-exe` (P1 `0337eba`, P2 `1a4cd51`, con P3 terminada).
-El objeto auditado es el bundle de P2: la carpeta `onedir` `MRI-Dataset-Tool/` (136 MB) y su `.zip` (58 MB), que
-se compilaron con `packaging/build_exe.py` (PyInstaller 6.22.3, Python 3.14.4). El recorrido de P3
+Esta auditoría se hizo el 2026-10-30 sobre la rama `etapa-5d-exe` (commits `0337eba` y `1a4cd51`).
+El objeto auditado es el primer bundle compilado: la carpeta `onedir` `MRI-Dataset-Tool/` (136 MB) y su `.zip` (58 MB), que
+se compilaron con `packaging/build_exe.py` (PyInstaller 6.22.3, Python 3.14.4). El recorrido con el bundle
 (`walk.py`/`compare.py`, fuera del repositorio) no se repite: se reutiliza y se amplía.
 
 Pruebas en `tests/qa/test_qa9_bundle.py`. Hay dos pruebas que siempre se ejecutan: usan `monkeypatch` para simular
@@ -19,8 +19,8 @@ Las sondas exploratorias no forman parte de la suite y están en `E:/mri_qa9/too
 QA no tocó código de producción. Todos los valores son sintéticos y no se usaron datos reales. Las compilaciones y
 los temporales están en `E:/mri_qa9/`.
 
-Resultado: `test_qa9_bundle.py` con el bundle de P2 da 5 passed; sin el bundle, 2 passed y 3 skipped. Junto con
-`tests/unit/test_service_inputs.py` dan 44 passed. La suite completa no la corrí yo: la corre @orquestador.
+Resultado: `test_qa9_bundle.py` con el bundle da 5 passed; sin el bundle, 2 passed y 3 skipped. Junto con
+`tests/unit/test_service_inputs.py` dan 44 passed. La suite completa no se corrió en esta auditoría.
 
 ## 1. Hallazgos
 
@@ -107,7 +107,7 @@ No hay bloqueantes.
 - El recorrido congelado solo usó BIDS. DICOM y NIfTI comparten los mismos servicios y la revisión estática no
   encontró escrituras en otros sitios, pero no lo ejecuté.
 - La sonda congelada no es el binario distribuido: es la misma compilación con otra entrada y con consola. El exe
-  distribuido solo se probó al arrancar y al cerrar, porque sus clics los hace el humano.
+  distribuido solo se probó al arrancar y al cerrar, porque los clics quedan para la verificación manual.
 
 ## 4. Verificaciones manuales pendientes (humano)
 
